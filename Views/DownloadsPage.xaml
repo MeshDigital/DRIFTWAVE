@@ -39,7 +39,8 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Size (KB)" Binding="{Binding Track.Size, StringFormat={}{0:N0}}" Width="100"/>
+                <DataGridTextColumn Header="Size (MB)" Binding="{Binding SizeInMb, StringFormat={}{0:F2}}" Width="100"/>
+                <DataGridTextColumn Header="Elapsed" Binding="{Binding ElapsedTime, StringFormat='hh\\:mm\\:ss'}" Width="100"/>
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

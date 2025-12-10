@@ -61,7 +61,7 @@ public class SoulseekAdapter : IDisposable
         IEnumerable<string>? formatFilter,
         (int? Min, int? Max) bitrateFilter,
         DownloadMode mode, // Add DownloadMode parameter
-        Action<Track> onTrackFound,
+        Action<IEnumerable<Track>> onTracksFound,
         CancellationToken ct = default)
     {
         if (_client == null)
@@ -94,12 +94,14 @@ public class SoulseekAdapter : IDisposable
             // For Album mode, we'll collect directories to evaluate later.
             var directories = new ConcurrentDictionary<string, List<Soulseek.File>>();
 
-            var searchResult = await _client.SearchAsync(
+            var searchResult = await _client!.SearchAsync(
                 searchQuery,
                 (response) =>
                 {
                     _logger.LogDebug("Received response from {User} with {Count} files", response.Username, response.Files.Count());
                     
+                    var foundTracksInResponse = new List<Track>();
+
                     // Process each search response
                     foreach (var file in response.Files)
                     {
@@ -151,10 +153,13 @@ public class SoulseekAdapter : IDisposable
                             {
                                 _logger.LogInformation("[ACCEPT] Track passed filters: {Artist} - {Title} ({Bitrate} kbps, {Ext})", track.Artist, track.Title, track.Bitrate, extension);
                             }
-                            onTrackFound(track);
+                            foundTracksInResponse.Add(track);
                             resultCount++;
                         }
                     }
+
+                    if (foundTracksInResponse.Any())
+                        onTracksFound(foundTracksInResponse);
                 },
                 options: options,
                 cancellationToken: ct
@@ -248,10 +253,7 @@ public class SoulseekAdapter : IDisposable
             if (directory != null)
                 System.IO.Directory.CreateDirectory(directory);
 
-            // Use Soulseek.NET's DownloadAsync which returns byte array
-            // We need to track progress and write to file
-            using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, useAsync: true);
-            
+            // Use Soulseek.NET's DownloadAsync with stream factory
             var downloadOptions = new TransferOptions(
                 stateChanged: (args) =>
                 {
@@ -265,16 +267,17 @@ public class SoulseekAdapter : IDisposable
                     }
                 });
 
-            var data = await this._client.DownloadAsync(
-                username: username,
-                filename: filename,
-                size: size,
+            using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, useAsync: true);
+            
+            // DownloadAsync signature: (username, filename, streamFactory, size, startOffset, options, cancellationToken)
+            await this._client.DownloadAsync(
+                username,
+                filename,
+                () => Task.FromResult((Stream)fileStream),
+                size,
+                startOffset: 0,
                 options: downloadOptions,
                 cancellationToken: ct);
-
-            // Write the downloaded data to file
-            await fileStream.WriteAsync(data, 0, data.Length, ct);
-            await fileStream.FlushAsync(ct);
 
             this._logger.LogInformation("Download completed: {Filename}", filename);
             progress?.Report(1.0);

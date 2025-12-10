@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using SLSKDONET.Configuration;
 using SLSKDONET.Models;
 
@@ -17,7 +18,8 @@ public class DownloadManager : IDisposable
     private readonly FileNameFormatter _fileNameFormatter;
     private readonly ConcurrentDictionary<string, DownloadJob> _jobs = new();
     private readonly SemaphoreSlim _concurrencySemaphore;
-    private CancellationTokenSource? _cts;
+    private readonly Channel<DownloadJob> _jobChannel;
+    private CancellationTokenSource _cts = new();
 
     public event EventHandler<DownloadJob>? JobUpdated;
     public event EventHandler<DownloadJob>? JobCompleted;
@@ -33,6 +35,7 @@ public class DownloadManager : IDisposable
         _soulseek = soulseek;
         _fileNameFormatter = fileNameFormatter;
         _concurrencySemaphore = new SemaphoreSlim(_config.MaxConcurrentDownloads);
+        _jobChannel = Channel.CreateUnbounded<DownloadJob>();
     }
 
     /// <summary>
@@ -51,43 +54,46 @@ public class DownloadManager : IDisposable
 
         _jobs.TryAdd(job.Id, job);
         _logger.LogInformation("Enqueued download: {TrackId}", job.Id);
+        
+        // Post the job to the channel for processing
+        _jobChannel.Writer.TryWrite(job);
 
         return job;
     }
 
     /// <summary>
-    /// Starts processing all enqueued downloads.
+    /// Starts the long-running task that processes jobs from the channel.
     /// </summary>
     public async Task StartAsync(CancellationToken ct = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var pendingJobs = _jobs.Values.Where(j => j.State == DownloadState.Pending).ToList();
-
-        _logger.LogInformation("Starting download of {Count} items", pendingJobs.Count);
-
-        var downloadTasks = pendingJobs.Select(job =>
-            ProcessJobAsync(job, _cts.Token)
-        ).ToList();
+        _logger.LogInformation("Download manager started. Waiting for jobs...");
 
         try
         {
-            await Task.WhenAll(downloadTasks);
+            // Continuously read from the channel until it's completed.
+            await foreach (var job in _jobChannel.Reader.ReadAllAsync(_cts.Token))
+            {
+                // Don't wait for the job to finish, just start it.
+                // The semaphore will limit concurrency.
+                _ = ProcessJobAsync(job, _cts.Token);
+            }
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Download processing cancelled");
+            _logger.LogInformation("Download manager processing loop cancelled.");
         }
+        _logger.LogInformation("Download manager stopped.");
     }
 
     /// <summary>
     /// Processes a single download job.
     /// </summary>
     private async Task ProcessJobAsync(DownloadJob job, CancellationToken ct)
-    {
+    {        
         await _concurrencySemaphore.WaitAsync(ct);
         try
         {
-
             // Download the file
             var progress = new Progress<double>(p =>
             {
@@ -144,7 +150,12 @@ public class DownloadManager : IDisposable
     public void CancelAll()
     {
         _logger.LogInformation("Cancelling all downloads");
-        _cts?.Cancel();
+        if (!_cts.IsCancellationRequested)
+        {
+            _cts.Cancel();
+        }
+        // Complete the channel to stop the processing loop.
+        _jobChannel.Writer.TryComplete();
     }
 
     /// <summary>
@@ -176,6 +187,7 @@ public class DownloadManager : IDisposable
     public void Dispose()
     {
         _cts?.Dispose();
+        _jobChannel.Writer.TryComplete();
         _concurrencySemaphore?.Dispose();
     }
 }

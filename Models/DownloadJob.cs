@@ -32,6 +32,14 @@ public class DownloadJob : INotifyPropertyChanged
         set => SetProperty(ref _bytesDownloaded, value);
     }
 
+    private double? _speedBps; // Speed in Bytes per second
+    public double? SpeedBps
+    {
+        get => _speedBps;
+        set => SetProperty(ref _speedBps, value);
+    }
+
+
     public string? OutputPath { get; set; }
 
     private string? _errorMessage;
@@ -59,6 +67,8 @@ public class DownloadJob : INotifyPropertyChanged
 
     public TimeSpan? ElapsedTime => 
         (CompletedAt ?? DateTime.UtcNow) - (StartedAt ?? CreatedAt);
+
+    public double? SizeInMb => Track.Size.HasValue ? (double)Track.Size.Value / 1024 / 1024 : null;
 
     public override string ToString()
     {

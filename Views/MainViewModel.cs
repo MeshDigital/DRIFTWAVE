@@ -418,24 +418,45 @@ public class MainViewModel : INotifyPropertyChanged
             _logger.LogInformation("Bitrate filter: Min={Min}, Max={Max}", MinBitrate, MaxBitrate);
 
             SearchResults.Clear();
-            var resultCount = 0;
-
-            var actualCount = await _soulseek.SearchAsync(normalizedQuery, formatFilter, (MinBitrate, MaxBitrate), DownloadMode.Normal, track =>
+            var resultsBuffer = new ConcurrentBag<Track>();
+            
+            // Use a timer to batch UI updates
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+            var batchUpdateTask = Task.Run(async () =>
             {
-                // This callback is executed for each found track.
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                while (await timer.WaitForNextTickAsync(_searchCts.Token))
                 {
-                    SearchResults.Add(track);
-                    resultCount++;
-                    if (resultCount % 10 == 0) // Log every 10 results
+                    if (!resultsBuffer.IsEmpty)
                     {
-                        _logger.LogInformation("Received {Count} results so far...", resultCount);
+                        var batch = new List<Track>();
+                        while(resultsBuffer.TryTake(out var track))
+                        {
+                            batch.Add(track);
+                        }
+
+                        if (batch.Any())
+                        {
+                            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                foreach (var track in batch)
+                                {
+                                    SearchResults.Add(track);
+                                }
+                                StatusText = $"Searching... {SearchResults.Count} found.";
+                            });
+                        }
                     }
-                });
+                }
+            }, _searchCts.Token);
+
+            var actualCount = await _soulseek.SearchAsync(normalizedQuery, formatFilter, (MinBitrate, MaxBitrate), DownloadMode.Normal, tracks =>
+            {
+                foreach(var track in tracks) resultsBuffer.Add(track);
             }, _searchCts.Token);
             
             StatusText = $"Found {actualCount} results";
             _logger.LogInformation("Search completed with {Count} results", actualCount);
+            await batchUpdateTask; // Allow any final batch to complete
         }
         catch (OperationCanceledException)
         {
@@ -584,21 +605,55 @@ public class MainViewModel : INotifyPropertyChanged
         });
 
         var formatFilter = PreferredFormats.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var resultsBuffer = new ConcurrentBag<Track>();
 
         try
         {
+            // Use a timer to batch UI updates
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+            var batchUpdateTask = Task.Run(async () =>
+            {
+                while (await timer.WaitForNextTickAsync(_searchCts.Token))
+                {
+                    if (!resultsBuffer.IsEmpty)
+                    {
+                        var batch = new List<Track>();
+                        while (resultsBuffer.TryTake(out var track))
+                        {
+                            batch.Add(track);
+                        }
+
+                        if (batch.Any())
+                        {
+                            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                foreach (var track in batch)
+                                {
+                                    SearchResults.Add(track);
+                                }
+                                StatusText = $"Searching... {SearchResults.Count} found.";
+                            });
+                        }
+                    }
+                }
+            }, _searchCts.Token);
+
             var totalFound = 0;
             await Parallel.ForEachAsync(ImportedQueries, new ParallelOptions { MaxDegreeOfParallelism = 4 }, async (query, ct) =>
             {
-                var resultCount = await _soulseek.SearchAsync(query.ToString(), formatFilter, (MinBitrate, MaxBitrate), DownloadMode.Normal, track =>
+                var resultCount = await _soulseek.SearchAsync(query.ToString(), formatFilter, (MinBitrate, MaxBitrate), DownloadMode.Normal, tracks =>
                 {
-                    // This callback is executed for each found track.
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => SearchResults.Add(track));
-                }, ct); // Pass the token here
+                    // Add batches of tracks to the buffer
+                    foreach (var track in tracks)
+                    {
+                        resultsBuffer.Add(track);
+                    }
+                }, ct);
                 Interlocked.Add(ref totalFound, resultCount);
             });
 
             StatusText = $"Found {totalFound} total results from {ImportedQueries.Count} imported queries.";
+            await batchUpdateTask; // Allow any final batch to complete
         }
         catch (Exception ex)
         {
