@@ -236,8 +236,8 @@ public class SoulseekAdapter : IDisposable
         string username,
         string filename,
         string outputPath,
-        long? size,
-        IProgress<double> progress,
+        long? size = null,
+        IProgress<double>? progress = null,
         CancellationToken ct = default)
     {
         if (this._client == null)
@@ -248,6 +248,9 @@ public class SoulseekAdapter : IDisposable
         try
         {
             this._logger.LogInformation("Downloading {Filename} from {Username} to {OutputPath}", filename, username, outputPath);
+            
+            // Check if already cancelled
+            ct.ThrowIfCancellationRequested();
 
             var directory = Path.GetDirectoryName(outputPath);
             if (directory != null)
@@ -288,6 +291,25 @@ public class SoulseekAdapter : IDisposable
         {
             this._logger.LogWarning("Download cancelled: {Filename}", filename);
             this.EventBus.OnNext(("transfer_cancelled", new { filename, username }));
+            throw; // Re-throw to let caller know it was cancelled
+        }
+        catch (TimeoutException ex)
+        {
+            this._logger.LogWarning("Download timeout: {Filename} from {Username} - {Message}", filename, username, ex.Message);
+            this.EventBus.OnNext(("transfer_failed", new { filename, username, error = "Connection timeout" }));
+            return false;
+        }
+        catch (IOException ex)
+        {
+            this._logger.LogError(ex, "I/O error during download: {Filename} from {Username}", filename, username);
+            this.EventBus.OnNext(("transfer_failed", new { filename, username, error = "I/O error: " + ex.Message }));
+            return false;
+        }
+        catch (Exception ex) when (ex.Message.Contains("refused") || ex.Message.Contains("aborted") || ex.Message.Contains("Unable to read"))
+        {
+            // Network-related errors - log as warning, not error
+            this._logger.LogWarning("Network error during download: {Filename} from {Username} - {Message}", filename, username, ex.Message);
+            this.EventBus.OnNext(("transfer_failed", new { filename, username, error = "Connection failed" }));
             return false;
         }
         catch (Exception ex)

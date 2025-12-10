@@ -109,8 +109,16 @@ public class MainViewModel : INotifyPropertyChanged
         PreferredFormats = string.Join(",", _config.PreferredFormats ?? new List<string> { "mp3", "flac" });
         CheckForDuplicates = _config.CheckForDuplicates;
         RememberPassword = _config.RememberPassword;
-        SpotifyClientId = _config.SpotifyClientId;
-        SpotifyClientSecret = _config.SpotifyClientSecret;
+        SpotifyClientId = _config.SpotifyClientId; // Client ID can be plaintext
+        // Decrypt the secret for display/use in the session. Handle potential null.
+        if (!string.IsNullOrEmpty(_config.SpotifyClientSecret))
+        {
+            try
+            {
+                SpotifyClientSecret = _protectedDataService.Unprotect(_config.SpotifyClientSecret);
+            }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to decrypt Spotify Client Secret. It might be corrupted or from a different user/machine."); }
+        }
         MinBitrate = _config.PreferredMinBitrate;
         MaxBitrate = _config.PreferredMaxBitrate;
 
@@ -756,9 +764,14 @@ public class MainViewModel : INotifyPropertyChanged
         _config.NameFormat = FileNameFormat;
         _config.PreferredFormats = PreferredFormats.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         _config.CheckForDuplicates = CheckForDuplicates;
-        _config.SpotifyClientId = SpotifyClientId;
-        _config.SpotifyClientSecret = SpotifyClientSecret;
         _config.RememberPassword = RememberPassword;
+        
+        _config.SpotifyClientId = SpotifyClientId;
+        // Encrypt the secret before saving it to the config file.
+        if (!string.IsNullOrEmpty(SpotifyClientSecret))
+            _config.SpotifyClientSecret = _protectedDataService.Protect(SpotifyClientSecret);
+        else _config.SpotifyClientSecret = null;
+
         _config.PreferredMinBitrate = MinBitrate ?? _config.PreferredMinBitrate;
         _config.PreferredMaxBitrate = MaxBitrate ?? _config.PreferredMaxBitrate;
     }

@@ -19,6 +19,18 @@ public class Track
     public Dictionary<string, object>? Metadata { get; set; }
     public bool IsSelected { get; set; } = false;
     public Soulseek.File? SoulseekFile { get; set; }
+    
+    /// <summary>
+    /// Original index from the search results (before sorting/filtering).
+    /// Allows user to reset view to original search order.
+    /// </summary>
+    public int OriginalIndex { get; set; } = -1;
+    
+    /// <summary>
+    /// Current ranking score for this result.
+    /// Higher = better match. Used for sorting display.
+    /// </summary>
+    public double CurrentRank { get; set; } = 0.0;
 
     /// <summary>
     /// Gets the file extension from the filename.

@@ -39,7 +39,23 @@ public partial class App : System.Windows.Application
         {
             try
             {
-                System.Windows.MessageBox.Show($"Unobserved task exception: {ev.Exception.Message}\n\n{ev.Exception.StackTrace}", "Unhandled Task Exception", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                // Check if it's a network-related error that we can safely ignore
+                var isNetworkError = ev.Exception.InnerExceptions.Any(e => 
+                    e.Message.Contains("refused") || 
+                    e.Message.Contains("aborted") || 
+                    e.Message.Contains("Unable to read") ||
+                    e.Message.Contains("transport connection"));
+                
+                if (isNetworkError)
+                {
+                    // Log network errors but don't show dialog
+                    System.Diagnostics.Debug.WriteLine($"Network error (handled): {ev.Exception.Message}");
+                }
+                else
+                {
+                    // Show dialog for non-network errors
+                    System.Windows.MessageBox.Show($"Unobserved task exception: {ev.Exception.Message}\n\n{ev.Exception.StackTrace}", "Unhandled Task Exception", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
                 ev.SetObserved();
             }
             catch { }
@@ -112,19 +128,33 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ProtectedDataService>();
 
         // Register Spotify services
+#pragma warning disable CS8634, CS8600, CS8604, CS8621
         services.AddSingleton(provider =>
         {
             var config = provider.GetRequiredService<AppConfig>();
+            var protectedDataService = provider.GetRequiredService<ProtectedDataService>();
+
             if (string.IsNullOrEmpty(config.SpotifyClientId) || string.IsNullOrEmpty(config.SpotifyClientSecret))
             {
                 // Return a null client if not configured. The app can handle this gracefully.
-                return null!;
+                return null;
+            }
+
+            string decryptedSecret;
+            try
+            {
+                decryptedSecret = protectedDataService.Unprotect(config.SpotifyClientSecret!);
+            }
+            catch (Exception) {
+                // Failed to decrypt, treat as not configured.
+                return null;
             }
             var spotifyConfig = SpotifyClientConfig.CreateDefault()
-                .WithAuthenticator(new ClientCredentialsAuthenticator(config.SpotifyClientId, config.SpotifyClientSecret));
+                .WithAuthenticator(new ClientCredentialsAuthenticator(config.SpotifyClientId, decryptedSecret));
             
             return new SpotifyClient(spotifyConfig);
         });
+#pragma warning restore CS8634, CS8600, CS8604, CS8621
         services.AddSingleton<SpotifyInputSource>();
 
         // Input parsers

@@ -20,6 +20,7 @@ public class DownloadManager : IDisposable
     private readonly SemaphoreSlim _concurrencySemaphore;
     private readonly Channel<DownloadJob> _jobChannel;
     private CancellationTokenSource _cts = new();
+    private readonly List<Task> _runningTasks = new();
 
     public event EventHandler<DownloadJob>? JobUpdated;
     public event EventHandler<DownloadJob>? JobCompleted;
@@ -74,9 +75,22 @@ public class DownloadManager : IDisposable
             // Continuously read from the channel until it's completed.
             await foreach (var job in _jobChannel.Reader.ReadAllAsync(_cts.Token))
             {
-                // Don't wait for the job to finish, just start it.
-                // The semaphore will limit concurrency.
-                _ = ProcessJobAsync(job, _cts.Token);
+                // Start the job and track it to prevent unobserved exceptions
+                var task = ProcessJobAsync(job, _cts.Token);
+                lock (_runningTasks)
+                {
+                    _runningTasks.Add(task);
+                    // Clean up completed tasks
+                    _runningTasks.RemoveAll(t => t.IsCompleted);
+                }
+                // Observe the task to prevent unobserved exceptions
+                _ = task.ContinueWith(t =>
+                {
+                    if (t.IsFaulted && t.Exception != null)
+                    {
+                        _logger.LogError(t.Exception, "Unhandled exception in ProcessJobAsync");
+                    }
+                }, TaskScheduler.Default);
             }
         }
         catch (OperationCanceledException)
