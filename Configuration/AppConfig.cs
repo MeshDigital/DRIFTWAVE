@@ -23,9 +23,11 @@ public class AppConfig
     public int PreferredMinBitrate { get; set; } = 128; // kbps (more permissive default)
     public int PreferredMaxBitrate { get; set; } = 2500; // kbps
     public int PreferredMaxSampleRate { get; set; } = 48000; // Hz
-    public int PreferredLengthTolerance { get; set; } = 3; // seconds
+    public string? PreferredLengthTolerance { get; set; } = "3"; // seconds
     public string? SpotifyClientId { get; set; }
     public string? SpotifyClientSecret { get; set; }
+    public string? SpotifyAccessToken { get; set; }
+    public string? SpotifyRefreshToken { get; set; }
 
     public override string ToString()
     {

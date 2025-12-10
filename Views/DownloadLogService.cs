@@ -53,55 +53,53 @@ public class DownloadLogService
     /// Syncs the log with the current state of a folder: add missing files, remove entries whose local file is gone.
     /// Returns (added, removed).
     /// </summary>
-    public (int added, int removed) SyncWithFolder(string folder)
-    {
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        public (int added, int removed) SyncWithFolder(string folder)
         {
-            _logger.LogWarning("Sync skipped - folder missing: {Folder}", folder);
-            return (0, 0);
-        }
-
-        var filesOnDisk = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToList();
-
-        // Add new files not present in log (by LocalPath)
-        int added = 0;
-        int updated = 0;
-        foreach (var file in filesOnDisk)
-        {
-            if (!AudioExtensions.Contains(Path.GetExtension(file)))
-                continue;
-
-            var existing = _logEntries.FirstOrDefault(t => string.Equals(t.LocalPath, file, StringComparison.OrdinalIgnoreCase));
-            if (existing != null)
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
             {
-                if (NeedsMetadata(existing))
-                {
-                    var enriched = CreateTrackFromFile(file);
-                    if (ApplyMetadata(existing, enriched))
-                        updated++;
-                }
-                continue;
+                _logger.LogWarning("Sync skipped - folder missing: {Folder}", folder);
+                return (0, 0);
             }
 
-            var track = CreateTrackFromFile(file);
-            _logEntries.Add(track);
-            added++;
-        }
+            var filesOnDisk = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToList();
 
-        // Remove entries whose LocalPath file is missing
-        int removed = _logEntries.RemoveAll(t =>
-            !string.IsNullOrEmpty(t.LocalPath) && !File.Exists(t.LocalPath));
+            // Add new files not present in log (by LocalPath)
+            int added = 0;
+            int updated = 0;
+            foreach (var file in filesOnDisk)
+            {
+                if (!AudioExtensions.Contains(Path.GetExtension(file)))
+                    continue;
 
-        if (added > 0 || removed > 0 || updated > 0)
-        {
-            SaveLog();
-            _logger.LogInformation("Sync complete: added {Added}, removed {Removed}, updated metadata {Updated}", added, removed, updated);
-        }
+                var existing = _logEntries.FirstOrDefault(t => string.Equals(t.LocalPath, file, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    if (NeedsMetadata(existing))
+                    {
+                        var enriched = CreateTrackFromFile(file);
+                        if (ApplyMetadata(existing, enriched))
+                            updated++;
+                    }
+                    continue;
+                }
 
-        return (added, removed);
-    }
+                var track = CreateTrackFromFile(file);
+                _logEntries.Add(track);
+                added++;
+            }
 
-    public void RemoveEntries(IEnumerable<Track> tracks)
+            // Remove entries whose LocalPath file is missing
+            int removed = _logEntries.RemoveAll(t =>
+                !string.IsNullOrEmpty(t.LocalPath) && !System.IO.File.Exists(t.LocalPath));
+
+            if (added > 0 || removed > 0 || updated > 0)
+            {
+                SaveLog();
+                _logger.LogInformation("Sync complete: added {Added}, removed {Removed}, updated metadata {Updated}", added, removed, updated);
+            }
+
+            return (added, removed);
+        }    public void RemoveEntries(IEnumerable<Track> tracks)
     {
         int count = 0;
         foreach (var track in tracks)
@@ -124,8 +122,8 @@ public class DownloadLogService
     {
         try
         {
-            if (!File.Exists(_logFilePath)) return new List<Track>();
-            var json = File.ReadAllText(_logFilePath);
+            if (!System.IO.File.Exists(_logFilePath)) return new List<Track>();
+            var json = System.IO.File.ReadAllText(_logFilePath);
             return JsonSerializer.Deserialize<List<Track>>(json) ?? new List<Track>();
         }
         catch (Exception ex)
@@ -138,7 +136,7 @@ public class DownloadLogService
     private void SaveLog()
     {
         var json = JsonSerializer.Serialize(_logEntries, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(_logFilePath, json);
+        System.IO.File.WriteAllText(_logFilePath, json);
     }
 
     private static bool NeedsMetadata(Track track)
@@ -154,18 +152,21 @@ public class DownloadLogService
     {
         bool changed = false;
 
-        void SetIfEmpty(ref string? field, string? value)
+        if (string.IsNullOrWhiteSpace(target.Title) && !string.IsNullOrWhiteSpace(enriched.Title))
         {
-            if (string.IsNullOrWhiteSpace(field) && !string.IsNullOrWhiteSpace(value))
-            {
-                field = value;
-                changed = true;
-            }
+            target.Title = enriched.Title;
+            changed = true;
         }
-
-        SetIfEmpty(ref target.Title, enriched.Title);
-        SetIfEmpty(ref target.Artist, enriched.Artist);
-        SetIfEmpty(ref target.Album, enriched.Album);
+        if (string.IsNullOrWhiteSpace(target.Artist) && !string.IsNullOrWhiteSpace(enriched.Artist))
+        {
+            target.Artist = enriched.Artist;
+            changed = true;
+        }
+        if (string.IsNullOrWhiteSpace(target.Album) && !string.IsNullOrWhiteSpace(enriched.Album))
+        {
+            target.Album = enriched.Album;
+            changed = true;
+        }
 
         if (target.Bitrate <= 0 && enriched.Bitrate > 0)
         {
@@ -214,8 +215,8 @@ public class DownloadLogService
         try
         {
             using var tagFile = TagLibFile.Create(file);
-            artist = tagFile.Tag.FirstAlbumArtist
-                     ?? tagFile.Tag.FirstArtist
+            artist = tagFile.Tag.FirstPerformer
+                     ?? tagFile.Tag.FirstAlbumArtist
                      ?? tagFile.Tag.Performers.FirstOrDefault()
                      ?? "";
             album = tagFile.Tag.Album ?? "";

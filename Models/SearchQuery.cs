@@ -1,7 +1,7 @@
 namespace SLSKDONET.Models;
 
 /// <summary>
-/// Represents different download modes.
+/// Different download modes.
 /// </summary>
 public enum DownloadMode
 {
@@ -27,7 +27,7 @@ public enum DownloadMode
 }
 
 /// <summary>
-/// Represents input source types.
+/// Represents different input source types.
 /// </summary>
 public enum InputType
 {
@@ -41,10 +41,32 @@ public enum InputType
 }
 
 /// <summary>
+/// Input source type for playlist/batch imports.
+/// </summary>
+public enum InputSourceType
+{
+    Spotify,
+    CSV,
+    YouTube,
+    Bandcamp,
+    Local
+}
+
+/// <summary>
 /// Represents a search query with properties.
 /// </summary>
 public class SearchQuery
 {
+    /// <summary>
+    /// Link back to the parent PlaylistJob (if this query came from an imported playlist).
+    /// </summary>
+    public PlaylistJob? SourceJob { get; set; }
+
+    /// <summary>
+    /// Reference to the track's hash in the parent PlaylistJob for status tracking.
+    /// </summary>
+    public string TrackHash { get; set; } = string.Empty;
+
     public string? Title { get; set; }
     public string? Artist { get; set; }
     public string? Album { get; set; }

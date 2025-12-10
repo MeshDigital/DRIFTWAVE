@@ -54,25 +54,13 @@
                 <DataGridTextColumn Header="Title" Binding="{Binding Track.Title}" Width="*"/>
                 <DataGridTextColumn Header="User" Binding="{Binding Track.Username}" Width="120"/>
                 <DataGridTextColumn Header="Dest" Binding="{Binding DestinationPath}" Width="220"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding State}" Width="100"/>
                 <DataGridTemplateColumn Header="Progress" Width="170">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <ProgressBar Value="{Binding Progress}" Maximum="1.0" Height="18" Width="110"/>
                                 <TextBlock Text="{Binding Progress, StringFormat={}{0:P0}}" Width="40" HorizontalAlignment="Right" Margin="8,0,0,0"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Size (MB)" Binding="{Binding SizeInMb, StringFormat={}{0:F2}}" Width="90"/>
-                <DataGridTextColumn Header="Elapsed" Binding="{Binding ElapsedTime, StringFormat='hh\\:mm\\:ss'}" Width="90"/>
-                <DataGridTemplateColumn Header="Actions" Width="160">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Open" Command="{Binding OpenFolderCommand}"/>
-                                <Button Content="Cancel" Command="{Binding CancelCommand}" Margin="8,0,0,0"/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>

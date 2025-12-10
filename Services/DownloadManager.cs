@@ -1,12 +1,15 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using SLSKDONET.Configuration;
 using SLSKDONET.Models;
+using SLSKDONET.Services.InputParsers;
+using SLSKDONET.Utils;
 
 namespace SLSKDONET.Services;
 
@@ -19,28 +22,161 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     private readonly AppConfig _config;
     private readonly SoulseekAdapter _soulseek;
     private readonly FileNameFormatter _fileNameFormatter;
+    private readonly ILibraryService _libraryService;
+    private readonly SpotifyInputSource _spotifyInputSource;
+    private readonly CsvInputSource _csvInputSource;
     private readonly ConcurrentDictionary<string, DownloadJob> _jobs = new();
     private readonly SemaphoreSlim _concurrencySemaphore;
     private readonly Channel<DownloadJob> _jobChannel;
     private CancellationTokenSource _cts = new();
     private readonly List<Task> _runningTasks = new();
+    private PlaylistJob? _currentPlaylistJob;
 
     public event EventHandler<DownloadJob>? JobUpdated;
     public event EventHandler<DownloadJob>? JobCompleted;
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>
+    /// Collection of imported playlists and their download status.
+    /// </summary>
+    public ObservableCollection<PlaylistJob> ImportedPlaylists { get; } = new();
+
     public DownloadManager(
         ILogger<DownloadManager> logger,
         AppConfig config,
         SoulseekAdapter soulseek,
-        FileNameFormatter fileNameFormatter)
+        FileNameFormatter fileNameFormatter,
+        ILibraryService libraryService,
+        SpotifyInputSource spotifyInputSource,
+        CsvInputSource csvInputSource)
     {
         _logger = logger;
         _config = config;
         _soulseek = soulseek;
         _fileNameFormatter = fileNameFormatter;
+        _libraryService = libraryService;
+        _spotifyInputSource = spotifyInputSource;
+        _csvInputSource = csvInputSource;
         _concurrencySemaphore = new SemaphoreSlim(_config.MaxConcurrentDownloads);
         _jobChannel = Channel.CreateUnbounded<DownloadJob>();
+    }
+
+    /// <summary>
+    /// Starts a playlist/source import job with deduplication.
+    /// Fetches tracks from the source, deduplicates against library, and creates SearchQueries for missing tracks.
+    /// </summary>
+    public async Task StartPlaylistDownloadAsync(string inputUrl, string destinationFolder, InputSourceType sourceType)
+    {
+        try
+        {
+            _logger.LogInformation("Starting playlist download: {URL} to {Folder}", inputUrl, destinationFolder);
+
+            // Fetch tracks from the source
+            List<Track> sourceTracks = new();
+            string playlistName = "Import";
+
+            if (sourceType == InputSourceType.Spotify)
+            {
+                try
+                {
+                    _logger.LogInformation("Fetching tracks from Spotify: {Url}", inputUrl);
+                    var queries = await _spotifyInputSource.ParseAsync(inputUrl);
+                    
+                    if (!queries.Any())
+                        throw new InvalidOperationException("No tracks found in Spotify source");
+                    
+                    sourceTracks = queries.Select(q => new Track
+                    {
+                        Artist = q.Artist,
+                        Title = q.Title,
+                        Album = q.Album,
+                        SourceTitle = q.SourceTitle
+                    }).ToList();
+                    playlistName = queries.FirstOrDefault()?.SourceTitle ?? "Spotify Playlist";
+                    
+                    _logger.LogInformation("Successfully fetched {Count} tracks from Spotify", sourceTracks.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to fetch Spotify tracks");
+                    throw new InvalidOperationException($"Spotify error: {ex.Message}");
+                }
+            }
+            else if (sourceType == InputSourceType.CSV)
+            {
+                var queries = await _csvInputSource.ParseAsync(inputUrl);
+                sourceTracks = queries.Select(q => new Track
+                {
+                    Artist = q.Artist,
+                    Title = q.Title,
+                    Album = q.Album,
+                    SourceTitle = q.SourceTitle
+                }).ToList();
+                playlistName = Path.GetFileNameWithoutExtension(inputUrl);
+            }
+
+            if (!sourceTracks.Any())
+                throw new InvalidOperationException("No tracks found in source");
+
+            // Create the playlist job
+            var playlistJob = new PlaylistJob
+            {
+                SourceTitle = playlistName,
+                SourceType = sourceType.ToString(),
+                DestinationFolder = destinationFolder,
+                OriginalTracks = new ObservableCollection<Track>(sourceTracks)
+            };
+
+            _currentPlaylistJob = playlistJob;
+
+            // Load existing library for deduplication
+            var libraryEntries = _libraryService.LoadDownloadedTracks();
+            var libraryHashToPath = libraryEntries.ToDictionary(e => e.UniqueHash, e => e.FilePath);
+
+            // Perform deduplication and calculate FilePath
+            foreach (var track in sourceTracks)
+            {
+                var hash = track.UniqueHash;
+                
+                if (libraryHashToPath.TryGetValue(hash, out var libFilePath))
+                {
+                    // Track already in library - use actual path
+                    track.FilePath = libFilePath;
+                    track.LocalPath = libFilePath;
+                    playlistJob.TrackStatuses[hash] = TrackStatus.Downloaded;
+                    _logger.LogDebug("Track already in library: {Hash} at {Path}", hash, track.FilePath);
+                }
+                else
+                {
+                    // Track is missing - calculate expected path
+                    var expectedFilename = FormatFilename(track);
+                    track.FilePath = Path.Combine(destinationFolder, expectedFilename);
+                    playlistJob.TrackStatuses[hash] = TrackStatus.Missing;
+                    _logger.LogDebug("Track missing, will be downloaded to: {Path}", track.FilePath);
+                }
+            }
+
+            playlistJob.RefreshStatusCounts();
+
+            // Save the job for persistence
+            await _libraryService.SavePlaylistJobAsync(playlistJob);
+
+            // Add to imported playlists collection
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                ImportedPlaylists.Add(playlistJob);
+            });
+
+            _logger.LogInformation("Playlist job created: {SourceTitle}, {Total} tracks, {Missing} missing",
+                playlistJob.SourceTitle, playlistJob.TotalTracks, playlistJob.MissingCount);
+
+            OnPropertyChanged(nameof(ImportedPlaylists));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start playlist download");
+            throw;
+        }
     }
 
     /// <summary>

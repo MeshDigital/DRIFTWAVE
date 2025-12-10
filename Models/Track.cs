@@ -17,10 +17,24 @@ public class Track
     public int? Length { get; set; } // in seconds
     public int Bitrate { get; set; } // in kbps
     public Dictionary<string, object>? Metadata { get; set; }
+    
     /// <summary>
     /// Local filesystem path where the track was stored (if known).
     /// </summary>
     public string? LocalPath { get; set; }
+
+    /// <summary>
+    /// Absolute file path of the downloaded file, or expected final path if not yet downloaded.
+    /// Used for library tracking and Rekordbox export.
+    /// </summary>
+    public string? FilePath { get; set; }
+
+    /// <summary>
+    /// Name of the source playlist (e.g., Spotify playlist name or CSV filename).
+    /// Temporary field used during parsing before tracks are added to PlaylistJob.
+    /// </summary>
+    public string? SourceTitle { get; set; }
+
     public bool IsSelected { get; set; } = false;
     public Soulseek.File? SoulseekFile { get; set; }
     
@@ -35,6 +49,11 @@ public class Track
     /// Higher = better match. Used for sorting display.
     /// </summary>
     public double CurrentRank { get; set; } = 0.0;
+
+    /// <summary>
+    /// Unique hash for deduplication: artist-title combination (lowercase, no spaces).
+    /// </summary>
+    public string UniqueHash => $"{Artist?.ToLower().Replace(" ", "")}-{Title?.ToLower().Replace(" ", "")}".TrimStart('-').TrimEnd('-');
 
     /// <summary>
     /// Gets the file extension from the filename.

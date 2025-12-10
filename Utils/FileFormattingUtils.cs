@@ -55,4 +55,28 @@ public static class FileFormattingUtils
             ? $"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}"
             : $"{ts.Minutes:D2}:{ts.Seconds:D2}";
     }
+
+    /// <summary>
+    /// Converts a local file path to a Rekordbox-compatible file:// URL.
+    /// Handles path normalization and proper URL encoding.
+    /// </summary>
+    public static string ToRekordboxUrl(string localFilePath)
+    {
+        if (string.IsNullOrEmpty(localFilePath))
+            return string.Empty;
+
+        // Normalize path separators to forward slashes for URL format
+        var normalizedPath = localFilePath.Replace("\\", "/");
+
+        // URL-encode the path, but preserve forward slashes
+        var encodedPath = Uri.EscapeDataString(normalizedPath);
+        encodedPath = encodedPath.Replace("%2F", "/");
+
+        // Add file:// protocol
+        // Windows paths like "C:/Music/file.mp3" become "file:///C:/Music/file.mp3"
+        // (note: three slashes for absolute path)
+        var fileUrl = $"file:///{encodedPath}";
+
+        return fileUrl;
+    }
 }

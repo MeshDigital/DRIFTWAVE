@@ -123,7 +123,6 @@ public partial class App : System.Windows.Application
 
         // Services
         services.AddSingleton<SoulseekAdapter>();
-        services.AddSingleton<DownloadManager>();
         services.AddSingleton<FileNameFormatter>();
         services.AddSingleton<ProtectedDataService>();
 
@@ -160,8 +159,16 @@ public partial class App : System.Windows.Application
         // Input parsers
         services.AddSingleton<CsvInputSource>();
         
-        // Download logging
+        // Download logging and library management
         services.AddSingleton<DownloadLogService>();
+        services.AddSingleton<LibraryService>();
+        services.AddSingleton<ILibraryService>(provider => provider.GetRequiredService<LibraryService>());
+        
+        // Rekordbox export service
+        services.AddSingleton<RekordboxXmlExporter>();
+
+        // Download manager (depends on ILibraryService, SpotifyInputSource, CsvInputSource)
+        services.AddSingleton<DownloadManager>();
 
         // Register navigation and UI services used by the app.
         services.AddSingleton<INavigationService, NavigationService>();
@@ -182,3 +189,4 @@ public partial class App : System.Windows.Application
         services.AddSingleton<SearchQueryNormalizer>();
     }
 }
+

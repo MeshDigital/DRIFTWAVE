@@ -22,7 +22,7 @@
                 <Label Content="Download History &amp; Imported Queries" Style="{StaticResource ModernLabelStyle}"
                    FontSize="{StaticResource FontSizeMedium}" FontWeight="Bold"/>
                 <ui:Button x:Name="ToggleImportedBtn" Content="Show Imported" Icon="{ui:SymbolIcon ChevronDown24}" 
-                           Style="{StaticResource SimpleButtonStyle}" Margin="8,0,0,0" Click="ToggleImportedBtn_Click"/>
+                           Margin="8,0,0,0" Click="ToggleImportedBtn_Click"/>
             </StackPanel>
         </Border>
 
