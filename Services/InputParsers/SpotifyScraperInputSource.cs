@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using HtmlAgilityPack;
 using SLSKDONET.Models;
 
 namespace SLSKDONET.Services.InputParsers;
@@ -275,25 +276,21 @@ public class SpotifyScraperInputSource
     {
         try
         {
-            var scriptStart = html.IndexOf("id=\"__NEXT_DATA__\"", StringComparison.OrdinalIgnoreCase);
-            if (scriptStart == -1)
-                return new List<SearchQuery>();
-
-            var contentStart = html.IndexOf(">", scriptStart);
-            var contentEnd = html.IndexOf("</script>", contentStart);
-            if (contentStart == -1 || contentEnd == -1)
-                return new List<SearchQuery>();
-
-            var jsonContent = html.Substring(contentStart + 1, contentEnd - contentStart - 1).Trim();
+            var jsonContent = GetNextDataJson(html);
             if (string.IsNullOrEmpty(jsonContent))
                 return new List<SearchQuery>();
 
             using var doc = JsonDocument.Parse(jsonContent);
             var root = doc.RootElement;
 
-            var playlistTitle = ExtractPlaylistTitle(root);
+            var playlistTitle = ExtractPlaylistTitle(root) ?? "Spotify Playlist";
             var tracks = new List<SearchQuery>();
-            ExtractTracksRecursive(root, tracks, playlistTitle ?? "Spotify Playlist");
+
+            // Prefer targeted extraction from entities/track lists; fall back to full recursion.
+            if (!TryExtractTracksFromEntities(root, playlistTitle, tracks))
+            {
+                ExtractTracksRecursive(root, tracks, playlistTitle);
+            }
 
             if (tracks.Count > 0)
                 _logger.LogDebug("Extracted {TrackCount} tracks from __NEXT_DATA__", tracks.Count);
@@ -303,6 +300,105 @@ public class SpotifyScraperInputSource
         {
             _logger.LogDebug(ex, "HTML extraction from __NEXT_DATA__ failed, returning empty list");
             return new List<SearchQuery>();
+        }
+    }
+
+    /// <summary>
+    /// Retrieves the __NEXT_DATA__ JSON payload using HtmlAgilityPack first, then falls back to string search.
+    /// </summary>
+    private string? GetNextDataJson(string html)
+    {
+        try
+        {
+            var doc = new HtmlAgilityPack.HtmlDocument();
+            doc.LoadHtml(html);
+            var node = doc.DocumentNode.SelectSingleNode("//script[@id='__NEXT_DATA__']");
+            if (node != null)
+            {
+                var inner = (node.InnerText ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(inner))
+                    return inner;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "HtmlAgilityPack extraction of __NEXT_DATA__ failed; will try fallback");
+        }
+
+        // Fallback: manual string search
+        var scriptStart = html.IndexOf("id=\"__NEXT_DATA__\"", StringComparison.OrdinalIgnoreCase);
+        if (scriptStart == -1)
+            return null;
+
+        var contentStart = html.IndexOf(">", scriptStart);
+        var contentEnd = html.IndexOf("</script>", contentStart);
+        if (contentStart == -1 || contentEnd == -1)
+            return null;
+
+        var jsonContent = html.Substring(contentStart + 1, contentEnd - contentStart - 1).Trim();
+        return string.IsNullOrEmpty(jsonContent) ? null : jsonContent;
+    }
+
+    /// <summary>
+    /// Attempts to navigate common __NEXT_DATA__ shapes to pull track items without deep recursion.
+    /// </summary>
+    private bool TryExtractTracksFromEntities(JsonElement root, string sourceTitle, List<SearchQuery> tracks)
+    {
+        try
+        {
+            if (root.TryGetProperty("props", out var props) &&
+                props.TryGetProperty("pageProps", out var pageProps) &&
+                pageProps.TryGetProperty("initialState", out var initialState) &&
+                initialState.TryGetProperty("entities", out var entities))
+            {
+                foreach (var entityProp in entities.EnumerateObject())
+                {
+                    var entityVal = entityProp.Value;
+
+                    // Common shape: { items: [ { track: {...} } ] }
+                    if (entityVal.ValueKind == JsonValueKind.Object)
+                    {
+                        if (entityVal.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+                        {
+                            ExtractTracksFromItemsArray(items, sourceTitle, tracks);
+                        }
+                        else if (entityVal.ValueKind == JsonValueKind.Array)
+                        {
+                            ExtractTracksFromItemsArray(entityVal, sourceTitle, tracks);
+                        }
+                    }
+                    else if (entityVal.ValueKind == JsonValueKind.Array)
+                    {
+                        ExtractTracksFromItemsArray(entityVal, sourceTitle, tracks);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Targeted entity extraction failed; will fall back to recursion");
+        }
+
+        return tracks.Count > 0;
+    }
+
+    /// <summary>
+    /// Extracts track information from a known items array shape.
+    /// </summary>
+    private void ExtractTracksFromItemsArray(JsonElement items, string sourceTitle, List<SearchQuery> tracks)
+    {
+        foreach (var item in items.EnumerateArray())
+        {
+            // Some payloads nest under "track"; others are the track object directly.
+            if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("track", out var trackObj))
+            {
+                var track = ExtractTrackFromObject(trackObj, sourceTitle);
+                if (track != null) tracks.Add(track);
+                continue;
+            }
+
+            var direct = ExtractTrackFromObject(item, sourceTitle);
+            if (direct != null) tracks.Add(direct);
         }
     }
 

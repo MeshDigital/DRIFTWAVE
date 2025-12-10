@@ -151,10 +151,11 @@ public class MainViewModel : INotifyPropertyChanged
 
         // Initialize commands
         LoginCommand = new AsyncRelayCommand<string>(LoginAsync, (pwd) => !IsConnected && !string.IsNullOrEmpty(pwd));
-        SearchCommand = new AsyncRelayCommand(SearchAsync, () => IsConnected && !IsSearching && !string.IsNullOrEmpty(SearchQuery));
+        SearchCommand = new AsyncRelayCommand(SearchAsync, () =>
+            !IsSearching && !string.IsNullOrEmpty(SearchQuery) && (IsConnected || LooksLikeSpotifyUrl(SearchQuery)));
         AddToDownloadsCommand = new RelayCommand<IList<object>?>(AddToDownloads, items => items is { Count: > 0 });
         ImportCsvCommand = new AsyncRelayCommand<string>(ImportCsvAsync, filePath => !string.IsNullOrEmpty(filePath));
-        ImportFromSpotifyCommand = new AsyncRelayCommand(ImportFromSpotifyAsync);
+        ImportFromSpotifyCommand = new AsyncRelayCommand(() => ImportFromSpotifyAsync());
         RemoveFromLibraryCommand = new RelayCommand<IList<object>?>(RemoveFromLibrary, items => items is { Count: > 0 });
         RescanLibraryCommand = new AsyncRelayCommand(RescanLibraryAsync);
         StartDownloadsCommand = new AsyncRelayCommand(StartDownloadsAsync, () => Downloads.Any(j => j.State == DownloadState.Pending));
@@ -258,6 +259,17 @@ public class MainViewModel : INotifyPropertyChanged
                 CommandManager.InvalidateRequerySuggested();
             }
         }
+    }
+
+    private bool LooksLikeSpotifyUrl(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return false;
+
+        var q = query.Trim();
+        return q.StartsWith("spotify:playlist:", StringComparison.OrdinalIgnoreCase)
+            || q.StartsWith("spotify:album:", StringComparison.OrdinalIgnoreCase)
+            || q.Contains("open.spotify.com/playlist/", StringComparison.OrdinalIgnoreCase)
+            || q.Contains("open.spotify.com/album/", StringComparison.OrdinalIgnoreCase);
     }
 
     public bool IsConnected
@@ -480,17 +492,6 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (!IsConnected)
-        {
-            StatusText = "Not connected to Soulseek";
-            _logger.LogWarning("Search cancelled - not connected");
-            return;
-        }
-
-        IsSearching = true;
-        StatusText = $"Searching for '{SearchQuery}'...";
-        _logger.LogInformation("Search started for: {Query}", SearchQuery);
-
         // Add to search history (max 20 items)
         if (!string.IsNullOrWhiteSpace(SearchQuery))
         {
@@ -504,6 +505,33 @@ public class MainViewModel : INotifyPropertyChanged
                 SearchHistory.RemoveAt(SearchHistory.Count - 1);
             }
         }
+
+        // Spotify URL path: import without requiring Soulseek connection
+        if (LooksLikeSpotifyUrl(SearchQuery))
+        {
+            try
+            {
+                IsSearching = true;
+                StatusText = "Importing from Spotify...";
+                await ImportFromSpotifyAsync(SearchQuery);
+            }
+            finally
+            {
+                IsSearching = false;
+            }
+            return;
+        }
+
+        if (!IsConnected)
+        {
+            StatusText = "Not connected to Soulseek";
+            _logger.LogWarning("Search cancelled - not connected");
+            return;
+        }
+
+        IsSearching = true;
+        StatusText = $"Searching for '{SearchQuery}'...";
+        _logger.LogInformation("Search started for: {Query}", SearchQuery);
 
         try
         {
@@ -737,9 +765,9 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task ImportFromSpotifyAsync()
+    private async Task ImportFromSpotifyAsync(string? playlistUrlOverride = null)
     {
-        string? playlistUrl = _userInputService.GetInput("Enter Spotify Playlist URL", "Import from Spotify");
+        string? playlistUrl = playlistUrlOverride ?? _userInputService.GetInput("Enter Spotify Playlist URL", "Import from Spotify");
 
         if (string.IsNullOrEmpty(playlistUrl)) return;
 

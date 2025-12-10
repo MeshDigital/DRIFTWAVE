@@ -44,6 +44,9 @@
 
     <!-- Modern Windows 11 UI Controls -->
     <PackageReference Include="WPF-UI" Version="4.1.0" />
+
+    <!-- HTML parsing for Spotify scraping -->
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.60" />
   </ItemGroup>
 
   <!-- Explicitly include XAML pages to ensure generated InitializeComponent and named elements are available. -->
