@@ -3,80 +3,171 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:converters="clr-namespace:SLSKDONET.Converters"
       mc:Ignorable="d" 
-      d:DesignHeight="450" d:DesignWidth="800"
+      d:DesignHeight="600" d:DesignWidth="1000"
       Title="LibraryPage">
 
+    <Page.Resources>
+        <converters:ViewModeToggleConverter x:Key="ViewModeToggleConverter"/>
+        <converters:ViewModeToVisibilityConverter x:Key="ViewModeToVisibilityConverter"/>
+    </Page.Resources>
+
     <Grid Background="{StaticResource BackgroundBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="1"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="0" Background="{StaticResource SecondaryBackgroundBrush}"
-            BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Label Content="Download History &amp; Imported Queries" Style="{StaticResource ModernLabelStyle}"
-                   FontSize="{StaticResource FontSizeMedium}" FontWeight="Bold"/>
-                <ui:Button x:Name="ToggleImportedBtn" Content="Show Imported" Icon="{ui:SymbolIcon ChevronDown24}" 
-                           Margin="8,0,0,0" Click="ToggleImportedBtn_Click"/>
+        <!-- Left Pane: Source Sidebar -->
+        <Border Grid.Column="0" Background="{StaticResource SecondaryBackgroundBrush}" 
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <StackPanel Orientation="Vertical">
+                <!-- Header -->
+                <TextBlock Text="Library Sources" Foreground="{StaticResource TextBrush}" 
+                           FontWeight="Bold" Padding="16,12,16,12" FontSize="13"/>
+                
+                <!-- Source List -->
+                <ListBox ItemsSource="{Binding Sources}" 
+                         SelectedItem="{Binding SelectedSource}"
+                         Background="Transparent" BorderThickness="0" Padding="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="12,10" BorderThickness="0,0,0,1" 
+                                    BorderBrush="{StaticResource BorderBrush}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                    <TextBlock Text="{Binding TrackCount, StringFormat='{}{0} tracks'}" 
+                                               FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" 
+                                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                                BorderThickness="{TemplateBinding BorderThickness}">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
             </StackPanel>
         </Border>
 
-        <!-- Imported Queries Section (collapsible) -->
-        <Expander Grid.Row="1" x:Name="ImportedExpander" Header="Imported Queries" 
-                  Background="{StaticResource SecondaryBackgroundBrush}"
-                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
-                  IsExpanded="False" Padding="16">
-            <StackPanel>
-                <DataGrid ItemsSource="{Binding ImportedQueries}"
-                      Style="{StaticResource ModernDataGridStyle}"
-                      ColumnHeaderStyle="{StaticResource ModernColumnHeaderStyle}"
-                      CellStyle="{StaticResource ModernCellStyle}"
-                      RowStyle="{StaticResource ModernRowStyle}"
-                      Margin="0,0,0,12"
-                      Height="150"
-                      AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Extended">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="150"/>
-                        <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*"/>
-                        <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="150"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-                <ui:Button Content="Search All Imported" Icon="{ui:SymbolIcon Search24}" Appearance="Primary"
-                           Command="{Binding SearchAllImportedCommand}"/>
-            </StackPanel>
-        </Expander>
+        <!-- Splitter -->
+        <GridSplitter Grid.Column="1" Width="1" Background="{StaticResource BorderBrush}" HorizontalAlignment="Stretch"/>
 
-        <DataGrid Grid.Row="2" Name="LibraryGrid" ItemsSource="{Binding LibraryEntries}"
-              Style="{StaticResource ModernDataGridStyle}"
-              ColumnHeaderStyle="{StaticResource ModernColumnHeaderStyle}"
-              CellStyle="{StaticResource ModernCellStyle}"
-              RowStyle="{StaticResource ModernRowStyle}"
-              Margin="0"
-              AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Extended">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="150"/>
-                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*"/>
-                <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="150"/>
-                <DataGridTextColumn Header="Format" Binding="{Binding Format}" Width="70"/>
-                <DataGridTextColumn Header="Bitrate" Binding="{Binding Bitrate}" Width="70"/>
-                <DataGridTextColumn Header="Downloaded From" Binding="{Binding Username}" Width="120"/>
-            </DataGrid.Columns>
-        </DataGrid>
+        <!-- Right Pane: Content Area -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <Border Grid.Row="3" Background="{StaticResource SecondaryBackgroundBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="16">
-            <StackPanel Orientation="Horizontal">
-                <ui:Button Content="Remove Selected" Icon="{ui:SymbolIcon Delete24}" Appearance="Danger"
-                           Command="{Binding RemoveFromLibraryCommand}"
-                           CommandParameter="{Binding ElementName=LibraryGrid, Path=SelectedItems}"/>
-                <ui:Button Content="Rescan Folder" Icon="{ui:SymbolIcon ArrowClockwise24}" Margin="8,0,0,0"
-                           Command="{Binding RescanLibraryCommand}"/>
-            </StackPanel>
-        </Border>
+            <!-- View Mode Toggle Buttons -->
+            <Border Grid.Row="0" Background="{StaticResource SecondaryBackgroundBrush}" 
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16,12">
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button Content="📊 Album View" 
+                               IsEnabled="{Binding CurrentViewMode, Converter={StaticResource ViewModeToggleConverter}, ConverterParameter=Albums, FallbackValue=False}"
+                               Command="{Binding ChangeViewModeCommand}" CommandParameter="Albums"
+                               Appearance="Secondary" Margin="0,0,8,0"/>
+                    <ui:Button Content="🎵 Track View" 
+                               IsEnabled="{Binding CurrentViewMode, Converter={StaticResource ViewModeToggleConverter}, ConverterParameter=Tracks, FallbackValue=True}"
+                               Command="{Binding ChangeViewModeCommand}" CommandParameter="Tracks"
+                               Appearance="Secondary" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding SelectedSource.Name, FallbackValue='Select a source'}" 
+                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Content Area with DataTemplate Selection -->
+            <Grid Grid.Row="1">
+                <!-- Album Tile View (WrapPanel with card tiles) -->
+                <Border Visibility="{Binding CurrentViewMode, Converter={StaticResource ViewModeToVisibilityConverter}, ConverterParameter=Albums}"
+                        Background="{StaticResource BackgroundBrush}" Padding="16">
+                    <ScrollViewer>
+                        <WrapPanel ItemHeight="200" ItemWidth="150">
+                            <ItemsControl ItemsSource="{Binding DisplayedItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="8" Background="{StaticResource SurfaceBrush}" 
+                                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                                Padding="12" Margin="8" Width="150" Height="200">
+                                            <StackPanel Orientation="Vertical" VerticalAlignment="Stretch">
+                                                <!-- Album Art Placeholder -->
+                                                <Border CornerRadius="4" Background="#333" Height="120" Margin="0,0,0,8">
+                                                    <TextBlock Text="🎵" FontSize="48" 
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                
+                                                <!-- Metadata -->
+                                                <TextBlock Text="{Binding Album, FallbackValue='Unknown Album'}" 
+                                                           FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontSize="11"/>
+                                                <TextBlock Text="{Binding Artist, FallbackValue='Unknown Artist'}" 
+                                                           FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" 
+                                                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </WrapPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Track DataGrid View -->
+                <Border Visibility="{Binding CurrentViewMode, Converter={StaticResource ViewModeToVisibilityConverter}, ConverterParameter=Tracks}"
+                        Background="{StaticResource BackgroundBrush}" Padding="16">
+                    <DataGrid ItemsSource="{Binding DisplayedItems}"
+                              Style="{StaticResource ModernDataGridStyle}"
+                              ColumnHeaderStyle="{StaticResource ModernColumnHeaderStyle}"
+                              CellStyle="{StaticResource ModernCellStyle}"
+                              RowStyle="{StaticResource ModernRowStyle}"
+                              AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Extended">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="150"/>
+                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*"/>
+                            <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="150"/>
+                            <DataGridTextColumn Header="Format" Binding="{Binding Format}" Width="70"/>
+                            <DataGridTextColumn Header="Bitrate" Binding="{Binding Bitrate, StringFormat={}{0}k}" Width="70"/>
+                            
+                            <!-- Action Column -->
+                            <DataGridTemplateColumn Header="Action" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="🔍 Search" 
+                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                Padding="8,6" FontSize="11"
+                                                HorizontalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+        </Grid>
     </Grid>
 </Page>

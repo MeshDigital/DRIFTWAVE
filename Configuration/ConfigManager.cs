@@ -59,8 +59,6 @@ public class ConfigManager
                 NameFormat = config["Download:NameFormat"] ?? "{artist} - {title}",
                 RememberPassword = bool.TryParse(config["Soulseek:RememberPassword"], out var remember) && remember,
                 CheckForDuplicates = !bool.TryParse(config["Download:CheckForDuplicates"], out var check) || check, // Default to true
-                SpotifyClientId = config["Soulseek:SpotifyClientId"],
-                SpotifyClientSecret = config["Soulseek:SpotifyClientSecret"],
                 SpotifyUsePublicOnly = !bool.TryParse(config["Soulseek:SpotifyUsePublicOnly"], out var supo) || supo,
                 SearchLengthToleranceSeconds = int.TryParse(config["Download:SearchLengthToleranceSeconds"], out var tol) ? tol : 3,
                 FuzzyMatchEnabled = !bool.TryParse(config["Download:FuzzyMatchEnabled"], out var fz) || fz,
@@ -95,8 +93,6 @@ public class ConfigManager
         iniContent.AppendLine($"ConnectTimeout = {config.ConnectTimeout}");
         iniContent.AppendLine($"SearchTimeout = {config.SearchTimeout}");
         iniContent.AppendLine($"RememberPassword = {config.RememberPassword}");
-        iniContent.AppendLine($"SpotifyClientId = {config.SpotifyClientId}");
-        iniContent.AppendLine($"SpotifyClientSecret = {config.SpotifyClientSecret}");
         iniContent.AppendLine($"SpotifyUsePublicOnly = {config.SpotifyUsePublicOnly}");
 
         iniContent.AppendLine();

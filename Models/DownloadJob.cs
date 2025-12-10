@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using SLSKDONET.Services;
 using SLSKDONET.Views;
 
 namespace SLSKDONET.Models;
@@ -83,7 +84,8 @@ public class DownloadJob : INotifyPropertyChanged
     public string? SourceTitle { get; set; }
 
     public ICommand OpenFolderCommand { get; }
-    public ICommand CancelCommand { get; }
+    public ICommand StopCommand { get; }
+    public ICommand StartCommand { get; }
 
     private string? _errorMessage;
     public string? ErrorMessage
@@ -142,11 +144,19 @@ public class DownloadJob : INotifyPropertyChanged
         _cancellationTokenSource = new CancellationTokenSource();
     }
 
-    public DownloadJob()
+    [Newtonsoft.Json.JsonIgnore]
+    public DownloadManager? DownloadManager { get; set; }
+
+    public DownloadJob(DownloadManager? downloadManager = null)
     {
+        DownloadManager = downloadManager;
         OpenFolderCommand = new RelayCommand(OpenContainingFolder);
-        CancelCommand = new AsyncRelayCommand(CancelDownloadAsync);
+        StopCommand = new AsyncRelayCommand(CancelDownloadAsync, CanStop);
+        StartCommand = new AsyncRelayCommand(ResumeDownloadAsync, CanStart);
     }
+
+    // Parameterless constructor for serialization
+    public DownloadJob() : this(null) { }
 
     private void OpenContainingFolder()
     {
@@ -175,6 +185,23 @@ public class DownloadJob : INotifyPropertyChanged
         return Task.CompletedTask;
     }
 
+    private Task ResumeDownloadAsync()
+    {
+        // Directly ask the DownloadManager to requeue this job.
+        DownloadManager?.RequeueJob(this);
+        return Task.CompletedTask;
+    }
+
+    private bool CanStart()
+    {
+        return State == DownloadState.Cancelled || State == DownloadState.Failed;
+    }
+
+    private bool CanStop()
+    {
+        return State == DownloadState.Downloading || State == DownloadState.Retrying || State == DownloadState.Searching || State == DownloadState.Pending;
+    }
+
     public override string ToString()
     {
         return $"[{State}] {Track.Artist} - {Track.Title} ({Progress:P})";
@@ -192,6 +219,7 @@ public class DownloadJob : INotifyPropertyChanged
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         OnPropertyChanged(propertyName);
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         return true;
     }
 }

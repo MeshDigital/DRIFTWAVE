@@ -30,10 +30,12 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly SoulseekAdapter _soulseek;
     private readonly DownloadManager _downloadManager;
     private string _username = "";
+    private PlaylistJob? _currentPlaylistJob;
     private bool _isConnected = false;
     private bool _isSearching = false;
     private string _statusText = "Disconnected";
     private string _downloadPath = "";
+    private string _sharedFolderPath = "";
     private int _maxConcurrentDownloads = 2;
     private string _fileNameFormat = "{artist} - {title}";
     private int _selectedTrackCount;
@@ -53,6 +55,19 @@ public class MainViewModel : INotifyPropertyChanged
     public int FailedCount => _downloadManager.FailedCount;
     public int TodoCount => _downloadManager.TodoCount;
 
+    /// <summary>
+    /// Calculate overall download progress percentage for the global progress bar.
+    /// </summary>
+    public double DownloadProgressPercentage
+    {
+        get
+        {
+            var total = SuccessfulCount + FailedCount + TodoCount;
+            if (total == 0) return 0;
+            return (SuccessfulCount / (double)total) * 100;
+        }
+    }
+
     private void DownloadManagerOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(DownloadManager.SuccessfulCount)
@@ -62,6 +77,7 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(SuccessfulCount));
             OnPropertyChanged(nameof(FailedCount));
             OnPropertyChanged(nameof(TodoCount));
+            OnPropertyChanged(nameof(DownloadProgressPercentage));
         }
     }
     public ICommand LoginCommand { get; }
@@ -73,7 +89,11 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand RescanLibraryCommand { get; }
     public ICommand CancelDownloadsCommand { get; }
     public ICommand ToggleFiltersPanelCommand { get; }
+    public ICommand ClearSearchHistoryCommand { get; }
+    public ICommand QuickDownloadCommand { get; }
     public ICommand ImportFromSpotifyCommand { get; }
+    public ICommand BrowseDownloadPathCommand { get; }
+    public ICommand BrowseSharedFolderCommand { get; }
     public ICommand ShowPauseComingSoonCommand { get; }
     public ICommand SearchAllImportedCommand { get; }
     public ICommand SaveSettingsCommand { get; }
@@ -121,21 +141,14 @@ public class MainViewModel : INotifyPropertyChanged
         // Load initial settings
         Username = _config.Username ?? "";
         DownloadPath = _config.DownloadDirectory ?? "";
+        SharedFolderPath = _config.SharedFolderPath ?? "";
         MaxConcurrentDownloads = _config.MaxConcurrentDownloads;
         FileNameFormat = _config.NameFormat ?? "{artist} - {title}";
         PreferredFormats = string.Join(",", _config.PreferredFormats ?? new List<string> { "mp3", "flac" });
         CheckForDuplicates = _config.CheckForDuplicates;
         RememberPassword = _config.RememberPassword;
-        SpotifyClientId = _config.SpotifyClientId; // Client ID can be plaintext
-        // Decrypt the secret for display/use in the session. Handle potential null.
-        if (!string.IsNullOrEmpty(_config.SpotifyClientSecret))
-        {
-            try
-            {
-                SpotifyClientSecret = _protectedDataService.Unprotect(_config.SpotifyClientSecret);
-            }
-            catch (Exception ex) { _logger.LogWarning(ex, "Failed to decrypt Spotify Client Secret. It might be corrupted or from a different user/machine."); }
-        }
+        // Spotify integration uses public scraping only - no credentials required
+        SpotifyUseApi = !_config.SpotifyUsePublicOnly;
         MinBitrate = _config.PreferredMinBitrate;
         MaxBitrate = _config.PreferredMaxBitrate;
 
@@ -149,9 +162,13 @@ public class MainViewModel : INotifyPropertyChanged
         StartDownloadsCommand = new AsyncRelayCommand(StartDownloadsAsync, () => Downloads.Any(j => j.State == DownloadState.Pending));
         CancelDownloadsCommand = new RelayCommand(CancelDownloads);
         ToggleFiltersPanelCommand = new RelayCommand(ToggleFiltersPanel);
+        QuickDownloadCommand = new RelayCommand<Track?>(QuickDownload);
         ImportFromSpotifyCommand = new AsyncRelayCommand(ImportFromSpotifyAsync);
+        BrowseDownloadPathCommand = new RelayCommand(BrowseDownloadPath);
+        BrowseSharedFolderCommand = new RelayCommand(BrowseSharedFolder);
         SearchAllImportedCommand = new AsyncRelayCommand(SearchAllImportedAsync, () => ImportedQueries.Any() && !IsSearching);
         ShowPauseComingSoonCommand = new RelayCommand(() => StatusText = "Pause functionality is planned for a future update!");
+        ClearSearchHistoryCommand = new RelayCommand(ClearSearchHistory);
         SaveSettingsCommand = new RelayCommand(() =>
         {
             UpdateConfigFromViewModel();
@@ -226,6 +243,12 @@ public class MainViewModel : INotifyPropertyChanged
         set { SetProperty(ref _username, value); }
     }
 
+    public PlaylistJob? CurrentPlaylistJob
+    {
+        get => _currentPlaylistJob;
+        set => SetProperty(ref _currentPlaylistJob, value);
+    }
+
     private string _searchQuery = "";
     public string SearchQuery
     {
@@ -248,6 +271,7 @@ public class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _isConnected, value))
             {
                 OnPropertyChanged(nameof(IsLoginOverlayVisible));
+                OnPropertyChanged(nameof(ConnectionStatus));
                 // Notify commands that depend on IsConnected
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -255,6 +279,12 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public bool IsLoginOverlayVisible => !_isConnected;
+
+    /// <summary>
+    /// Connection status string for display (e.g., "Connected", "Disconnected").
+    /// Used by the status indicator in MainWindow.
+    /// </summary>
+    public string ConnectionStatus => _isConnected ? "Connected" : "Disconnected";
 
     public bool IsSearching
     {
@@ -280,6 +310,12 @@ public class MainViewModel : INotifyPropertyChanged
     {
         get => _downloadPath;
         set { SetProperty(ref _downloadPath, value); }
+    }
+
+    public string SharedFolderPath
+    {
+        get => _sharedFolderPath;
+        set { SetProperty(ref _sharedFolderPath, value); }
     }
 
     public int MaxConcurrentDownloads
@@ -323,6 +359,45 @@ public class MainViewModel : INotifyPropertyChanged
         set => SetProperty(ref _isFiltersPanelVisible, value);
     }
 
+    /// <summary>
+    /// Input source type selector (Spotify URL, Plain Text, CSV, Auto-Detect)
+    /// </summary>
+    public List<string> InputSourceTypes { get; } = new() 
+    { 
+        "Auto-Detect", 
+        "Spotify URL", 
+        "Plain Text", 
+        "CSV File" 
+    };
+
+    private string _selectedInputSourceType = "Auto-Detect";
+    public string SelectedInputSourceType
+    {
+        get => _selectedInputSourceType;
+        set => SetProperty(ref _selectedInputSourceType, value);
+    }
+
+    public string QueryInputPlaceholder => "Enter artist, title, or Spotify URL...";
+
+    /// <summary>
+    /// Search history for recall (last 20 queries)
+    /// </summary>
+    public ObservableCollection<string> SearchHistory { get; } = new();
+
+    private string? _selectedHistoryItem;
+    public string? SelectedHistoryItem
+    {
+        get => _selectedHistoryItem;
+        set
+        {
+            if (SetProperty(ref _selectedHistoryItem, value) && value != null)
+            {
+                SearchQuery = value;
+                _selectedHistoryItem = null; // Reset for next selection
+            }
+        }
+    }
+
     private bool _checkForDuplicates;
     public bool CheckForDuplicates
     {
@@ -330,18 +405,11 @@ public class MainViewModel : INotifyPropertyChanged
         set => SetProperty(ref _checkForDuplicates, value);
     }
 
-    private string? _spotifyClientId;
-    public string? SpotifyClientId
+    private bool _spotifyUseApi;
+    public bool SpotifyUseApi
     {
-        get => _spotifyClientId;
-        set => SetProperty(ref _spotifyClientId, value);
-    }
-
-    private string? _spotifyClientSecret;
-    public string? SpotifyClientSecret
-    {
-        get => _spotifyClientSecret;
-        set => SetProperty(ref _spotifyClientSecret, value);
+        get => _spotifyUseApi;
+        set => SetProperty(ref _spotifyUseApi, value);
     }
 
     public int? MinBitrate
@@ -432,6 +500,20 @@ public class MainViewModel : INotifyPropertyChanged
         IsSearching = true;
         StatusText = $"Searching for '{SearchQuery}'...";
         _logger.LogInformation("Search started for: {Query}", SearchQuery);
+
+        // Add to search history (max 20 items)
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            if (SearchHistory.Contains(SearchQuery))
+            {
+                SearchHistory.Remove(SearchQuery);
+            }
+            SearchHistory.Insert(0, SearchQuery);
+            while (SearchHistory.Count > 20)
+            {
+                SearchHistory.RemoveAt(SearchHistory.Count - 1);
+            }
+        }
 
         try
         {
@@ -606,6 +688,31 @@ public class MainViewModel : INotifyPropertyChanged
         
         StatusText = $"Added {tracksToAdd.Count} item(s) to downloads. Skipped {skippedCount} duplicate(s).";
         _logger.LogInformation("Added {AddedCount} items to download queue, skipped {SkippedCount}", tracksToAdd.Count, skippedCount);
+    }
+
+    /// <summary>
+    /// Quick download a single track without showing the Downloads view.
+    /// </summary>
+    private void QuickDownload(Track? track)
+    {
+        if (track == null)
+            return;
+
+        // Check for duplicates if enabled
+        if (CheckForDuplicates)
+        {
+            var library = _downloadLogService.GetEntries();
+            if (library.Any(libTrack => libTrack.Filename == track.Filename && libTrack.Username == track.Username))
+            {
+                _notificationService.Show("Duplicate", "This track is already in your library.", NotificationType.Information, TimeSpan.FromSeconds(3));
+                return;
+            }
+        }
+
+        var job = _downloadManager.EnqueueDownload(track);
+        Downloads.Add(job);
+        _notificationService.Show("Download Started", $"📥 {track.Artist} - {track.Title}", NotificationType.Success, TimeSpan.FromSeconds(3));
+        _logger.LogInformation("Quick download initiated for: {Artist} - {Title}", track.Artist, track.Title);
     }
 
     private async Task ImportCsvAsync(string? filePath = null)
@@ -853,6 +960,12 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    private void ClearSearchHistory()
+    {
+        SearchHistory.Clear();
+        StatusText = "Search history cleared.";
+    }
+
     private void UpdateActiveFiltersSummary()
     {
         var filters = new List<string>();
@@ -869,20 +982,48 @@ public class MainViewModel : INotifyPropertyChanged
     {
         _config.Username = Username;
         _config.DownloadDirectory = DownloadPath;
+        _config.SharedFolderPath = SharedFolderPath;
         _config.MaxConcurrentDownloads = MaxConcurrentDownloads;
         _config.NameFormat = FileNameFormat;
         _config.PreferredFormats = PreferredFormats.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         _config.CheckForDuplicates = CheckForDuplicates;
         _config.RememberPassword = RememberPassword;
-        
-        _config.SpotifyClientId = SpotifyClientId;
-        // Encrypt the secret before saving it to the config file.
-        if (!string.IsNullOrEmpty(SpotifyClientSecret))
-            _config.SpotifyClientSecret = _protectedDataService.Protect(SpotifyClientSecret);
-        else _config.SpotifyClientSecret = null;
+        _config.SpotifyUsePublicOnly = !SpotifyUseApi;
+        // Spotify credentials not needed for public scraping
 
         _config.PreferredMinBitrate = MinBitrate ?? _config.PreferredMinBitrate;
         _config.PreferredMaxBitrate = MaxBitrate ?? _config.PreferredMaxBitrate;
+    }
+
+
+    private void BrowseDownloadPath()
+    {
+        var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Select a folder for downloads",
+            SelectedPath = DownloadPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
+        };
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            DownloadPath = dialog.SelectedPath;
+            StatusText = $"Download path set to: {DownloadPath}";
+        }
+    }
+
+    private void BrowseSharedFolder()
+    {
+        var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Select a shared folder",
+            SelectedPath = SharedFolderPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyMusic)
+        };
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            SharedFolderPath = dialog.SelectedPath;
+            StatusText = $"Shared folder set to: {SharedFolderPath}";
+        }
     }
 
 

@@ -1,7 +1,8 @@
 <Window x:Class="SLSKDONET.Views.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="clr-namespace:SLSKDONET.Views" 
+    xmlns:local="clr-namespace:SLSKDONET.Views"
+    xmlns:converters="clr-namespace:SLSKDONET.Converters"
     Title="Soulseek Downloader" 
     Height="800" 
     Width="1200"
@@ -10,12 +11,23 @@
     
     <Grid x:Name="MainGrid" Background="#1E1E1E">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Global Progress Bar (Top of Window) -->
+        <Border Grid.Row="0" Height="3" Background="#1E1E1E">
+            <ProgressBar Value="{Binding DownloadProgressPercentage, Mode=OneWay, FallbackValue=0}" 
+                         Maximum="100" 
+                         Foreground="#4CAF50" 
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Height="3"/>
+        </Border>
+
         <!-- Main Content Area with Simple Navigation Menu -->
-        <Grid x:Name="RootContent" Grid.Row="0" Background="#1E1E1E">
+        <Grid x:Name="RootContent" Grid.Row="1" Background="#1E1E1E">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="200"/>
                 <ColumnDefinition Width="*"/>
@@ -39,12 +51,40 @@
             <Frame x:Name="RootFrame" Grid.Column="1" NavigationUIVisibility="Hidden" Background="Transparent"/>
         </Grid>
 
-        <!-- Status Bar -->
-        <Border Grid.Row="1" Background="#2D2D2D" BorderBrush="#404040" BorderThickness="0,1,0,0" Padding="16,10">
-            <TextBlock Text="{Binding StatusText, FallbackValue='Disconnected'}" 
-                       Foreground="#A0A0A0"
-                       FontSize="12">
-            </TextBlock>
+        <!-- Status Bar with Connection Indicator -->
+        <Border Grid.Row="2" Background="#2D2D2D" BorderBrush="#404040" BorderThickness="0,1,0,0" Padding="16,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Connection Status Indicator (Left) -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="10" Height="10" Margin="0,0,8,0"
+                             Fill="{Binding IsConnected, Converter={StaticResource ConnectionStatusColorConverter}}"/>
+                    <TextBlock Text="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusTextConverter}}" 
+                               Foreground="#A0A0A0" FontSize="11" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+
+                <!-- Status Message (Center) -->
+                <TextBlock Grid.Column="1" 
+                           Text="{Binding StatusText, FallbackValue='Ready'}" 
+                           Foreground="#A0A0A0"
+                           FontSize="12"
+                           Margin="20,0,0,0"/>
+
+                <!-- Download Progress (Right) -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TodoCount, StringFormat='📥 {0} in progress'}" 
+                               Foreground="#A0A0A0" FontSize="11" Margin="0,0,12,0"/>
+                    <TextBlock Text="{Binding SuccessfulCount, StringFormat='✓ {0} completed'}" 
+                               Foreground="#A0A0A0" FontSize="11" Margin="0,0,12,0"/>
+                    <TextBlock Text="{Binding FailedCount, StringFormat='✗ {0} failed'}" 
+                               Foreground="#A0A0A0" FontSize="11"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Login Overlay - ALWAYS visible on top when not connected -->

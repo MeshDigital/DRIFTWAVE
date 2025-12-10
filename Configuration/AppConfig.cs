@@ -14,6 +14,7 @@ public class AppConfig
     public int ConnectTimeout { get; set; } = 20000; // ms
     public int SearchTimeout { get; set; } = 6000; // ms
     public string? DownloadDirectory { get; set; }
+    public string? SharedFolderPath { get; set; }
     public int MaxConcurrentDownloads { get; set; } = 2;
     public string? NameFormat { get; set; } = "{artist} - {title}";
     public bool CheckForDuplicates { get; set; } = true;
@@ -24,13 +25,9 @@ public class AppConfig
     public int PreferredMaxBitrate { get; set; } = 2500; // kbps
     public int PreferredMaxSampleRate { get; set; } = 48000; // Hz
     public string? PreferredLengthTolerance { get; set; } = "3"; // seconds
-    public string? SpotifyClientId { get; set; }
-    public string? SpotifyClientSecret { get; set; }
-    public string? SpotifyAccessToken { get; set; }
-    public string? SpotifyRefreshToken { get; set; }
     
-    // Spotify source preference
-    public bool SpotifyUsePublicOnly { get; set; } = true; // Default to public scraping only, no API keys
+    // Spotify source preference - public scraping only, no API credentials needed
+    public bool SpotifyUsePublicOnly { get; set; } = true; // Default to public scraping only
     
     // Search and download preferences
     public int SearchLengthToleranceSeconds { get; set; } = 3; // Allow +/- 3 seconds duration mismatch

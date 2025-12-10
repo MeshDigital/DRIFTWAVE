@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:converters="clr-namespace:SLSKDONET.Converters"
       mc:Ignorable="d" 
       d:DesignHeight="450" d:DesignWidth="800"
       Title="SearchPage">
@@ -18,48 +19,81 @@
         <!-- Search Input -->
         <Border Grid.Row="0" Background="{StaticResource SecondaryBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16">
-            <StackPanel Orientation="Vertical">
-                <Label Content="Search for Tracks" Style="{StaticResource ModernLabelStyle}"
-                       FontSize="{StaticResource FontSizeMedium}" FontWeight="Bold"/>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <TextBox Name="SearchBox" 
-                             Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource ModernTextBoxStyle}"
-                             Width="400" 
-                             Height="36"
-                             Margin="0,0,8,0" 
-                             VerticalAlignment="Center"
-                             VerticalContentAlignment="Center"
-                             IsEnabled="{Binding IsSearching, Converter={StaticResource InverseBooleanConverter}}"/>
-                    <Button Content="🔍 Search" 
+                <!-- Main Search Row -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Search Input with integrated buttons -->
+                    <Border Grid.Column="0" Background="{StaticResource BackgroundBrush}" 
+                            CornerRadius="6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Main TextBox -->
+                            <TextBox Name="SearchBox" Grid.Column="0"
+                                     Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBoxStyle}"
+                                     Height="40"
+                                     BorderThickness="0"
+                                     Padding="12,0"
+                                     VerticalAlignment="Center"
+                                     VerticalContentAlignment="Center"
+                                     IsEnabled="{Binding IsSearching, Converter={StaticResource InverseBooleanConverter}}">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding SearchCommand}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+
+                            <!-- Quick Action Buttons (in textbox) -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,4,0">
+                                <Button Content="📋" ToolTip="Import CSV" Click="ImportCsvButton_Click"
+                                        Style="{StaticResource ModernButtonStyle}" 
+                                        Width="32" Height="32" Padding="0" FontSize="14" Margin="2,0"/>
+                                <Button Content="🎵" ToolTip="Import Spotify Playlist" Click="ImportSpotifyButton_Click"
+                                        Style="{StaticResource ModernButtonStyle}"
+                                        Width="32" Height="32" Padding="0" FontSize="14" Margin="2,0"/>
+                                <Button Content="🔧" ToolTip="Search Filters" Command="{Binding ToggleFiltersPanelCommand}"
+                                        Style="{StaticResource ModernButtonStyle}"
+                                        Width="32" Height="32" Padding="0" FontSize="14" Margin="2,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Search Button -->
+                    <Button Grid.Column="1" Content="🔍 Search" 
                             Style="{StaticResource PrimaryButtonStyle}"
-                            VerticalAlignment="Center" 
                             Command="{Binding SearchCommand}"
-                            Padding="20,8"/>
-                    <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center"
-                                Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
-                        <TextBlock Text="⏳ Searching..." 
-                                   Foreground="{StaticResource AccentBrush}"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,8,0"/>
-                        <ProgressBar IsIndeterminate="True" 
-                                     Width="100" 
-                                     Height="4"
-                                     VerticalAlignment="Center"/>
-                    </StackPanel>
-                </StackPanel>
+                            Height="40" Padding="24,0" Margin="8,0,0,0"
+                            IsEnabled="{Binding IsSearching, Converter={StaticResource InverseBooleanConverter}}"/>
+                </Grid>
 
-                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                    <Button Content="📋 Import CSV" Click="ImportCsvButton_Click"
-                            Style="{StaticResource ModernButtonStyle}" Padding="12,6"/>
-                    <Button Content="🎵 Import Spotify" Margin="8,0,0,0" Click="ImportSpotifyButton_Click"
-                            Style="{StaticResource ModernButtonStyle}" Padding="12,6"/>
-                    <Button Content="🔧 Filters" Margin="8,0,0,0" Command="{Binding ToggleFiltersPanelCommand}"
-                            Style="{StaticResource ModernButtonStyle}" Padding="12,6"/>
+                <!-- Search Status Row -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0"
+                            Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                    <TextBlock Text="⏳ Searching..." 
+                               Foreground="{StaticResource AccentBrush}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               FontSize="12"/>
+                    <ProgressBar IsIndeterminate="True" 
+                                 Width="120" 
+                                 Height="3"
+                                 VerticalAlignment="Center"/>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Inline Filter Panel -->

@@ -20,7 +20,7 @@ public class SpotifyInputSource
     private readonly ILogger<SpotifyInputSource> _logger;
     private readonly AppConfig _config;
 
-    public bool IsConfigured => !string.IsNullOrEmpty(_config.SpotifyClientId) && !string.IsNullOrEmpty(_config.SpotifyClientSecret);
+    public bool IsConfigured => false; // API disabled - use public scraping only
 
     // Fallback credentials (base64-encoded to keep bots away)
     private const string DefaultEncodedClientId = "MWJmNDY5M1bLaH9WJiYjFhNGY0MWJjZWQ5YjJjMWNmZGJiZDI=";
@@ -71,16 +71,10 @@ public class SpotifyInputSource
     /// </summary>
     private async Task<List<SearchQuery>> FetchPlaylistWithPublicFlow(string url)
     {
-        var clientId = _config.SpotifyClientId;
-        var clientSecret = _config.SpotifyClientSecret;
-
-        // Fallback to default credentials if not configured
-        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
-        {
-            _logger.LogDebug("Using fallback Spotify credentials");
-            clientId = DecodeBase64(DefaultEncodedClientId);
-            clientSecret = DecodeBase64(DefaultEncodedClientSecret);
-        }
+        // Use default fallback credentials only
+        _logger.LogDebug("Using fallback Spotify credentials");
+        var clientId = DecodeBase64(DefaultEncodedClientId);
+        var clientSecret = DecodeBase64(DefaultEncodedClientSecret);
 
         var config = SpotifyClientConfig.CreateDefault()
             .WithAuthenticator(new ClientCredentialsAuthenticator(clientId, clientSecret));

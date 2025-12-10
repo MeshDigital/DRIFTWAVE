@@ -127,33 +127,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ProtectedDataService>();
 
         // Register Spotify services
-#pragma warning disable CS8634, CS8600, CS8604, CS8621
-        services.AddSingleton(provider =>
-        {
-            var config = provider.GetRequiredService<AppConfig>();
-            var protectedDataService = provider.GetRequiredService<ProtectedDataService>();
-
-            if (string.IsNullOrEmpty(config.SpotifyClientId) || string.IsNullOrEmpty(config.SpotifyClientSecret))
-            {
-                // Return a null client if not configured. The app can handle this gracefully.
-                return null;
-            }
-
-            string decryptedSecret;
-            try
-            {
-                decryptedSecret = protectedDataService.Unprotect(config.SpotifyClientSecret!);
-            }
-            catch (Exception) {
-                // Failed to decrypt, treat as not configured.
-                return null;
-            }
-            var spotifyConfig = SpotifyClientConfig.CreateDefault()
-                .WithAuthenticator(new ClientCredentialsAuthenticator(config.SpotifyClientId, decryptedSecret));
-            
-            return new SpotifyClient(spotifyConfig);
-        });
-#pragma warning restore CS8634, CS8600, CS8604, CS8621
+        // Spotify API client not used - public scraping only
+        services.AddSingleton<ISpotifyClient>(provider => null!);
         services.AddSingleton<SpotifyInputSource>();
         services.AddSingleton<SpotifyScraperInputSource>();
 
