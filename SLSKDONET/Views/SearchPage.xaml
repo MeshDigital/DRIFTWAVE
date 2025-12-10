@@ -1,0 +1,154 @@
+<Page x:Class="SLSKDONET.Views.SearchPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="SearchPage">
+
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Search Input -->
+        <Border Grid.Row="0" Background="{StaticResource SecondaryBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16">
+            <StackPanel Orientation="Vertical">
+                <Label Content="Search for Tracks" Style="{StaticResource ModernLabelStyle}"
+                       FontSize="{StaticResource FontSizeMedium}" FontWeight="Bold"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBox Name="SearchBox" 
+                             Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Width="400" 
+                             Height="36"
+                             Margin="0,0,8,0" 
+                             VerticalAlignment="Center"
+                             VerticalContentAlignment="Center"
+                             IsEnabled="{Binding IsSearching, Converter={StaticResource InverseBooleanConverter}}"/>
+                    <Button Content="🔍 Search" 
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            VerticalAlignment="Center" 
+                            Command="{Binding SearchCommand}"
+                            Padding="20,8"/>
+                    <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsSearching, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                        <TextBlock Text="⏳ Searching..." 
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <ProgressBar IsIndeterminate="True" 
+                                     Width="100" 
+                                     Height="4"
+                                     VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                    <Button Content="📋 Import CSV" Click="ImportCsvButton_Click"
+                            Style="{StaticResource ModernButtonStyle}" Padding="12,6"/>
+                    <Button Content="🎵 Import Spotify" Margin="8,0,0,0" Click="ImportSpotifyButton_Click"
+                            Style="{StaticResource ModernButtonStyle}" Padding="12,6"/>
+                    <Button Content="🔧 Filters" Margin="8,0,0,0" Command="{Binding ToggleFiltersPanelCommand}"
+                            Style="{StaticResource ModernButtonStyle}" Padding="12,6"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Inline Filter Panel -->
+        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" Padding="16"
+                Visibility="{Binding IsFiltersPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <StackPanel>
+                <Label Content="Active Filters" Style="{StaticResource ModernLabelStyle}" Margin="0,0,0,12"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Grid.Column="0" Content="Min Bitrate:" Style="{StaticResource ModernLabelStyle}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="1" Text="{Binding MinBitrate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Margin="8,0,16,0" VerticalAlignment="Center"/>
+
+                    <Label Grid.Column="2" Content="Max Bitrate:" Style="{StaticResource ModernLabelStyle}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="3" Text="{Binding MaxBitrate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Margin="8,0,16,0" VerticalAlignment="Center"/>
+
+                    <Label Grid.Column="4" Content="Formats:" Style="{StaticResource ModernLabelStyle}" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="5" Text="{Binding PreferredFormats, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </Grid>
+                <TextBlock Text="{Binding ActiveFiltersSummary}" Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="{StaticResource FontSizeSmall}" Margin="0,12,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Results DataGrid -->
+        <DataGrid Grid.Row="2" Name="ResultsGrid" 
+                  ItemsSource="{Binding SearchResults}"
+                  Style="{StaticResource ModernDataGridStyle}" 
+                  ColumnHeaderStyle="{StaticResource ModernColumnHeaderStyle}"
+                  CellStyle="{StaticResource ModernCellStyle}"
+                  RowStyle="{StaticResource ModernRowStyle}"
+                  Margin="0"
+                  IsReadOnly="True"
+                  SelectionChanged="ResultsGrid_SelectionChanged">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="150"/>
+                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" MinWidth="200"/>
+                <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="150"/>
+                <DataGridTextColumn Header="Bitrate" Binding="{Binding Bitrate, StringFormat={}{0} kbps}" Width="80"/>
+                <DataGridTextColumn Header="User" Binding="{Binding Username}" Width="120"/>
+                <DataGridTextColumn Header="Size" Binding="{Binding Size, StringFormat={}{0:N0} KB}" Width="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Action Buttons -->
+        <Border Grid.Row="3" Background="{StaticResource SecondaryBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Height="44">
+                    <Button Content="⬇️ Add Selected to Downloads"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            VerticalAlignment="Center" 
+                            Command="{Binding AddToDownloadsCommand}"
+                            CommandParameter="{Binding ElementName=ResultsGrid, Path=SelectedItems}"
+                            Padding="16,10"/>
+                    <TextBlock Text="{Binding SelectedTrackCount, StringFormat='({0} selected)'}"
+                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                               Margin="16,0,0,0" FontSize="{StaticResource FontSizeSmall}"/>
+                </StackPanel>
+                
+                <!-- Status Message -->
+                <TextBlock Grid.Column="1" 
+                           Text="{Binding StatusText, FallbackValue='Ready'}"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           FontSize="{StaticResource FontSizeSmall}"
+                           FontStyle="Italic"
+                           Margin="16,0,0,0"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>
