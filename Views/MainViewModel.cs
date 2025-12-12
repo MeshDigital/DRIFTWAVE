@@ -1148,7 +1148,8 @@ public class MainViewModel : INotifyPropertyChanged
                 // Initialize preview view model
                 ImportPreviewViewModel = new ImportPreviewViewModel(
                     Microsoft.Extensions.Logging.Abstractions.NullLogger<ImportPreviewViewModel>.Instance,
-                    _downloadManager);
+                    _downloadManager,
+                    _libraryService); // Pass library service for duplicate checking
                 ImportPreviewViewModel.InitializePreview(
                     queries.FirstOrDefault()?.SourceTitle ?? "Spotify Playlist",
                     "Spotify",

@@ -37,21 +37,11 @@ public class DatabaseService
     public async Task SaveTrackAsync(TrackEntity track)
     {
         using var context = new AppDbContext();
-        var existing = await context.Tracks.FindAsync(track.GlobalId);
-        
-        if (existing == null)
-        {
-            await context.Tracks.AddAsync(track);
-        }
-        else
-        {
-            // Update fields
-            existing.State = track.State;
-            existing.ErrorMessage = track.ErrorMessage;
-            existing.CoverArtUrl = track.CoverArtUrl; // Persist album art
-            // Should we update others? Usually just state changes.
-        }
-        
+
+        // Apply the atomic upsert pattern. EF Core's Update() method will generate
+        // an INSERT for a new entity or an UPDATE for an existing one based on its primary key.
+        context.Tracks.Update(track);
+
         await context.SaveChangesAsync();
     }
 
@@ -78,6 +68,62 @@ public class DatabaseService
             }
         }
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Finds all PlaylistJob(s) associated with a global track hash and recalculates their successful/failed counts,
+    /// then persists the updated job entities.
+    /// Returns the IDs of the jobs that were updated.
+    /// </summary>
+    public async Task<List<Guid>> RecalculateJobCountsForTrackAsync(string trackUniqueHash)
+    {
+        using var context = new AppDbContext();
+        var affectedJobIds = new List<Guid>();
+
+        // Find all unique PlaylistIds associated with the global track hash
+        var distinctJobIds = await context.PlaylistTracks
+            .Where(t => t.TrackUniqueHash == trackUniqueHash)
+            .Select(t => t.PlaylistId)
+            .Distinct()
+            .ToListAsync();
+
+        if (!distinctJobIds.Any()) return affectedJobIds;
+
+        // Fetch all jobs to update in one go
+        var jobsToUpdate = await context.PlaylistJobs
+            .Where(j => distinctJobIds.Contains(j.Id))
+            .ToListAsync();
+        
+        // Fetch all relevant playlist tracks in one go
+        var allRelatedTracks = await context.PlaylistTracks
+            .Where(t => distinctJobIds.Contains(t.PlaylistId))
+            .ToListAsync();
+
+        foreach (var jobEntity in jobsToUpdate)
+        {
+            var relatedTracks = allRelatedTracks.Where(t => t.PlaylistId == jobEntity.Id).ToList();
+            
+            // Recalculate the aggregate counts
+            int successfulCount = relatedTracks.Count(t => t.Status == TrackStatus.Downloaded);
+            // Treat Failed and Cancelled as terminal failures for job progress
+            int failedCount = relatedTracks.Count(t => t.Status == TrackStatus.Failed || t.Status == TrackStatus.Cancelled);
+            
+            // Only update if counts have actually changed
+            if (jobEntity.SuccessfulCount != successfulCount || jobEntity.FailedCount != failedCount)
+            {
+                jobEntity.SuccessfulCount = successfulCount;
+                jobEntity.FailedCount = failedCount;
+                affectedJobIds.Add(jobEntity.Id);
+            }
+        }
+
+        if (affectedJobIds.Any())
+        {
+            await context.SaveChangesAsync();
+            _logger.LogInformation("Recalculated counts for {Count} jobs based on track {Hash}", affectedJobIds.Count, trackUniqueHash);
+        }
+
+        return affectedJobIds;
     }
 
     // ===== LibraryEntry Methods =====
@@ -182,25 +228,15 @@ public class DatabaseService
     public async Task SavePlaylistTrackAsync(PlaylistTrackEntity track)
     {
         using var context = new AppDbContext();
-        var existing = await context.PlaylistTracks.FindAsync(track.Id);
-        
-        if (existing == null)
+
+        // Apply the atomic upsert pattern. EF Core handles INSERT vs. UPDATE.
+        // Set AddedAt only if the entity is new (detached).
+        if (context.Entry(track).State == EntityState.Detached)
         {
             track.AddedAt = DateTime.UtcNow;
-            await context.PlaylistTracks.AddAsync(track);
         }
-        else
-        {
-            existing.Status = track.Status;
-            existing.ResolvedFilePath = track.ResolvedFilePath;
-            existing.TrackNumber = track.TrackNumber;
-            existing.Artist = track.Artist;
-            existing.Title = track.Title;
-            existing.Album = track.Album;
-            existing.TrackUniqueHash = track.TrackUniqueHash;
-        }
-        
-        await context.SaveChangesAsync();
+        context.PlaylistTracks.Update(track);
+
         await UpdatePlaylistJobCountersAsync(context, track.PlaylistId);
         await context.SaveChangesAsync();
     }
@@ -211,10 +247,10 @@ public class DatabaseService
         if (job == null)
         {
             return;
-        }
-
-        var statuses = await context.PlaylistTracks
+        } 
+        var statuses = await context.PlaylistTracks.AsNoTracking()
             .Where(t => t.PlaylistId == playlistId)
+            .Select(t => t.Status)
             .Select(t => t.Status)
             .ToListAsync();
 
@@ -236,15 +272,15 @@ public class DatabaseService
     public async Task SavePlaylistTracksAsync(IEnumerable<PlaylistTrackEntity> tracks)
     {
         using var context = new AppDbContext();
-        foreach (var track in tracks)
+        
+        // Apply the atomic upsert pattern for a collection of entities.
+        // Set AddedAt for any new entities.
+        foreach (var track in tracks.Where(t => context.Entry(t).State == EntityState.Detached))
         {
-            var existing = await context.PlaylistTracks.FindAsync(track.Id);
-            if (existing == null)
-            {
-                track.AddedAt = DateTime.UtcNow;
-                await context.PlaylistTracks.AddAsync(track);
-            }
+            track.AddedAt = DateTime.UtcNow;
         }
+        context.PlaylistTracks.UpdateRange(tracks);
+
         await context.SaveChangesAsync();
         _logger.LogInformation("Saved {Count} playlist tracks", tracks.Count());
     }
@@ -291,24 +327,11 @@ public class DatabaseService
                 IsDeleted = false
             };
             
-            // Check if job already exists
-            var existing = await context.PlaylistJobs.FindAsync(job.Id);
-            if (existing == null)
-            {
-                await context.PlaylistJobs.AddAsync(jobEntity);
-            }
-            else
-            {
-                // Update existing job
-                existing.SourceTitle = jobEntity.SourceTitle;
-                existing.SourceType = jobEntity.SourceType;
-                existing.DestinationFolder = jobEntity.DestinationFolder;
-                existing.TotalTracks = jobEntity.TotalTracks;
-                existing.SuccessfulCount = jobEntity.SuccessfulCount;
-                existing.FailedCount = jobEntity.FailedCount;
-            }
+            // Use the atomic upsert pattern for the job header.
+            // EF Core will handle INSERT vs. UPDATE.
+            context.PlaylistJobs.Update(jobEntity);
             
-            // Add all tracks
+            // Use the atomic upsert pattern for each track.
             foreach (var track in job.PlaylistTracks)
             {
                 var trackEntity = new PlaylistTrackEntity
@@ -324,17 +347,7 @@ public class DatabaseService
                     TrackNumber = track.TrackNumber,
                     AddedAt = track.AddedAt
                 };
-                
-                var existingTrack = await context.PlaylistTracks.FindAsync(track.Id);
-                if (existingTrack == null)
-                {
-                    await context.PlaylistTracks.AddAsync(trackEntity);
-                }
-                else
-                {
-                    existingTrack.Status = trackEntity.Status;
-                    existingTrack.ResolvedFilePath = trackEntity.ResolvedFilePath;
-                }
+                context.PlaylistTracks.Update(trackEntity);
             }
             
             await context.SaveChangesAsync();

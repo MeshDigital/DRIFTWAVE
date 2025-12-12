@@ -103,40 +103,56 @@ public class LibraryViewModel : INotifyPropertyChanged
         // Subscribe to global track updates for live project track status
         _downloadManager.TrackUpdated += OnGlobalTrackUpdated;
 
-        // Subscribe to project deletion events for real-time Library updates
-        _libraryService.ProjectDeleted += OnProjectDeleted;
-        _libraryService.ProjectUpdated += OnProjectUpdated;
-
         // Subscribe to project added events for real-time Library updates
         _downloadManager.ProjectAdded += OnProjectAdded;
+        
+        // NEW: Subscribe to project updated events for project header/progress updates
+        _downloadManager.ProjectUpdated += OnProjectUpdated; // ADDED
+
+        // Subscribe to project deletion events for real-time Library updates
+        _libraryService.ProjectDeleted += OnProjectDeleted;
 
         // Load projects asynchronously
         _ = LoadProjectsAsync();
     }
 
-    private async void OnProjectUpdated(object? sender, ProjectEventArgs e)
+    /// <summary>
+    /// Handles updates to the project header (e.g., successful/failed count change)
+    /// </summary>
+    private async void OnProjectUpdated(object? sender, Guid jobId)
     {
-        _logger.LogDebug("OnProjectUpdated received for job {JobId}", e.Job.Id);
-        if (System.Windows.Application.Current is null) return;
+        _logger.LogDebug("OnProjectUpdated ENTRY for job {JobId}", jobId);
+        
+        // 1. Fetch the updated job data from persistence
+        var updatedJob = await _libraryService.FindPlaylistJobAsync(jobId);
 
+        if (updatedJob == null)
+        {
+            _logger.LogWarning("OnProjectUpdated: Could not find job {JobId} in library service.", jobId);
+            return;
+        }
+
+        if (System.Windows.Application.Current is null) return;
+        
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            var existing = AllProjects.FirstOrDefault(p => p.Id == e.Job.Id);
-            if (existing == null)
-            {
-                AllProjects.Add(e.Job);
-                return;
-            }
+            // 2. Find the existing job object in the master collection
+            var existingJob = AllProjects.FirstOrDefault(j => j.Id == jobId);
 
-            var index = AllProjects.IndexOf(existing);
-            if (index >= 0)
+            if (existingJob != null)
             {
-                AllProjects[index] = e.Job;
+                // 3. Update the existing job's properties directly to trigger PropertyChanged for UI binding
+                existingJob.SuccessfulCount = updatedJob.SuccessfulCount; // Triggers PropertyChanged
+                existingJob.FailedCount = updatedJob.FailedCount;       // Triggers PropertyChanged
+                existingJob.MissingCount = updatedJob.MissingCount;     // Forces re-calculation/refresh
+                
+                _logger.LogInformation("Updated progress counts for project: {Title}", existingJob.SourceTitle);
             }
-
-            if (SelectedProject?.Id == e.Job.Id)
+            else
             {
-                SelectedProject = e.Job;
+                 // Fallback to full refresh if the job isn't in the collection (e.g., load hasn't finished yet)
+                 _logger.LogWarning("Project {JobId} updated, but not found in AllProjects collection. Forcing a refresh.", jobId);
+                 _ = LoadProjectsAsync();
             }
         });
     }

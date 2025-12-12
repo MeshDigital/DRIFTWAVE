@@ -45,6 +45,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     // Event for new project creation
     public event EventHandler<ProjectEventArgs>? ProjectAdded;
 
+    // Event for project status update (used by LibraryViewModel)
+    public event EventHandler<Guid>? ProjectUpdated;
+
     public DownloadManager(
         ILogger<DownloadManager> logger,
         AppConfig config,
@@ -211,6 +214,27 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 e.PropertyName == nameof(PlaylistTrackViewModel.CoverArtUrl))
             {
                 await SaveTrackToDb(vm);
+                
+                // NEW: If a track reaches a terminal state, update the parent PlaylistJob counts and notify the UI
+                if (vm.State == PlaylistTrackState.Completed || 
+                    vm.State == PlaylistTrackState.Failed || 
+                    vm.State == PlaylistTrackState.Cancelled)
+                {
+                    try
+                    {
+                        var affectedJobIds = await _databaseService.RecalculateJobCountsForTrackAsync(vm.GlobalId);
+                        
+                        // Fire event for Library UI to refresh the job's summary status
+                        foreach (var jobId in affectedJobIds)
+                        {
+                            ProjectUpdated?.Invoke(this, jobId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                         _logger.LogError(ex, "Failed to recalculate PlaylistJob counts for track {Id}", vm.GlobalId);
+                    }
+                }
             }
         }
     }
