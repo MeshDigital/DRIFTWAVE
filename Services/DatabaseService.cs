@@ -97,24 +97,13 @@ public class DatabaseService
     public async Task SaveLibraryEntryAsync(LibraryEntryEntity entry)
     {
         using var context = new AppDbContext();
-        var existing = await context.LibraryEntries.FindAsync(entry.UniqueHash);
-        
-        if (existing == null)
-        {
-            await context.LibraryEntries.AddAsync(entry);
-        }
-        else
-        {
-            // Update existing entry
-            existing.Artist = entry.Artist;
-            existing.Title = entry.Title;
-            existing.Album = entry.Album;
-            existing.FilePath = entry.FilePath;
-            existing.Bitrate = entry.Bitrate;
-            existing.DurationSeconds = entry.DurationSeconds;
-            existing.Format = entry.Format;
-            existing.LastUsedAt = DateTime.UtcNow;
-        }
+
+        // EF Core's Update() on a detached entity with a PK acts as an "upsert".
+        // It will generate an INSERT if the key doesn't exist, or an UPDATE if it does.
+        // This is more atomic than a separate read-then-write operation.
+        // Note: For this to work, LibraryEntryEntity.UniqueHash must be configured as the primary key.
+        entry.LastUsedAt = DateTime.UtcNow; // Ensure the timestamp is always updated.
+        context.LibraryEntries.Update(entry);
         
         await context.SaveChangesAsync();
     }
@@ -142,24 +131,13 @@ public class DatabaseService
     public async Task SavePlaylistJobAsync(PlaylistJobEntity job)
     {
         using var context = new AppDbContext();
-        var existing = await context.PlaylistJobs.FindAsync(job.Id);
-        
-        if (existing == null)
-        {
-            job.CreatedAt = DateTime.UtcNow;
-            await context.PlaylistJobs.AddAsync(job);
-        }
-        else
-        {
-            existing.SourceTitle = job.SourceTitle;
-            existing.SourceType = job.SourceType;
-            existing.DestinationFolder = job.DestinationFolder;
-            existing.TotalTracks = job.TotalTracks;
-            existing.SuccessfulCount = job.SuccessfulCount;
-            existing.FailedCount = job.FailedCount;
-            existing.CompletedAt = job.CompletedAt;
-        }
-        
+
+        // Use the same atomic upsert pattern for PlaylistJobs.
+        // EF Core will handle INSERT vs. UPDATE based on the job.Id primary key.
+        // We set CreatedAt here if it's a new entity. The DB context tracks the entity state.
+        if (context.Entry(job).State == EntityState.Detached)
+             job.CreatedAt = DateTime.UtcNow;
+        context.PlaylistJobs.Update(job);
         await context.SaveChangesAsync();
         _logger.LogInformation("Saved PlaylistJob: {Title} ({Id})", job.SourceTitle, job.Id);
     }

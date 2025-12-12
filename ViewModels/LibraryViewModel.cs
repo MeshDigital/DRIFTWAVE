@@ -103,6 +103,9 @@ public class LibraryViewModel : INotifyPropertyChanged
         // Subscribe to global track updates for live project track status
         _downloadManager.TrackUpdated += OnGlobalTrackUpdated;
 
+        // Subscribe to project deletion events for real-time Library updates
+        _libraryService.ProjectDeleted += OnProjectDeleted;
+
         // Subscribe to project added events for real-time Library updates
         _downloadManager.ProjectAdded += OnProjectAdded;
 
@@ -110,6 +113,24 @@ public class LibraryViewModel : INotifyPropertyChanged
         _ = LoadProjectsAsync();
     }
 
+    private async void OnProjectDeleted(object? sender, Guid projectId)
+    {
+        _logger.LogInformation("OnProjectDeleted event received for job {JobId}", projectId);
+        if (System.Windows.Application.Current is null) return;
+
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var jobToRemove = AllProjects.FirstOrDefault(p => p.Id == projectId);
+            if (jobToRemove != null)
+            {
+                AllProjects.Remove(jobToRemove);
+
+                // Auto-select next project if the deleted one was selected
+                if (SelectedProject == jobToRemove)
+                    SelectedProject = AllProjects.FirstOrDefault();
+            }
+        });
+    }
     private async void OnProjectAdded(object? sender, ProjectEventArgs e)
     {
         _logger.LogInformation("OnProjectAdded ENTRY for job {JobId}. Current project count: {ProjectCount}, Global track count: {TrackCount}", e.Job.Id, AllProjects.Count, _downloadManager.AllGlobalTracks.Count);
@@ -219,19 +240,8 @@ public class LibraryViewModel : INotifyPropertyChanged
         {
             // Soft-delete via database service
             await _libraryService.DeletePlaylistJobAsync(job.Id);
-
-            if (System.Windows.Application.Current is null) return;
-            // Remove from UI collection immediately for responsive UX
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
-            {
-                AllProjects.Remove(job);
-
-                // Auto-select next project if available
-                if (SelectedProject == job)
-                    SelectedProject = AllProjects.FirstOrDefault();
-
-                _logger.LogInformation("Project removed from Library UI: {Title}", job.SourceTitle);
-            });
+            // The UI update will now be handled by the OnProjectDeleted event handler.
+            _logger.LogInformation("Deletion request for project {Title} processed. Event will trigger UI update.", job.SourceTitle);
         }
         catch (Exception ex)
         {

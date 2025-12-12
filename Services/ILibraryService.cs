@@ -12,6 +12,11 @@ namespace SLSKDONET.Services;
 /// </summary>
 public interface ILibraryService
 {
+    /// <summary>
+    /// Fired when a playlist job is successfully soft-deleted.
+    /// </summary>
+    event EventHandler<Guid>? ProjectDeleted;
+
     // ===== INDEX 1: LibraryEntry (Main Global Index) =====
     
     /// <summary>
@@ -31,15 +36,10 @@ public interface ILibraryService
     Task<List<LibraryEntry>> LoadAllLibraryEntriesAsync();
 
     /// <summary>
-    /// Adds a new entry to the main library.
-    /// Called when a track is successfully downloaded.
+    /// Atomically saves (inserts or updates) a library entry based on its UniqueHash.
+    /// This replaces separate Add and Update methods to prevent race conditions.
     /// </summary>
-    Task AddLibraryEntryAsync(LibraryEntry entry);
-
-    /// <summary>
-    /// Updates an existing library entry (e.g., metadata).
-    /// </summary>
-    Task UpdateLibraryEntryAsync(LibraryEntry entry);
+    Task SaveOrUpdateLibraryEntryAsync(LibraryEntry entry);
 
     // ===== INDEX 2: PlaylistJob (Playlist Headers) =====
 

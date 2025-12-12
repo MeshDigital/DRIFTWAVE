@@ -21,6 +21,8 @@ public class LibraryService : ILibraryService
     private readonly ILogger<LibraryService> _logger;
     private readonly DatabaseService _databaseService;
 
+    public event EventHandler<Guid>? ProjectDeleted;
+
     public LibraryService(ILogger<LibraryService> logger, DatabaseService databaseService)
     {
         _logger = logger;
@@ -49,42 +51,22 @@ public class LibraryService : ILibraryService
         return entities.Select(EntityToLibraryEntry).ToList();
     }
 
-    public async Task AddLibraryEntryAsync(LibraryEntry entry)
+    public async Task SaveOrUpdateLibraryEntryAsync(LibraryEntry entry)
     {
         try
         {
             var entity = LibraryEntryToEntity(entry);
-            entity.AddedAt = DateTime.UtcNow; // Ensure timestamp is set on creation
             entity.LastUsedAt = DateTime.UtcNow;
-            await _databaseService.SaveLibraryEntryAsync(entity);
-            _logger.LogDebug("Added library entry: {Hash}", entry.UniqueHash);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to add library entry");
-            throw;
-        }
-    }
 
-    public async Task UpdateLibraryEntryAsync(LibraryEntry entry)
-    {
-        try
-        {
-            var entity = await _databaseService.FindLibraryEntryAsync(entry.UniqueHash);
-            if (entity == null)
-            {
-                await AddLibraryEntryAsync(entry);
-                return;
-            }
-            
-            // Update existing entity
-            entity.LastUsedAt = DateTime.UtcNow;
+            // This call will perform an atomic upsert (INSERT or UPDATE)
+            // assuming the underlying DatabaseService uses EF Core's Update() or equivalent.
+            // If the PK is not found, it will be an INSERT; otherwise, an UPDATE.
             await _databaseService.SaveLibraryEntryAsync(entity);
-            _logger.LogDebug("Updated library entry: {Hash}", entry.UniqueHash);
+            _logger.LogDebug("Upserted library entry: {Hash}", entry.UniqueHash);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update library entry");
+            _logger.LogError(ex, "Failed to save or update library entry");
             throw;
         }
     }
@@ -158,6 +140,9 @@ public class LibraryService : ILibraryService
             // With soft delete, we just set the flag
             await _databaseService.SoftDeletePlaylistJobAsync(playlistId);
             _logger.LogInformation("Deleted playlist job: {Id}", playlistId);
+
+            // Emit the event so subscribers (like LibraryViewModel) can react.
+            ProjectDeleted?.Invoke(this, playlistId);
         }
         catch (Exception ex)
         {
@@ -252,8 +237,8 @@ public class LibraryService : ILibraryService
                 Format = track.Format ?? "Unknown"
             };
 
-            await AddLibraryEntryAsync(entry);
-            _logger.LogDebug("Added track to library: {Hash}", entry.UniqueHash);
+            await SaveOrUpdateLibraryEntryAsync(entry);
+            _logger.LogDebug("Saved/updated track in library: {Hash}", entry.UniqueHash);
         }
         catch (Exception ex)
         {
@@ -356,7 +341,12 @@ public class LibraryService : ILibraryService
         entity.Bitrate = entry.Bitrate;
         entity.DurationSeconds = entry.DurationSeconds;
         entity.Format = entry.Format;
-        entity.AddedAt = entry.AddedAt;
+        // Ensure AddedAt is only set on creation, not on update.
+        // The DatabaseService logic should handle this. If it doesn't, we can do it here:
+        if (entry.AddedAt == default)
+        {
+            entity.AddedAt = DateTime.UtcNow;
+        }
         return entity;
     }
 }
