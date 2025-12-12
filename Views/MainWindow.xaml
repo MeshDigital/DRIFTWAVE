@@ -159,6 +159,35 @@
                             FontSize="14"
                             FontWeight="SemiBold"
                             IsDefault="True"/>
+                    
+                    <Button Content="Maybe Later" 
+                            Command="{Binding DismissLoginCommand}"
+                            Background="Transparent" 
+                            Foreground="#A0A0A0" 
+                            FontSize="12"
+                            BorderThickness="0" 
+                            Padding="0,12"
+                            Margin="0,8,0,0"
+                            Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <TextBlock Text="{TemplateBinding Content}" 
+                                          Foreground="#A0A0A0"
+                                          HorizontalAlignment="Center"
+                                          TextDecorations="Underline">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

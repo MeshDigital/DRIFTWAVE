@@ -214,12 +214,8 @@ public class SpotifyImportViewModel : INotifyPropertyChanged
             job.PlaylistTracks.Add(playlistTrack);
         }
 
-        // Queue tracks for download
-        foreach (var track in job.PlaylistTracks)
-        {
-            var vm = new PlaylistTrackViewModel(track);
-            _downloadManager.AllGlobalTracks.Add(vm);
-        }
+        // Use the new DownloadManager overload to save job and queue tracks
+        await _downloadManager.QueueProject(job);
 
         StatusMessage = $"Queued {selectedTracks.Count} tracks for download";
         

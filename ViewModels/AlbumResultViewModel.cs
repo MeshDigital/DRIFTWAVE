@@ -64,29 +64,41 @@ public class AlbumResultViewModel
         DownloadAlbumCommand = new RelayCommand(DownloadAlbum_Execute);
     }
 
-    private void DownloadAlbum_Execute()
+    private async void DownloadAlbum_Execute()
     {
         if (Tracks == null || !Tracks.Any()) return;
         
-        // Convert to PlaylistTrack for the manager
-        // Logic similar to EnqueueTrack but for a batch
-        var playlistTracks = new List<PlaylistTrack>();
+        // Create PlaylistJob for Library integration
+        var job = new PlaylistJob
+        {
+            Id = System.Guid.NewGuid(),
+            SourceTitle = $"{Artist} - {AlbumTitle}",
+            SourceType = "Album",
+            CreatedAt = System.DateTime.Now,
+            DestinationFolder = ""
+        };
         
+        // Convert tracks to PlaylistTrack and add to job
         foreach(var t in Tracks)
         {
-            playlistTracks.Add(new PlaylistTrack
+            var playlistTrack = new PlaylistTrack
             {
                 Id = System.Guid.NewGuid(),
+                PlaylistId = job.Id,
                 Artist = t.Artist,
                 Title = t.Title,
                 Album = AlbumTitle,
                 Status = TrackStatus.Missing,
                 TrackUniqueHash = t.UniqueHash,
-                // We let DownloadManager handle path resolution but we can pass hints if needed
-                ResolvedFilePath = null 
-            });
+                ResolvedFilePath = null,
+                AddedAt = System.DateTime.Now
+            };
+            
+            job.PlaylistTracks.Add(playlistTrack);
+            job.OriginalTracks.Add(t);
         }
         
-        _downloadManager.QueueProject(playlistTracks);
+        // Use new QueueProject overload - creates job in Library and queues tracks
+        await _downloadManager.QueueProject(job);
     }
 }

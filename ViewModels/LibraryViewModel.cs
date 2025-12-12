@@ -111,11 +111,26 @@ public class LibraryViewModel : INotifyPropertyChanged
         CancelCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteCancel);
         OpenProjectCommand = new RelayCommand<PlaylistJob>(project => SelectedProject = project);
         
+        
         // Subscribe to global track updates for live progress
         _downloadManager.TrackUpdated += OnGlobalTrackUpdated;
         
+        // Subscribe to project added events for real-time Library updates
+        _downloadManager.ProjectAdded += OnProjectAdded;
+        
         // Load projects asynchronously
         _ = LoadProjectsAsync();
+    }
+    
+    private async void OnProjectAdded(object? sender, ProjectEventArgs e)
+    {
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+        {
+            // Add the new project to the observable collection
+            AllProjects.Add(e.Job);
+            
+            _logger.LogInformation("Project added to Library: {Title}", e.Job.SourceTitle);
+        });
     }
 
     public void ReorderTrack(PlaylistTrackViewModel source, PlaylistTrackViewModel target)

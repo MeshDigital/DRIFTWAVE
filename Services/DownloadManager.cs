@@ -27,6 +27,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     private readonly ITaggerService _taggerService;
     private readonly DatabaseService _databaseService;
     private readonly IMetadataService _metadataService;
+    private readonly ILibraryService _libraryService;
 
     // Concurrency control
     private readonly SemaphoreSlim _concurrencySemaphore;
@@ -37,6 +38,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     // Using BindingOperations for thread safety is best practice for ObservableCollection accessed from threads
     public ObservableCollection<PlaylistTrackViewModel> AllGlobalTracks { get; } = new();
     private readonly object _collectionLock = new object();
+    
+    // Event for new project creation
+    public event EventHandler<ProjectEventArgs>? ProjectAdded;
 
     public DownloadManager(
         ILogger<DownloadManager> logger,
@@ -45,7 +49,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         FileNameFormatter fileNameFormatter,
         ITaggerService taggerService,
         DatabaseService databaseService,
-        IMetadataService metadataService)
+        IMetadataService metadataService,
+        ILibraryService libraryService)
     {
         _logger = logger;
         _config = config;
@@ -54,6 +59,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         _taggerService = taggerService;
         _databaseService = databaseService;
         _metadataService = metadataService;
+        _libraryService = libraryService;
 
         _concurrencySemaphore = new SemaphoreSlim(_config.MaxConcurrentDownloads);
 
@@ -110,7 +116,34 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     public event EventHandler<PlaylistTrackViewModel>? TrackUpdated;
 
     /// <summary>
-    /// Queues a project (list of tracks) for processing.
+    /// Queues a project (a PlaylistJob) for processing and persists the job header and tracks.
+    /// This is the preferred entry point for importing new multi-track projects.
+    /// </summary>
+    public async Task QueueProject(PlaylistJob job)
+    {
+        _logger.LogInformation("Queueing project header: {Title} with {Count} tracks", job.SourceTitle, job.PlaylistTracks.Count);
+        
+        // 1. Persist the job header (for Library UI visibility)
+        try
+        {
+            await _libraryService.SavePlaylistJobAsync(job);
+            _logger.LogInformation("Saved PlaylistJob to database: {Title}", job.SourceTitle);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist PlaylistJob {Id}", job.Id);
+            // Non-critical error, continue to queue tracks.
+        }
+
+        // 2. Queue the tracks using the existing method for collection add and individual track persistence
+        QueueProject(job.PlaylistTracks);
+        
+        // 3. Fire event for Library UI to refresh
+        ProjectAdded?.Invoke(this, new ProjectEventArgs(job));
+    }
+
+    /// <summary>
+    /// Queues a list of individual tracks for processing (e.g. from an existing project or ad-hoc).
     /// </summary>
     public void QueueProject(List<PlaylistTrack> tracks)
     {

@@ -375,7 +375,22 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsLoginOverlayVisible => !_isConnected;
+    private bool _isLoginOverlayVisible = false;
+    public bool IsLoginOverlayVisible
+    {
+        get => _isLoginOverlayVisible;
+        set
+        {
+            if (_isLoginOverlayVisible != value)
+            {
+                _isLoginOverlayVisible = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+    
+    public ICommand ShowLoginCommand => new RelayCommand(() => IsLoginOverlayVisible = true);
+    public ICommand DismissLoginCommand => new RelayCommand(() => IsLoginOverlayVisible = false);
 
     /// <summary>
     /// Connection status string for display (e.g., "Connected", "Disconnected").
