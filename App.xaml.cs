@@ -75,6 +75,11 @@ public partial class App : System.Windows.Application
         try
         {
             var mainWindow = Services.GetRequiredService<MainWindow>();
+            
+            // Eagerly instantiate LibraryViewModel so it subscribes to ProjectAdded events
+            // during orchestration, before user navigates to Library page
+            _ = Services.GetRequiredService<SLSKDONET.ViewModels.LibraryViewModel>();
+            
             mainWindow.Show();
         }
         catch (Exception ex)

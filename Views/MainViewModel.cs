@@ -69,6 +69,11 @@ public class MainViewModel : INotifyPropertyChanged
     public int TodoCount => _downloadManager.AllGlobalTracks.Count(t => t.State == ViewModels.PlaylistTrackState.Pending || t.State == ViewModels.PlaylistTrackState.Downloading || t.State == ViewModels.PlaylistTrackState.Searching);
 
     /// <summary>
+    /// Exposes the global tracks collection from DownloadManager for binding in DownloadsPage.
+    /// </summary>
+    public ObservableCollection<PlaylistTrackViewModel> AllGlobalTracks => _downloadManager.AllGlobalTracks;
+
+    /// <summary>
     /// Calculate overall download progress percentage for the global progress bar.
     /// </summary>
     public double DownloadProgressPercentage
@@ -277,17 +282,9 @@ public class MainViewModel : INotifyPropertyChanged
                               $"RememberPassword: {_config.RememberPassword}");
         
         // Attempt auto-login if credentials are saved
-        if (!string.IsNullOrEmpty(_config.Username) && 
-            !string.IsNullOrEmpty(_config.Password) &&
-            _config.RememberPassword)
-        {
-            _logger.LogInformation("Auto-login: credentials found, attempting...");
-            _ = AutoLoginAsync();
-        }
-        else
-        {
-            _logger.LogInformation("Auto-login: skipped (no valid credentials)");
-        }
+        // Auto-login is now optional and controlled by user preference via AutoConnectEnabled
+        // Don't automatically attempt login on startup - let user decide via login screen
+        _logger.LogInformation("App startup complete - showing login overlay");
         
         // Load library asynchronously to avoid blocking UI thread
         _ = LoadLibraryAsync();
@@ -295,6 +292,13 @@ public class MainViewModel : INotifyPropertyChanged
     
     private async Task AutoLoginAsync()
     {
+        // Only attempt auto-login if user has enabled it and has saved credentials
+        if (!AutoConnectEnabled || string.IsNullOrEmpty(_config.Password))
+        {
+            _logger.LogInformation("Auto-login: disabled or no saved credentials");
+            return;
+        }
+
         try
         {
             // Give user 2 seconds to dismiss the overlay if they want
@@ -450,6 +454,16 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     private bool _loginDismissed = false;
+    private bool _autoConnectEnabled = false;
+    
+    /// <summary>
+    /// Whether user has enabled automatic connection on app startup.
+    /// </summary>
+    public bool AutoConnectEnabled
+    {
+        get => _autoConnectEnabled;
+        set { SetProperty(ref _autoConnectEnabled, value); }
+    }
     
     /// <summary>
     /// Login overlay is visible when not connected AND user hasn't dismissed it.
@@ -675,6 +689,7 @@ public class MainViewModel : INotifyPropertyChanged
             // Ensure the username from the UI is passed to the config before connecting
             _config.Username = Username;
             _config.RememberPassword = RememberPassword;
+            // Note: AutoConnectEnabled is a UI preference, not persisted to config
 
             // Save password to config if "Remember Me" is checked
             if (RememberPassword)
@@ -692,10 +707,10 @@ public class MainViewModel : INotifyPropertyChanged
             IsConnected = true;
             StatusText = "";
             
-            // Save config to persist credentials
+            // Save config to persist credentials and auto-connect preference
             _configManager.Save(_config);
             
-            _logger.LogInformation("Login successful");
+            _logger.LogInformation("Login successful - AutoConnect={AutoConnect}", AutoConnectEnabled);
         }
         catch (Exception ex)
         {

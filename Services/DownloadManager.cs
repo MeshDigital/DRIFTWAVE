@@ -135,10 +135,22 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             // Non-critical error, continue to queue tracks.
         }
 
-        // 2. Queue the tracks using the internal method for collection add and individual track persistence
+        // 2. Persist all playlist tracks to the database
+        try
+        {
+            await _libraryService.SavePlaylistTracksAsync(job.PlaylistTracks);
+            _logger.LogInformation("Saved {Count} playlist tracks to database for job {Title}", job.PlaylistTracks.Count, job.SourceTitle);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist playlist tracks for job {Id}", job.Id);
+            // Non-critical error, continue.
+        }
+
+        // 3. Queue the tracks using the internal method for collection add and individual track persistence
         QueueTracks(job.PlaylistTracks);
         
-        // 3. Fire event for Library UI to refresh
+        // 4. Fire event for Library UI to refresh
         ProjectAdded?.Invoke(this, new ProjectEventArgs(job));
     }
 

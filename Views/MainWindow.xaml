@@ -231,6 +231,11 @@
                     <CheckBox Content="Remember Password" 
                               IsChecked="{Binding RememberPassword, Mode=TwoWay}" 
                               Foreground="White"
+                              Margin="0,0,0,12"/>
+
+                    <CheckBox Content="Auto-Connect on startup" 
+                              IsChecked="{Binding AutoConnectEnabled, Mode=TwoWay}" 
+                              Foreground="White"
                               Margin="0,0,0,20"/>
 
                      <Button x:Name="SignInButton"

@@ -29,7 +29,7 @@
 
         <!-- Global Read-Only Grid -->
         <DataGrid Grid.Row="1" 
-                  ItemsSource="{Binding AllGlobalTracks, Source={x:Static Application.Current}, Path=MainWindow.DataContext.DownloadManager}" 
+                  ItemsSource="{Binding AllGlobalTracks}" 
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   Background="Transparent"
@@ -38,12 +38,6 @@
                   GridLinesVisibility="Horizontal"
                   HorizontalGridLinesBrush="#333"
                   BorderThickness="0">
-             <!-- Note: Binding path above is a bit hacky for XAML-only access. 
-                  Ideally MainViewModel exposes this directly or we inject DownloadManager into DownloadsViewModel. 
-                  For now, we'll assume MainViewModel isn't directly the DataContext here if it's transient, 
-                  BUT DownloadsPage is usually navigated from MainViewModel context. 
-                  Let's check code-behind/injection. If it's transient, it might need its own VM.
-                  Correction: I will implement a simpler binding assuming DataContext is MainViewModel or similar. -->
              
             <DataGrid.Resources>
                 <Style TargetType="DataGridColumnHeader">
