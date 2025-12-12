@@ -193,9 +193,44 @@ public class DatabaseService
         {
             existing.Status = track.Status;
             existing.ResolvedFilePath = track.ResolvedFilePath;
+            existing.TrackNumber = track.TrackNumber;
+            existing.Artist = track.Artist;
+            existing.Title = track.Title;
+            existing.Album = track.Album;
+            existing.TrackUniqueHash = track.TrackUniqueHash;
         }
         
         await context.SaveChangesAsync();
+        await UpdatePlaylistJobCountersAsync(context, track.PlaylistId);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task UpdatePlaylistJobCountersAsync(AppDbContext context, Guid playlistId)
+    {
+        var job = await context.PlaylistJobs.FirstOrDefaultAsync(j => j.Id == playlistId);
+        if (job == null)
+        {
+            return;
+        }
+
+        var statuses = await context.PlaylistTracks
+            .Where(t => t.PlaylistId == playlistId)
+            .Select(t => t.Status)
+            .ToListAsync();
+
+        job.TotalTracks = statuses.Count;
+        job.SuccessfulCount = statuses.Count(s => s == TrackStatus.Downloaded);
+        job.FailedCount = statuses.Count(s => s == TrackStatus.Failed || s == TrackStatus.Skipped);
+
+        var remaining = statuses.Count(s => s == TrackStatus.Missing);
+        if (job.TotalTracks > 0 && remaining == 0)
+        {
+            job.CompletedAt ??= DateTime.UtcNow;
+        }
+        else
+        {
+            job.CompletedAt = null;
+        }
     }
 
     public async Task SavePlaylistTracksAsync(IEnumerable<PlaylistTrackEntity> tracks)

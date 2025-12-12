@@ -123,7 +123,7 @@ public class PlaylistJob : INotifyPropertyChanged
     public void RefreshStatusCounts()
     {
         SuccessfulCount = PlaylistTracks.Count(t => t.Status == Models.TrackStatus.Downloaded);
-        FailedCount = PlaylistTracks.Count(t => t.Status == Models.TrackStatus.Failed);
+        FailedCount = PlaylistTracks.Count(t => t.Status == Models.TrackStatus.Failed || t.Status == Models.TrackStatus.Skipped);
         MissingCount = PlaylistTracks.Count(t => t.Status == Models.TrackStatus.Missing);
     }
 

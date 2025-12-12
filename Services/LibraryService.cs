@@ -22,6 +22,7 @@ public class LibraryService : ILibraryService
     private readonly DatabaseService _databaseService;
 
     public event EventHandler<Guid>? ProjectDeleted;
+    public event EventHandler<ProjectEventArgs>? ProjectUpdated;
 
     public LibraryService(ILogger<LibraryService> logger, DatabaseService databaseService)
     {
@@ -189,6 +190,13 @@ public class LibraryService : ILibraryService
             var entity = PlaylistTrackToEntity(track);
             await _databaseService.SavePlaylistTrackAsync(entity);
             _logger.LogDebug("Updated playlist track status: {Hash} = {Status}", track.TrackUniqueHash, track.Status);
+
+            // Emit an update event so the UI can refresh progress/state.
+            var jobEntity = await _databaseService.LoadPlaylistJobAsync(track.PlaylistId);
+            if (jobEntity != null)
+            {
+                ProjectUpdated?.Invoke(this, new ProjectEventArgs(EntityToPlaylistJob(jobEntity)));
+            }
         }
         catch (Exception ex)
         {
@@ -273,7 +281,8 @@ public class LibraryService : ILibraryService
         };
 
         job.MissingCount = entity.TotalTracks - entity.SuccessfulCount - entity.FailedCount;
-        
+        job.RefreshStatusCounts();
+
         return job;
     }
 

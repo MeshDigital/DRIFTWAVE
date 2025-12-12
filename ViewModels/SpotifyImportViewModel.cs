@@ -196,6 +196,8 @@ public class SpotifyImportViewModel : INotifyPropertyChanged
             DestinationFolder = "" // Will use default from config
         };
 
+        job.OriginalTracks = new ObservableCollection<Track>(selectedTracks.Select(t => t.Track));
+
         // Convert SelectableTracks to PlaylistTracks and attach the PlaylistId
         foreach (var selectable in selectedTracks)
         {
@@ -208,11 +210,14 @@ public class SpotifyImportViewModel : INotifyPropertyChanged
                 Album = selectable.Album,
                 TrackUniqueHash = $"{selectable.Artist}|{selectable.Title}".ToLowerInvariant(),
                 Status = TrackStatus.Missing,
-                AddedAt = DateTime.Now
+                AddedAt = DateTime.Now,
+                TrackNumber = selectable.TrackNumber
             };
 
             job.PlaylistTracks.Add(playlistTrack);
         }
+
+        job.RefreshStatusCounts();
 
         // Use the new DownloadManager overload which persists the PlaylistJob and queues the tracks
         await _downloadManager.QueueProject(job);

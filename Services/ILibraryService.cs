@@ -17,6 +17,11 @@ public interface ILibraryService
     /// </summary>
     event EventHandler<Guid>? ProjectDeleted;
 
+    /// <summary>
+    /// Fired whenever a playlist job's progress or metadata changes.
+    /// </summary>
+    event EventHandler<ProjectEventArgs>? ProjectUpdated;
+
     // ===== INDEX 1: LibraryEntry (Main Global Index) =====
     
     /// <summary>

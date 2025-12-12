@@ -105,12 +105,40 @@ public class LibraryViewModel : INotifyPropertyChanged
 
         // Subscribe to project deletion events for real-time Library updates
         _libraryService.ProjectDeleted += OnProjectDeleted;
+        _libraryService.ProjectUpdated += OnProjectUpdated;
 
         // Subscribe to project added events for real-time Library updates
         _downloadManager.ProjectAdded += OnProjectAdded;
 
         // Load projects asynchronously
         _ = LoadProjectsAsync();
+    }
+
+    private async void OnProjectUpdated(object? sender, ProjectEventArgs e)
+    {
+        _logger.LogDebug("OnProjectUpdated received for job {JobId}", e.Job.Id);
+        if (System.Windows.Application.Current is null) return;
+
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var existing = AllProjects.FirstOrDefault(p => p.Id == e.Job.Id);
+            if (existing == null)
+            {
+                AllProjects.Add(e.Job);
+                return;
+            }
+
+            var index = AllProjects.IndexOf(existing);
+            if (index >= 0)
+            {
+                AllProjects[index] = e.Job;
+            }
+
+            if (SelectedProject?.Id == e.Job.Id)
+            {
+                SelectedProject = e.Job;
+            }
+        });
     }
 
     private async void OnProjectDeleted(object? sender, Guid projectId)

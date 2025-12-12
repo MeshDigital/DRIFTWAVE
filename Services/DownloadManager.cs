@@ -1,11 +1,13 @@
-
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Channels;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Configuration;
 using SLSKDONET.Models;
@@ -28,6 +30,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     private readonly ITaggerService _taggerService;
     private readonly DatabaseService _databaseService;
     private readonly IMetadataService _metadataService;
+    private readonly ILibraryService _libraryService;
 
     // Concurrency control
     private readonly SemaphoreSlim _concurrencySemaphore;
@@ -49,7 +52,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         FileNameFormatter fileNameFormatter,
         ITaggerService taggerService,
         DatabaseService databaseService,
-        IMetadataService metadataService)
+        IMetadataService metadataService,
+        ILibraryService libraryService)
     {
         _logger = logger;
         _config = config;
@@ -58,6 +62,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         _taggerService = taggerService;
         _databaseService = databaseService;
         _metadataService = metadataService;
+        _libraryService = libraryService;
 
         _concurrencySemaphore = new SemaphoreSlim(_config.MaxConcurrentDownloads);
 
@@ -462,6 +467,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             {
                 track.State = PlaylistTrackState.Completed;
                 track.Progress = 100;
+                track.Model.Status = TrackStatus.Downloaded;
+                await PersistPlaylistTrackAsync(track.Model);
                 return;
             }
 
@@ -503,7 +510,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             if (results.IsEmpty)
             {
                 track.State = PlaylistTrackState.Failed;
+                track.Model.Status = TrackStatus.Failed;
                 track.ErrorMessage = "No results found";
+                await PersistPlaylistTrackAsync(track.Model);
                 return;
             }
 
@@ -527,7 +536,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             if (bestMatch == null)
             {
                 track.State = PlaylistTrackState.Failed;
+                track.Model.Status = TrackStatus.Failed;
                 track.ErrorMessage = "No suitable match found";
+                await PersistPlaylistTrackAsync(track.Model);
                 return;
             }
 
@@ -575,11 +586,15 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 {
                     _logger.LogWarning("Tagging error: {Msg}", ex.Message);
                 }
+
+                await PersistPlaylistTrackAsync(track.Model);
             }
             else
             {
                 track.State = PlaylistTrackState.Failed;
+                track.Model.Status = TrackStatus.Failed;
                 track.ErrorMessage = "Download failed (Transfer)";
+                await PersistPlaylistTrackAsync(track.Model);
             }
         }
         catch (OperationCanceledException)
@@ -597,8 +612,11 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         catch (Exception ex)
         {
             track.State = PlaylistTrackState.Failed;
+            track.Model.Status = TrackStatus.Failed;
             track.ErrorMessage = ex.Message;
             _logger.LogError(ex, "ProcessTrackAsync fatal error");
+
+            await PersistPlaylistTrackAsync(track.Model);
         }
     }
     
@@ -616,5 +634,22 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     {
         _globalCts.Cancel();
         _concurrencySemaphore.Dispose();
+    }
+
+    private async Task PersistPlaylistTrackAsync(PlaylistTrack trackModel)
+    {
+        if (trackModel.PlaylistId == Guid.Empty)
+        {
+            return;
+        }
+
+        try
+        {
+            await _libraryService.UpdatePlaylistTrackAsync(trackModel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist playlist track {PlaylistId}/{TrackId}", trackModel.PlaylistId, trackModel.TrackUniqueHash);
+        }
     }
 }
