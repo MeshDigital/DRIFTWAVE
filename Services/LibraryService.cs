@@ -382,6 +382,20 @@ public class LibraryService : ILibraryService
             throw;
         }
     }
+    
+    public async Task UpdateTrackFilePathAsync(string globalId, string filePath)
+    {
+        try
+        {
+            await _databaseService.UpdateTrackFilePathAsync(globalId, filePath);
+            _logger.LogDebug("Updated file path for track {GlobalId}: {Path}", globalId, filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update track file path");
+            throw;
+        }
+    }
 
     public async Task SavePlaylistTracksAsync(List<PlaylistTrack> tracks)
     {

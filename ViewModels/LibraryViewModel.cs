@@ -281,7 +281,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         CancelCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteCancel);
         OpenProjectCommand = new RelayCommand<PlaylistJob>(project => SelectedProject = project);
         DeleteProjectCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteDeleteProjectAsync);
-        RefreshLibraryCommand = new AsyncRelayCommand(async () => await LoadProjectsAsync());
+        RefreshLibraryCommand = new AsyncRelayCommand(ExecuteRefreshAsync);
         PauseProjectCommand = new RelayCommand<PlaylistJob>(ExecutePauseProject);
         ResumeProjectCommand = new RelayCommand<PlaylistJob>(ExecuteResumeProject);
         LoadAllTracksCommand = new RelayCommand(() => SelectedProject = _allTracksJob);
@@ -359,6 +359,128 @@ public class LibraryViewModel : INotifyPropertyChanged
                     SelectedProject = AllProjects.FirstOrDefault();
             }
         });
+    }
+    
+    private async Task ExecuteRefreshAsync()
+    {
+        // Confirmation dialog for intensive operation
+        var result = System.Windows.MessageBox.Show(
+            "This will scan your download folder and resolve missing file paths.\n\n" +
+            "On large libraries, this may take some time.\n\n" +
+            "Continue with refresh?",
+            "Confirm Refresh",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+        
+        if (result != System.Windows.MessageBoxResult.Yes)
+        {
+            _logger.LogInformation("Refresh cancelled by user");
+            return;
+        }
+        
+        _logger.LogInformation("Manual refresh requested - reloading projects and resolving file paths");
+        
+        // Remember the currently selected project ID
+        var selectedProjectId = SelectedProject?.Id;
+        
+        // 1. Scan download folder and resolve missing file paths
+        await ResolveMissingFilePathsAsync();
+        
+        // 2. Reload all projects from database
+        await LoadProjectsAsync();
+        
+        // 3. If a project was selected, reload its tracks
+        if (selectedProjectId.HasValue && selectedProjectId != Guid.Empty)
+        {
+            var project = AllProjects.FirstOrDefault(p => p.Id == selectedProjectId.Value);
+            if (project != null)
+            {
+                _logger.LogInformation("Refreshing tracks for selected project: {Title}", project.SourceTitle);
+                await LoadProjectTracksAsync(project);
+            }
+        }
+        
+        _logger.LogInformation("Manual refresh completed");
+    }
+    
+    private async Task ResolveMissingFilePathsAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Scanning download folder for missing file paths...");
+            
+            // Load ALL playlist tracks from database (not just global tracks in memory)
+            var allPlaylistTracks = await _libraryService.GetAllPlaylistTracksAsync();
+            
+            // Get tracks that are marked as Downloaded but have no file path
+            var tracksNeedingPaths = allPlaylistTracks
+                .Where(t => t.Status == TrackStatus.Downloaded && string.IsNullOrEmpty(t.ResolvedFilePath))
+                .ToList();
+            
+            if (!tracksNeedingPaths.Any())
+            {
+                _logger.LogInformation("No tracks need file path resolution");
+                return;
+            }
+            
+            _logger.LogInformation("Found {Count} completed tracks without file paths", tracksNeedingPaths.Count);
+            
+            // Get download directory from config (via main view model or a service)
+            var downloadDir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "SLSKDONET", "Downloads");
+            
+            if (!System.IO.Directory.Exists(downloadDir))
+            {
+                _logger.LogWarning("Download directory not found: {Dir}", downloadDir);
+                return;
+            }
+            
+            // Get all audio files in download directory
+            var audioExtensions = new[] { ".mp3", ".flac", ".m4a", ".wav", ".ogg", ".wma" };
+            var files = System.IO.Directory.GetFiles(downloadDir, "*.*", System.IO.SearchOption.AllDirectories)
+                .Where(f => audioExtensions.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()))
+                .ToList();
+            
+            _logger.LogInformation("Found {Count} audio files in download directory", files.Count);
+            
+            int resolved = 0;
+            foreach (var track in tracksNeedingPaths)
+            {
+                // Try to find a matching file by artist and title
+                var matchingFile = files.FirstOrDefault(f =>
+                {
+                    var fileName = System.IO.Path.GetFileNameWithoutExtension(f);
+                    var artistMatch = !string.IsNullOrEmpty(track.Artist) && 
+                                    fileName.Contains(track.Artist, StringComparison.OrdinalIgnoreCase);
+                    var titleMatch = !string.IsNullOrEmpty(track.Title) && 
+                                   fileName.Contains(track.Title, StringComparison.OrdinalIgnoreCase);
+                    return artistMatch && titleMatch;
+                });
+                
+                if (matchingFile != null)
+                {
+                    track.ResolvedFilePath = matchingFile;
+                    _logger.LogInformation("Resolved path for {Artist} - {Title}: {Path}", 
+                        track.Artist, track.Title, matchingFile);
+                    resolved++;
+                    
+                    // Save to database
+                    await _libraryService.UpdatePlaylistTrackAsync(track);
+                }
+            }
+            
+            _logger.LogInformation("Resolved {Resolved}/{Total} missing file paths", resolved, tracksNeedingPaths.Count);
+            
+            if (_mainViewModel != null)
+            {
+                _mainViewModel.StatusText = $"Resolved {resolved} missing file paths";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resolve missing file paths");
+        }
     }
     private async void OnProjectAdded(object? sender, ProjectEventArgs e)
     {
@@ -459,20 +581,53 @@ public class LibraryViewModel : INotifyPropertyChanged
         _downloadManager.CancelTrack(vm.GlobalId);
     }
 
-    private void ExecutePlayTrack(PlaylistTrackViewModel? vm)
-    {
-        if (vm == null || string.IsNullOrEmpty(vm.Model?.ResolvedFilePath)) return;
-        
-        // Ensure file exists? libVLC will fail or log err if not.
-        _logger.LogInformation("Playing track: {Title} by {Artist}", vm.Title, vm.Artist);
-        _playerViewModel.PlayTrack(vm.Model!.ResolvedFilePath, vm.Title ?? "Unknown", vm.Artist ?? "Unknown Artist");
-        
-        // FIX: Ensure the player sidebar is visible
-        if (_mainViewModel != null)
+        private void ExecutePlayTrack(PlaylistTrackViewModel? vm)
         {
-            _mainViewModel.IsPlayerSidebarVisible = true;
+            if (vm == null)
+            {
+                _logger.LogWarning("PlayTrack called with null track");
+                return;
+            }
+
+            // Check if track has been downloaded
+            if (string.IsNullOrEmpty(vm.Model?.ResolvedFilePath))
+            {
+                _logger.LogWarning("Cannot play track {Artist} - {Title}: No file path (track not downloaded)", vm.Artist, vm.Title);
+                
+                // Show user-friendly message
+                if (_mainViewModel != null)
+                {
+                    _mainViewModel.StatusText = $"Cannot play '{vm.Title}' - track not downloaded yet";
+                }
+                return;
+            }
+
+            // Check if file actually exists
+            if (!System.IO.File.Exists(vm.Model.ResolvedFilePath))
+            {
+                _logger.LogWarning("Cannot play track {Artist} - {Title}: File not found at {Path}", 
+                    vm.Artist, vm.Title, vm.Model.ResolvedFilePath);
+                
+                if (_mainViewModel != null)
+                {
+                    _mainViewModel.StatusText = $"Cannot play '{vm.Title}' - file not found";
+                }
+                return;
+            }
+
+            // Play the track
+            _logger.LogInformation("Playing track: {Title} by {Artist} from {Path}", 
+                vm.Title, vm.Artist, vm.Model.ResolvedFilePath);
+            
+            _playerViewModel.PlayTrack(vm.Model.ResolvedFilePath, vm.Title ?? "Unknown", vm.Artist ?? "Unknown Artist");
+            
+            // Ensure the player sidebar is visible
+            if (_mainViewModel != null)
+            {
+                _mainViewModel.IsPlayerSidebarVisible = true;
+                _mainViewModel.StatusText = $"Now playing: {vm.Artist} - {vm.Title}";
+            }
         }
-    }
 
     private void ExecutePauseProject(PlaylistJob? job)
     {
@@ -752,6 +907,26 @@ public class LibraryViewModel : INotifyPropertyChanged
                         vm.Progress = liveTrack.Progress;
                         vm.CurrentSpeed = liveTrack.CurrentSpeed;
                         vm.ErrorMessage = liveTrack.ErrorMessage;
+                        
+                        // CRITICAL FIX: If database doesn't have ResolvedFilePath, get it from live track
+                        if (string.IsNullOrEmpty(vm.Model.ResolvedFilePath) && 
+                            !string.IsNullOrEmpty(liveTrack.Model?.ResolvedFilePath))
+                        {
+                            vm.Model.ResolvedFilePath = liveTrack.Model.ResolvedFilePath;
+                            
+                            // Persist this path back to database for future loads
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await _libraryService.UpdatePlaylistTrackAsync(vm.Model);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogWarning(ex, "Failed to persist ResolvedFilePath for track {Id}", vm.Model.Id);
+                                }
+                            });
+                        }
                     }
 
                     tracks.Add(vm);

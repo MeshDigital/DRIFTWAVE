@@ -97,13 +97,76 @@ public class DatabaseService
 
     public async Task SaveTrackAsync(TrackEntity track)
     {
+        const int maxRetries = 3;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                using var context = new AppDbContext();
+
+                // Find existing entity by GlobalId (primary key)
+                var existingTrack = await context.Tracks
+                    .FirstOrDefaultAsync(t => t.GlobalId == track.GlobalId);
+
+                if (existingTrack == null)
+                {
+                    // Case 1: New track - INSERT
+                    context.Tracks.Add(track);
+                }
+                else
+                {
+                    // Case 2: Existing track - UPDATE
+                    // Apply only the properties that may change during download lifecycle
+                    existingTrack.State = track.State;
+                    existingTrack.Filename = track.Filename;
+                    existingTrack.ErrorMessage = track.ErrorMessage;
+                    existingTrack.CoverArtUrl = track.CoverArtUrl;
+                    existingTrack.Artist = track.Artist;
+                    existingTrack.Title = track.Title;
+                    existingTrack.Size = track.Size;
+                    
+                    // Don't update AddedAt - preserve original
+                    // context.Tracks.Update() is not needed - EF Core tracks changes automatically
+                }
+
+                await context.SaveChangesAsync();
+                return; // Success - exit method
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                if (attempt < maxRetries - 1)
+                {
+                    // Retry after a brief delay
+                    _logger.LogWarning("Concurrency conflict saving track {GlobalId}, attempt {Attempt}/{Max}. Retrying...", 
+                        track.GlobalId, attempt + 1, maxRetries);
+                    await Task.Delay(50 * (attempt + 1)); // Exponential backoff: 50ms, 100ms, 150ms
+                }
+                else
+                {
+                    // Final attempt failed
+                    _logger.LogError(ex, "Failed to save track {GlobalId} after {Max} attempts due to concurrency conflicts", 
+                        track.GlobalId, maxRetries);
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error saving track {GlobalId}", track.GlobalId);
+                throw;
+            }
+        }
+    }
+    
+    public async Task UpdateTrackFilePathAsync(string globalId, string filePath)
+    {
         using var context = new AppDbContext();
-
-        // Apply the atomic upsert pattern. EF Core's Update() method will generate
-        // an INSERT for a new entity or an UPDATE for an existing one based on its primary key.
-        context.Tracks.Update(track);
-
-        await context.SaveChangesAsync();
+        var track = await context.Tracks.FirstOrDefaultAsync(t => t.GlobalId == globalId);
+        if (track != null)
+        {
+            track.Filename = filePath;
+            await context.SaveChangesAsync();
+        }
     }
 
     public async Task RemoveTrackAsync(string globalId)

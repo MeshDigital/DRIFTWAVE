@@ -146,4 +146,10 @@ public interface ILibraryService
     /// Adds a track to the library with optional source playlist reference (legacy).
     /// </summary>
     Task AddTrackAsync(Track track, string actualFilePath, Guid sourcePlaylistId);
+    
+    /// <summary>
+    /// Updates the resolved file path for a track in the global library.
+    /// Used when scanning filesystem to resolve missing paths.
+    /// </summary>
+    Task UpdateTrackFilePathAsync(string globalId, string filePath);
 }

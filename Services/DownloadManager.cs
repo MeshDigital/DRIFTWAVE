@@ -754,9 +754,12 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
 
         if (success)
         {
-            track.State = PlaylistTrackState.Completed;
-            track.Progress = 100;
+            // CRITICAL: Set the file path BEFORE changing state
+            // State change triggers OnTrackPropertyChanged which saves to DB
+            // So we must set ResolvedFilePath first to ensure it's included in the save
             track.Model.ResolvedFilePath = finalPath;
+            track.Progress = 100;
+            track.State = PlaylistTrackState.Completed; // This triggers DB save
 
             try
             {
