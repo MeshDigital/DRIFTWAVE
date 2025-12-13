@@ -76,6 +76,13 @@ public class MainViewModel : INotifyPropertyChanged
         set => SetProperty(ref _isImportPreviewVisible, value);
     }
 
+    private bool _isSidebarCollapsed;
+    public bool IsSidebarCollapsed
+    {
+        get => _isSidebarCollapsed;
+        set => SetProperty(ref _isSidebarCollapsed, value);
+    }
+
     // --- Downloads Page Search & Filtering ---
     private string _downloadsSearchText = "";
     public string DownloadsSearchText
@@ -152,6 +159,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ShowLoginCommand { get; }
     public ICommand DismissLoginCommand { get; }
     public ICommand DisconnectCommand { get; }
+    public ICommand ToggleSidebarCommand { get; }
     private readonly INotificationService _notificationService;
     private readonly INavigationService _navigationService;
 
@@ -283,6 +291,8 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsLoginOverlayVisible));
             StatusText = "Disconnected";
         });
+
+        ToggleSidebarCommand = new RelayCommand(() => IsSidebarCollapsed = !IsSidebarCollapsed);
         
         // Subscribe to download events
         // REMOVED: DownloadManager events are deprecated in Bundle 1 refactor.
