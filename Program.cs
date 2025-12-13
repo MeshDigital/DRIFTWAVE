@@ -1,4 +1,5 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 using System;
 
 namespace SLSKDONET;
@@ -29,6 +30,8 @@ class Program
             .LogToTrace();
 #endif
 =======
+=======
+>>>>>>> Stashed changes
 // Program.cs (Standard Avalonia Desktop Entry Point)
 
 using Avalonia;
@@ -53,5 +56,8 @@ namespace SLSKDONET
                 .LogToTrace()
                 .UseReactiveUI();
     }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 }
