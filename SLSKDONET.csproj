@@ -1,12 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Multi-targeting: Windows (WPF) + Cross-platform (Avalonia) -->
-    <TargetFrameworks>net8.0-windows;net8.0</TargetFrameworks>
-    
-    <!-- WPF support for Windows target only -->
-    <UseWPF Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWPF>
-    <UseWindowsForms Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWindowsForms>
+    <!-- Avalonia cross-platform target -->
+    <TargetFramework>net8.0</TargetFramework>
     
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -56,10 +52,9 @@
     
     <!-- JSON serialization for index files -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
 
-      <!-- Spotify API client -->
-      <PackageReference Include="SpotifyAPI.Web" Version="7.2.1" />
+    <!-- Spotify API client -->
+    <PackageReference Include="SpotifyAPI.Web" Version="7.2.1" />
 
     <!-- HTML parsing for Spotify scraping -->
     <PackageReference Include="HtmlAgilityPack" Version="1.11.60" />
@@ -73,12 +68,6 @@
     <PackageReference Include="Avalonia.Diagnostics" Version="11.2.2" Condition="'$(Configuration)' == 'Debug'" />
   </ItemGroup>
 
-  <!-- WPF-specific packages (Windows only) -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
-    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.5" />
-    <PackageReference Include="WPF-UI" Version="4.1.0" />
-  </ItemGroup>
-
   <ItemGroup>
     <Content Include="tray_icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -86,28 +75,6 @@
     <Content Include="app_icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-
-  <!-- WPF XAML pages (Windows only) -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
-    <Page Update="Views\MainWindow.xaml" />
-    <Page Update="Views\SearchPage.xaml" />
-    <Page Update="Views\ImportedPage.xaml" />
-    <Page Update="Views\DownloadsPage.xaml" />
-    <Page Update="Views\LibraryPage.xaml" />
-    <Page Update="Views\SettingsPage.xaml" />
-  </ItemGroup>
-
-  <!-- Avalonia build configuration (Cross-platform) -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <!-- Exclude WPF-specific files from net8.0 build -->
-    <Compile Remove="App.xaml.cs" />
-    <Compile Remove="Converters\**\*.cs" />
-    <Compile Remove="Views\*.cs" />
-    <Compile Remove="Views\Helpers\**\*.cs" />
-    <Compile Remove="ViewModels\LibraryViewModel.cs" />
-    <Compile Remove="ViewModels\PlaylistTrackViewModel.cs" />
-    <Compile Remove="Services\InputDialog.xaml.cs" />
   </ItemGroup>
 
 </Project>

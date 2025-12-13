@@ -1,27 +1,11 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
 // App.axaml.cs (Avalonia Application & DI Setup)
 
->>>>>>> Stashed changes
-=======
-// App.axaml.cs (Avalonia Application & DI Setup)
-
->>>>>>> Stashed changes
-=======
-// App.axaml.cs (Avalonia Application & DI Setup)
-
->>>>>>> Stashed changes
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Configuration;
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 using SLSKDONET.Services;
 using SLSKDONET.Services.InputParsers;
 using SLSKDONET.ViewModels;
@@ -33,7 +17,7 @@ namespace SLSKDONET;
 /// <summary>
 /// Avalonia application class for cross-platform UI
 /// </summary>
-public partial class AvaloniaApp : Application
+public partial class App : Application
 {
     public IServiceProvider? Services { get; private set; }
 
@@ -160,126 +144,18 @@ public partial class AvaloniaApp : Application
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<IMetadataService, MetadataService>();
 
+        // Navigation and UI services
+        services.AddSingleton<INavigationService, NavigationService>();
+        services.AddSingleton<IUserInputService, UserInputService>();
+
         // ViewModels
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<LibraryViewModel>();
         services.AddSingleton<ImportPreviewViewModel>();
         services.AddSingleton<ImportHistoryViewModel>();
+        services.AddSingleton<SpotifyImportViewModel>();
 
         // Utilities
         services.AddSingleton<SearchQueryNormalizer>();
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-using SLSKDONET.Services.InputParsers;
-using SLSKDONET.Services;
-using SLSKDONET.ViewModels;
-using SLSKDONET.Views;
-using System;
-using System.IO;
-using System.Linq;
-
-namespace SLSKDONET
-{
-    public partial class App : Application
-    {
-        public IServiceProvider Services { get; private set; }
-
-        public override void Initialize()
-        {
-            Services = ConfigureServices();
-            AvaloniaXamlLoader.Load(this);
-        }
-
-        public override void OnFrameworkInitializationCompleted()
-        {
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                // In Avalonia, the MainViewModel/Shell Window is resolved here.
-                // Note: The original logic for database init and download manager start 
-                // should be moved/re-evaluated based on Avalonia's lifecycle.
-                
-                // For now, only assign the DataContext to the main window.
-                // We'll address the window itself later.
-                // desktop.MainWindow = Services.GetRequiredService<MainWindow>(); // Placeholder for MainWindow
-
-                // We'll initialize the main window/shell in a subsequent step.
-            }
-
-            base.OnFrameworkInitializationCompleted();
-        }
-
-        // Adapted from original WPF App.xaml.cs
-        private IServiceProvider ConfigureServices()
-        {
-            var services = new ServiceCollection();
-            ConfigureServices(services);
-            return services.BuildServiceProvider();
-        }
-
-        private static void ConfigureServices(IServiceCollection services)
-        {
-            // Logging
-            services.AddLogging(config =>
-            {
-                config.ClearProviders();
-                config.AddConsole();
-                config.SetMinimumLevel(LogLevel.Information);
-            });
-
-            // Configuration
-            services.AddSingleton<ConfigManager>();
-            services.AddSingleton(provider =>
-            {
-                var configManager = provider.GetRequiredService<ConfigManager>();
-                var appConfig = configManager.Load();
-                if (string.IsNullOrEmpty(appConfig.DownloadDirectory))
-                    appConfig.DownloadDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "SLSKDONET");
-                return appConfig;
-            });
-
-            // Services
-            services.AddSingleton<SoulseekAdapter>();
-            services.AddSingleton<FileNameFormatter>();
-            services.AddSingleton<ProtectedDataService>();
-            
-            // Audio Player
-            services.AddSingleton<IAudioPlayerService, AudioPlayerService>();
-            services.AddSingleton<PlayerViewModel>();
-            
-            // Core ViewModels
-            services.AddSingleton<MainViewModel>();
-            services.AddSingleton<DatabaseService>();
-            services.AddSingleton<IMetadataService, MetadataService>();
-            services.AddSingleton<ILibraryService, LibraryService>();
-            services.AddSingleton<DownloadManager>();
-            services.AddSingleton<ITaggerService, TaggerService>();
-            services.AddSingleton<IUserInputService, UserInputService>();
-            services.AddSingleton<INavigationService, NavigationService>();
-            
-            // Pages for navigation
-            // Note: Views are typically registered as UserControl or Window
-            services.AddSingleton<SLSKDONET.ViewModels.LibraryViewModel>();
-            services.AddSingleton<ImportPreviewViewModel>();
-            services.AddSingleton<ImportHistoryViewModel>();
-            services.AddSingleton<SpotifyImportViewModel>();
-            services.AddTransient<SearchPage>();
-            services.AddTransient<DownloadsPage>();
-            services.AddTransient<LibraryPage>();
-            services.AddTransient<SettingsPage>();
-            // services.AddTransient<MainWindow>(); // Placeholder for MainWindow
-
-            // Utilities
-            services.AddSingleton<SearchQueryNormalizer>();
-        }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     }
 }
