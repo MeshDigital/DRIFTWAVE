@@ -196,6 +196,10 @@ public partial class App : System.Windows.Application
         services.AddTransient<LibraryPage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<ImportPreviewPage>();
+        
+        // Import History
+        services.AddSingleton<ImportHistoryViewModel>();
+        services.AddTransient<ImportHistoryPage>();
 
 
         // Utilities can be registered as singletons as they are stateless.

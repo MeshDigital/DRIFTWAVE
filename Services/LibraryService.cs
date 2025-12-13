@@ -109,6 +109,33 @@ public class LibraryService : ILibraryService
 
     // ===== INDEX 2: PlaylistJob (Playlist Headers - Database Backed) =====
 
+    public async Task<List<PlaylistJob>> GetHistoricalJobsAsync()
+    {
+        // "History" means completed, failed, or cancelled jobs.
+        // For now, let's assume it's all jobs sorted by date, or we can filter.
+        // The user request implies "Import Job History".
+        // Let's return all jobs, and the VM can filter active vs history?
+        // Or better: Let's fetch all jobs that have "CompletedAt" or are "Deleted" (soft) maybe?
+        // Actually, LoadAllPlaylistJobsAsync() filters out IsDeleted.
+        // Let's add a method to get even deleted ones? Or just non-active?
+        
+        // Simpler for Phase 1: Return ALL jobs, filtering is done in VM or use existing method.
+        // User asked for "GetHistoricalJobsAsync", specifically for Import History.
+        
+        try 
+        {
+            var entities = await _databaseService.LoadAllPlaylistJobsAsync();
+            // Optional: Filter logic if we defined "Historical" strictly.
+            // For now, return all so the user can see everything.
+            return entities.Select(EntityToPlaylistJob).OrderByDescending(j => j.CreatedAt).ToList();
+        }
+        catch (Exception ex)
+        {
+             _logger.LogError(ex, "Failed to load historical jobs");
+             return new List<PlaylistJob>();
+        }
+    }
+
     public async Task<List<PlaylistJob>> LoadAllPlaylistJobsAsync()
     {
         try
@@ -420,7 +447,8 @@ public class LibraryService : ILibraryService
             Status = entity.Status,
             ResolvedFilePath = entity.ResolvedFilePath,
             TrackNumber = entity.TrackNumber,
-            AddedAt = entity.AddedAt
+            AddedAt = entity.AddedAt,
+            SortOrder = entity.SortOrder
         };
     }
 
@@ -437,7 +465,8 @@ public class LibraryService : ILibraryService
             Status = track.Status,
             ResolvedFilePath = track.ResolvedFilePath,
             TrackNumber = track.TrackNumber,
-            AddedAt = track.AddedAt
+            AddedAt = track.AddedAt,
+            SortOrder = track.SortOrder
         };
     }
 

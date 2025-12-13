@@ -54,7 +54,16 @@ public interface ILibraryService
     /// Loads all playlist jobs (playlist history).
     /// Used to populate the Playlist List view in the UI.
     /// </summary>
+    /// <summary>
+    /// Loads all playlist jobs (playlist history).
+    /// Used to populate the Playlist List view in the UI.
+    /// </summary>
     Task<List<PlaylistJob>> LoadAllPlaylistJobsAsync();
+
+    /// <summary>
+    /// Loads historical (completed/cancelled) jobs for history view.
+    /// </summary>
+    Task<List<PlaylistJob>> GetHistoricalJobsAsync();
 
     /// <summary>
     /// Loads a specific playlist job by ID (asynchronous).

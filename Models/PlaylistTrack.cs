@@ -54,6 +54,11 @@ public class PlaylistTrack
     /// Timestamp when this track was added to the playlist.
     /// </summary>
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Custom sort order for track reordering (Rekordbox style).
+    /// </summary>
+    public int SortOrder { get; set; }
 }
 
 /// <summary>

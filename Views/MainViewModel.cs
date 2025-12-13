@@ -2050,7 +2050,7 @@ public class MainViewModel : INotifyPropertyChanged
     /// Updates FilteredLibraryEntries based on the selected import.
     /// Shows all imported queries (search entries) from the same source playlist/CSV.
     /// </summary>
-    private async void UpdateFilteredTracks()
+    private void UpdateFilteredTracks()
     {
         // LEGACY: Filtering now handled by LibraryViewModel
         /*

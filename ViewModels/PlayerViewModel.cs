@@ -1,35 +1,85 @@
 using System;
 using System.Windows.Input; // For ICommand
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using SLSKDONET.Services;
+using SLSKDONET.Views;
+
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace SLSKDONET.ViewModels
 {
-    public partial class PlayerViewModel : ObservableObject
+    public partial class PlayerViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? name = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(name);
+            return true;
+        }
         private readonly IAudioPlayerService _playerService;
         
-        [ObservableProperty]
         private string _trackTitle = "No Track Playing";
+        public string TrackTitle
+        {
+            get => _trackTitle;
+            set => SetProperty(ref _trackTitle, value);
+        }
 
-        [ObservableProperty]
         private string _trackArtist = "";
+        public string TrackArtist
+        {
+            get => _trackArtist;
+            set => SetProperty(ref _trackArtist, value);
+        }
 
-        [ObservableProperty]
         private bool _isPlaying;
+        public bool IsPlaying
+        {
+            get => _isPlaying;
+            set => SetProperty(ref _isPlaying, value);
+        }
 
-        [ObservableProperty]
         private float _position; // 0.0 to 1.0
+        public float Position
+        {
+            get => _position;
+            set => SetProperty(ref _position, value);
+        }
 
-        [ObservableProperty]
         private string _currentTimeStr = "0:00";
+        public string CurrentTimeStr
+        {
+            get => _currentTimeStr;
+            set => SetProperty(ref _currentTimeStr, value);
+        }
 
-        [ObservableProperty]
         private string _totalTimeStr = "0:00";
+        public string TotalTimeStr
+        {
+            get => _totalTimeStr;
+            set => SetProperty(ref _totalTimeStr, value);
+        }
         
-        [ObservableProperty]
         private int _volume = 100;
+        public int Volume
+        {
+            get => _volume;
+            set
+            {
+                if (SetProperty(ref _volume, value))
+                {
+                    OnVolumeChanged(value);
+                }
+            }
+        }
+
+        public ICommand TogglePlayPauseCommand { get; }
+        public ICommand StopCommand { get; }
 
         public PlayerViewModel(IAudioPlayerService playerService)
         {
@@ -38,25 +88,16 @@ namespace SLSKDONET.ViewModels
             _playerService.PausableChanged += (s, e) => IsPlaying = _playerService.IsPlaying;
             _playerService.EndReached += (s, e) => IsPlaying = false;
             
-            // Throttle position updates? LibVLC updates frequently.
-            _playerService.PositionChanged += (s, pos) => 
-            {
-                 // Check if user is dragging?
-                 Position = pos;
-            };
+            _playerService.PositionChanged += (s, pos) => Position = pos;
             
-            _playerService.TimeChanged += (s, timeMs) =>
-            {
-                CurrentTimeStr = TimeSpan.FromMilliseconds(timeMs).ToString(@"m\:ss");
-            };
+            _playerService.TimeChanged += (s, timeMs) => CurrentTimeStr = TimeSpan.FromMilliseconds(timeMs).ToString(@"m\:ss");
             
-            _playerService.LengthChanged += (s, lenMs) =>
-            {
-                TotalTimeStr = TimeSpan.FromMilliseconds(lenMs).ToString(@"m\:ss");
-            };
+            _playerService.LengthChanged += (s, lenMs) => TotalTimeStr = TimeSpan.FromMilliseconds(lenMs).ToString(@"m\:ss");
+
+            TogglePlayPauseCommand = new RelayCommand(TogglePlayPause);
+            StopCommand = new RelayCommand(Stop);
         }
 
-        [RelayCommand]
         private void TogglePlayPause()
         {
             if (IsPlaying)
@@ -70,7 +111,6 @@ namespace SLSKDONET.ViewModels
             IsPlaying = _playerService.IsPlaying;
         }
 
-        [RelayCommand]
         private void Stop()
         {
             _playerService.Stop();
@@ -80,7 +120,7 @@ namespace SLSKDONET.ViewModels
         }
         
         // Volume Change
-        partial void OnVolumeChanged(int value)
+        private void OnVolumeChanged(int value)
         {
             _playerService.Volume = value;
         }

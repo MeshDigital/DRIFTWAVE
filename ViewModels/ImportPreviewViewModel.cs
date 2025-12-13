@@ -9,7 +9,7 @@ using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
-using SLSKDONET.Services;
+
 using SLSKDONET.Views;
 
 namespace SLSKDONET.ViewModels;

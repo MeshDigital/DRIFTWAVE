@@ -23,7 +23,41 @@ public class DatabaseService
     {
         using var context = new AppDbContext();
         await context.Database.EnsureCreatedAsync();
-        _logger.LogInformation("Database initialized.");
+
+        // Manual Schema Migration for existing databases
+        try 
+        {
+            // 1. Check for SortOrder in PlaylistTracks
+            // We can't easily read results with ExecuteSqlRaw, but we can try to add and catch error, 
+            // OR use a safe add column syntax if SQLite supports it (it doesn't support IF NOT EXISTS for columns directly in all versions).
+            // A safer way: Try select.
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("SELECT SortOrder FROM PlaylistTracks LIMIT 1");
+            }
+            catch
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'SortOrder' to PlaylistTracks");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistTracks ADD COLUMN SortOrder INTEGER DEFAULT 0");
+            }
+
+            // 2. Check for IsDeleted in PlaylistJobs
+            try
+            {
+                 await context.Database.ExecuteSqlRawAsync("SELECT IsDeleted FROM PlaylistJobs LIMIT 1");
+            }
+            catch
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'IsDeleted' to PlaylistJobs");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistJobs ADD COLUMN IsDeleted INTEGER DEFAULT 0");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to patch database schema");
+        }
+
+        _logger.LogInformation("Database initialized and schema verified.");
     }
 
     // ===== Track Methods =====
@@ -360,7 +394,8 @@ public class DatabaseService
                     Status = track.Status,
                     ResolvedFilePath = track.ResolvedFilePath,
                     TrackNumber = track.TrackNumber,
-                    AddedAt = track.AddedAt
+                    AddedAt = track.AddedAt,
+                    SortOrder = track.SortOrder
                 });
                 context.PlaylistTracks.AddRange(trackEntities);
             }
@@ -395,7 +430,8 @@ public class DatabaseService
                         Status = track.Status,
                         ResolvedFilePath = track.ResolvedFilePath,
                         TrackNumber = track.TrackNumber,
-                        AddedAt = track.AddedAt
+                        AddedAt = track.AddedAt,
+                        SortOrder = track.SortOrder
                     };
 
                     if (existingTrackIdSet.Contains(track.Id))

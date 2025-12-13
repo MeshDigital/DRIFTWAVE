@@ -135,6 +135,9 @@
                          Padding="10">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
+                            <Setter Property="AllowDrop" Value="True"/>
+                            <EventSetter Event="Drop" Handler="Playlist_Drop"/>
+                            <EventSetter Event="PreviewDragOver" Handler="OnPreviewDragOver"/>
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
@@ -233,8 +236,31 @@
                                     <Run Text="{Binding SelectedProject.SuccessfulCount, Mode=OneWay}" Foreground="#4CAF50"/>
                                     <Run Text="/"/>
                                     <Run Text="{Binding SelectedProject.TotalTracks, Mode=OneWay}"/>
+                                    <Run Text="{Binding SelectedProject.TotalTracks, Mode=OneWay}"/>
                                     <Run Text="tracks downloaded"/>
                                 </TextBlock>
+
+                                <!-- History Shortcut -->
+                                <Button Command="{Binding ViewHistoryCommand}" 
+                                        Background="Transparent" BorderThickness="0" Foreground="#888"
+                                        Margin="12,0,0,0" Padding="4,2" Cursor="Hand"
+                                        ToolTip="View Import History">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="📜" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="History" FontSize="12" TextDecorations="Underline"/>
+                                    </StackPanel>
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Opacity" Value="0.7"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Opacity" Value="1.0"/>
+                                                    <Setter Property="Foreground" Value="#FFF"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                             </StackPanel>
                         </StackPanel>
 
@@ -490,11 +516,11 @@
                             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                             <Setter Property="Padding" Value="10,0"/>
                             <Setter Property="Template">
+                                <Setter.Value>
                                     <ControlTemplate TargetType="DataGridCell">
                                         <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
                                             <ContentPresenter VerticalAlignment="Center"/>
                                         </Border>
-                                    </ControlTemplate>
                                     </ControlTemplate>
                                 </Setter.Value>
                             </Setter>
@@ -518,17 +544,8 @@
                             <EventSetter Event="PreviewDragOver" Handler="OnPreviewDragOver"/>
                             <Setter Property="Background" Value="Transparent"/>
                             
-                            <!-- Double Click to Play -->
-                            <Setter Property="InputBindings">
-                                <Setter.Value>
-                                    <InputBindingCollection>
-                                        <MouseBinding Gesture="LeftDoubleClick" 
-                                                      Command="{Binding DataContext.PlayTrackCommand, RelativeSource={RelativeSource AncestorType=Page}}" 
-                                                      CommandParameter="{Binding}"/>
-                                    </InputBindingCollection>
-                                </Setter.Value>
-                            </Setter>
-
+                            <EventSetter Event="MouseDoubleClick" Handler="DataGridRow_MouseDoubleClick"/>
+                            
                             <Style.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter Property="Background" Value="#1AFFFFFF"/>

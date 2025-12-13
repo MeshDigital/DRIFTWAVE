@@ -46,7 +46,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged
                  _sortOrder = value;
                  OnPropertyChanged();
                  // Propagate to Model
-                 if (Model != null) Model.TrackNumber = value;
+                 if (Model != null) Model.SortOrder = value;
              }
         }
     }

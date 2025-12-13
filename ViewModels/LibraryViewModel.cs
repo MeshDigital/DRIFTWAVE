@@ -17,9 +17,11 @@ public class LibraryViewModel : INotifyPropertyChanged
 {
     private readonly ILogger<LibraryViewModel> _logger;
     private readonly DownloadManager _downloadManager;
-    private readonly DownloadManager _downloadManager;
+
     private readonly ILibraryService _libraryService;
     private readonly PlayerViewModel _playerViewModel;
+    private readonly ImportHistoryViewModel _importHistoryViewModel;
+    private readonly INavigationService _navigationService;
 
 
     private bool FilterTracks(object obj)
@@ -60,9 +62,10 @@ public class LibraryViewModel : INotifyPropertyChanged
     public ICommand LoadAllTracksCommand { get; }
     public ICommand OpenFolderCommand { get; }
     public ICommand RemoveTrackCommand { get; }
-    public ICommand RemoveTrackCommand { get; }
     public ICommand AddPlaylistCommand { get; }
     public ICommand PlayTrackCommand { get; }
+
+    public ICommand ViewHistoryCommand { get; }
 
     // Master List: All import jobs/projects
     public ObservableCollection<PlaylistJob> AllProjects
@@ -87,8 +90,6 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
 
-    // Detail List: Tracks for selected project (Project Manifest)
-    // Detail List: Tracks for selected project (Project Manifest)
     public ObservableCollection<PlaylistTrackViewModel> CurrentProjectTracks
     {
         get => _currentProjectTracks;
@@ -191,7 +192,6 @@ public class LibraryViewModel : INotifyPropertyChanged
     
     public ICommand ToggleActiveDownloadsCommand { get; }
 
-    private int _maxDownloads;
     public int MaxDownloads 
     {
         get => _downloadManager.MaxActiveDownloads;
@@ -205,9 +205,6 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// Message to display when no project is selected.
-    /// </summary>
     public string NoProjectSelectedMessage
     {
         get => _noProjectSelectedMessage;
@@ -230,16 +227,20 @@ public class LibraryViewModel : INotifyPropertyChanged
 
     private bool _initialLoadCompleted = false;
 
-    public LibraryViewModel(ILogger<LibraryViewModel> logger, DownloadManager downloadManager, ILibraryService libraryService)
-    {
-        _logger = logger;
-        _downloadManager = downloadManager;
-    public LibraryViewModel(ILogger<LibraryViewModel> logger, DownloadManager downloadManager, ILibraryService libraryService, PlayerViewModel playerViewModel)
+    public LibraryViewModel(
+        ILogger<LibraryViewModel> logger, 
+        DownloadManager downloadManager, 
+        ILibraryService libraryService, 
+        PlayerViewModel playerViewModel,
+        ImportHistoryViewModel importHistoryViewModel,
+        INavigationService navigationService)
     {
         _logger = logger;
         _downloadManager = downloadManager;
         _libraryService = libraryService;
         _playerViewModel = playerViewModel;
+        _importHistoryViewModel = importHistoryViewModel;
+        _navigationService = navigationService;
 
         // Commands
         HardRetryCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteHardRetry);
@@ -253,9 +254,9 @@ public class LibraryViewModel : INotifyPropertyChanged
         ResumeProjectCommand = new RelayCommand<PlaylistJob>(ExecuteResumeProject);
         LoadAllTracksCommand = new RelayCommand(() => SelectedProject = _allTracksJob);
         ToggleActiveDownloadsCommand = new RelayCommand<object>(_ => IsActiveDownloadsVisible = !IsActiveDownloadsVisible);
-        ToggleActiveDownloadsCommand = new RelayCommand<object>(_ => IsActiveDownloadsVisible = !IsActiveDownloadsVisible);
         AddPlaylistCommand = new AsyncRelayCommand(ExecuteAddPlaylistAsync);
         PlayTrackCommand = new RelayCommand<PlaylistTrackViewModel>(ExecutePlayTrack);
+        ViewHistoryCommand = new AsyncRelayCommand(ExecuteViewHistoryAsync);
         
         // Basic impl for missing commands
         OpenFolderCommand = new RelayCommand<object>(_ => { /* TODO: Implement Open Folder */ });
@@ -351,53 +352,87 @@ public class LibraryViewModel : INotifyPropertyChanged
         _logger.LogInformation("OnProjectAdded EXIT for job {JobId}. New project count: {ProjectCount}", e.Job.Id, AllProjects.Count);
     }
 
-    public void ReorderTrack(PlaylistTrackViewModel source, PlaylistTrackViewModel target)
+    public async void AddToPlaylist(PlaylistJob targetPlaylist, PlaylistTrackViewModel sourceTrack)
+    {
+        if (targetPlaylist == null || sourceTrack == null || targetPlaylist.Id == Guid.Empty) return; // Prevent invalid drops
+
+        _logger.LogInformation("Adding track {Track} to playlist {Playlist}", sourceTrack.Title, targetPlaylist.SourceTitle);
+
+        try
+        {
+            // 1. Create new PlaylistTrack model linked to the target playlist
+            var newTrack = new PlaylistTrack
+            {
+                Id = Guid.NewGuid(),
+                PlaylistId = targetPlaylist.Id,
+                Artist = sourceTrack.Artist,
+                Title = sourceTrack.Title,
+                Album = sourceTrack.Album,
+                TrackUniqueHash = sourceTrack.GlobalId,
+                Status = TrackStatus.Downloaded, // Assuming we dragged a downloaded/existing track
+                ResolvedFilePath = sourceTrack.Model.ResolvedFilePath,
+                TrackNumber = targetPlaylist.TotalTracks + 1, // Append to end
+                AddedAt = DateTime.UtcNow,
+                SortOrder = targetPlaylist.TotalTracks + 1 // Default sort order
+            };
+
+            // 2. Persist to Database
+            await _libraryService.SavePlaylistTrackAsync(newTrack);
+
+            // 3. Update Target Playlist Counts/Metadata if needed
+            // The service might do this, or we rely on events.
+            // Let's manually refresh the target playlist's in-memory list if it's currently selected?
+            // If it's NOT selected, we just need to update the TotalTracks count on the job object.
+            
+            targetPlaylist.TotalTracks++;
+            targetPlaylist.SuccessfulCount++; // Validation: check actual status? 
+            
+            _logger.LogInformation("Successfully added track to playlist {Playlist}", targetPlaylist.SourceTitle);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to add track to playlist");
+        }
+    }
+
+    public async void ReorderTrack(PlaylistTrackViewModel source, PlaylistTrackViewModel target)
     {
         if (source == null || target == null || source == target) return;
+        if (CurrentProjectTracks == null) return;
 
-        // Simple implementation: Swap SortOrder
-        // Better implementation: Insert
-        // Renumbering everything is safest for consistency
+        // Ensure we are operating on the same collection
+        int oldIndex = CurrentProjectTracks.IndexOf(source);
+        int newIndex = CurrentProjectTracks.IndexOf(target);
 
-        // Find current indices in the underlying collection? 
-        // We really want to change SortOrder values.
+        if (oldIndex < 0 || newIndex < 0) return;
 
-        // Let's adopt a "dense rank" approach.
-        // First, ensure everyone has a SortOrder. if 0, assign based on current index.
+        // 1. Move in ObservableCollection (updates UI immediately)
+        CurrentProjectTracks.Move(oldIndex, newIndex);
 
-        var allTracks = _downloadManager.AllGlobalTracks; // This is the source
-        // But we are only reordering within "Warehouse" view ideally. 
-        // Mixing active/warehouse reordering is tricky.
-        // Assuming we drag pending items.
-
-        int oldIndex = source.SortOrder;
-        int newIndex = target.SortOrder;
-
-        if (oldIndex == newIndex) return;
-
-        // Shift items
-        foreach (var track in allTracks)
+        // 2. Recalculate SortOrder for the entire collection (Dense Rank)
+        // This ensures a clean 0..N sequence regardless of previous state
+        for (int i = 0; i < CurrentProjectTracks.Count; i++)
         {
-            if (oldIndex < newIndex)
-            {
-                // Moving down: shift items between old and new UP (-1)
-                if (track.SortOrder > oldIndex && track.SortOrder <= newIndex)
-                {
-                    track.SortOrder--;
-                }
-            }
-            else
-            {
-                // Moving up: shift items between new and old DOWN (+1)
-                if (track.SortOrder >= newIndex && track.SortOrder < oldIndex)
-                {
-                    track.SortOrder++;
-                }
-            }
+            var track = CurrentProjectTracks[i];
+            track.SortOrder = i; 
+            // Note: Setter updates Model.SortOrder automatically
         }
 
-        source.SortOrder = newIndex;
-        // Verify uniqueness? If we started with unique 0..N, we end with unique 0..N
+        // 3. Persist changes asynchronously
+        if (SelectedProject != null)
+        {
+            try 
+            {
+                // Extract models to save
+                var tracksToSave = CurrentProjectTracks.Select(vm => vm.Model).ToList();
+                await _libraryService.SaveTrackOrderAsync(SelectedProject.Id, tracksToSave);
+                _logger.LogInformation("Persisted new track order for playlist {Id}", SelectedProject.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist track order");
+            }
+        }
     }
 
     private void ExecuteHardRetry(PlaylistTrackViewModel? vm)
@@ -436,11 +471,11 @@ public class LibraryViewModel : INotifyPropertyChanged
 
     private void ExecutePlayTrack(PlaylistTrackViewModel? vm)
     {
-        if (vm == null || string.IsNullOrEmpty(vm.LocalPath)) return;
+        if (vm == null || string.IsNullOrEmpty(vm.Model?.ResolvedFilePath)) return;
         
         // Ensure file exists? libVLC will fail or log err if not.
         _logger.LogInformation("Playing track: {Title} by {Artist}", vm.Title, vm.Artist);
-        _playerViewModel.PlayTrack(vm.LocalPath, vm.Title ?? "Unknown", vm.Artist ?? "Unknown Artist");
+        _playerViewModel.PlayTrack(vm.Model!.ResolvedFilePath, vm.Title ?? "Unknown", vm.Artist ?? "Unknown Artist");
         
         // Also ensure sidebar is visible?
         // _mainViewModel.TogglePlayerCommand.Execute(null); // No reference to MainViewModel here.
@@ -548,6 +583,19 @@ public class LibraryViewModel : INotifyPropertyChanged
         {
             _logger.LogError(ex, "Failed to delete project {Id}", targetJob.Id);
         }
+    }
+
+    private async Task ExecuteViewHistoryAsync()
+    {
+        if (SelectedProject == null || SelectedProject.Id == Guid.Empty) return;
+
+        _logger.LogInformation("Navigating to history for job: {Title}", SelectedProject.SourceTitle);
+        
+        // 1. Pre-select in target VM
+        await _importHistoryViewModel.SelectJob(SelectedProject.Id);
+        
+        // 2. Navigate
+        _navigationService.NavigateTo("ImportHistory");
     }
 
     private async Task LoadProjectTracksAsync(PlaylistJob job)

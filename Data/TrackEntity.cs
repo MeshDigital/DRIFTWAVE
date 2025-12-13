@@ -71,7 +71,9 @@ public class PlaylistTrackEntity
     public TrackStatus Status { get; set; } = TrackStatus.Missing; // Changed to enum
     public string ResolvedFilePath { get; set; } = string.Empty;
     public int TrackNumber { get; set; }
+
     public DateTime AddedAt { get; set; }
+    public int SortOrder { get; set; }
     
     public PlaylistJobEntity? Job { get; set; }
 }
