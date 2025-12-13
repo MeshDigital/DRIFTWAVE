@@ -1,0 +1,90 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="SLSKDONET.Views.Avalonia.MainWindow"
+        Title="QMUSICSLSK - Soulseek Music Downloader (Avalonia)"
+        Width="1200" Height="800"
+        Icon="/app_icon.png">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2D2D2D" Padding="16,12">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="🎵" FontSize="24" VerticalAlignment="Center"/>
+                <TextBlock Text="QMUSICSLSK" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Text="(Avalonia Cross-Platform)" FontSize="14" Foreground="#888" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- Main Content Area -->
+        <TabControl Grid.Row="1" Margin="0">
+            <TabItem Header="Search">
+                <Grid>
+                    <TextBlock Text="Search Page - Coming Soon" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontSize="24"
+                               Foreground="#888"/>
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="Library">
+                <Grid>
+                    <TextBlock Text="Library Page - Coming Soon" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontSize="24"
+                               Foreground="#888"/>
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="Downloads">
+                <Grid>
+                    <TextBlock Text="Downloads Page - Coming Soon" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontSize="24"
+                               Foreground="#888"/>
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="Settings">
+                <Grid>
+                    <TextBlock Text="Settings Page - Coming Soon" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontSize="24"
+                               Foreground="#888"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+        
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#252525" Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" 
+                           Text="Ready - Avalonia UI Framework" 
+                           VerticalAlignment="Center"
+                           Foreground="#888"/>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16">
+                    <TextBlock Text="✅ Cross-Platform" VerticalAlignment="Center" Foreground="#4CAF50"/>
+                    <TextBlock Text="Phase 2 - Testing" VerticalAlignment="Center" Foreground="#2196F3"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

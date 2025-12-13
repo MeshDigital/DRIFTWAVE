@@ -98,4 +98,16 @@
     <Page Update="Views\SettingsPage.xaml" />
   </ItemGroup>
 
+  <!-- Avalonia build configuration (Cross-platform) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <!-- Exclude WPF-specific files from net8.0 build -->
+    <Compile Remove="App.xaml.cs" />
+    <Compile Remove="Converters\**\*.cs" />
+    <Compile Remove="Views\*.cs" />
+    <Compile Remove="Views\Helpers\**\*.cs" />
+    <Compile Remove="ViewModels\LibraryViewModel.cs" />
+    <Compile Remove="ViewModels\PlaylistTrackViewModel.cs" />
+    <Compile Remove="Services\InputDialog.xaml.cs" />
+  </ItemGroup>
+
 </Project>
