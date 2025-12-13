@@ -46,6 +46,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
 
     // Event for project status update (used by LibraryViewModel to refresh counts)
     public event EventHandler<Guid>? ProjectUpdated;
+    
+    // Expose download directory from config
+    public string? DownloadDirectory => _config.DownloadDirectory;
 
     public DownloadManager(
         ILogger<DownloadManager> logger,

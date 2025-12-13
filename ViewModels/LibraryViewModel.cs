@@ -425,10 +425,14 @@ public class LibraryViewModel : INotifyPropertyChanged
             
             _logger.LogInformation("Found {Count} completed tracks without file paths", tracksNeedingPaths.Count);
             
-            // Get download directory from config (via main view model or a service)
-            var downloadDir = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SLSKDONET", "Downloads");
+            // Get download directory from config (NOT hardcoded AppData path!)
+            var downloadDir = _downloadManager.DownloadDirectory;
+            
+            if (string.IsNullOrEmpty(downloadDir))
+            {
+                _logger.LogWarning("Download directory not configured in settings");
+                return;
+            }
             
             if (!System.IO.Directory.Exists(downloadDir))
             {
@@ -1013,15 +1017,22 @@ public class LibraryViewModel : INotifyPropertyChanged
                     }
                 }
 
-                if (SelectedProject == null && AllProjects.Any())
+                // OPTIMIZATION: Don't load tracks on initial startup
+                // Set the selected project without triggering track load
+                if (SelectedProject == null && AllProjects.Any() && !_initialLoadCompleted)
                 {
-                    SelectedProject = AllProjects.First();
+                    _selectedProject = AllProjects.First(); // Direct field assignment to avoid triggering setter
+                    OnPropertyChanged(nameof(SelectedProject));
+                }
+                else if (SelectedProject == null && AllProjects.Any())
+                {
+                    SelectedProject = AllProjects.First(); // Normal assignment after initial load
                 }
 
                 if (!_initialLoadCompleted)
                 {
                     _initialLoadCompleted = true;
-                    _logger.LogInformation("Initial load of {count} projects completed.", AllProjects.Count);
+                    _logger.LogInformation("Initial load of {count} projects completed (tracks deferred).", AllProjects.Count);
                 }
             });
         }

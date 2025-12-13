@@ -76,24 +76,42 @@ namespace SLSKDONET.Services
             }
         }
 
-        public void Play(string uri)
+        public void Play(string filePath)
         {
             if (!_isInitialized || _libVLC == null || _mediaPlayer == null) return;
 
-            // Stop current if playing? MediaPlayer handles this if we set new media.
-            // But good practice to clean up Media object.
+            // Ensure we have a clean file path (not URL-encoded)
+            // If it's a URI, decode it first
+            string cleanPath = filePath;
+            if (filePath.StartsWith("file:///"))
+            {
+                cleanPath = Uri.UnescapeDataString(new Uri(filePath).LocalPath);
+            }
+            else if (filePath.Contains("%20") || filePath.Contains("%"))
+            {
+                cleanPath = Uri.UnescapeDataString(filePath);
+            }
+
+            // Verify file exists
+            if (!File.Exists(cleanPath))
+            {
+                Console.WriteLine($"[AudioPlayerService] File not found: {cleanPath}");
+                return;
+            }
+
+            // Stop current if playing
+            if (_mediaPlayer.IsPlaying)
+            {
+                _mediaPlayer.Stop();
+            }
             
-            var media = new Media(_libVLC, uri, FromType.FromPath);
-            media.Parse(MediaParseOptions.ParseLocal); // Optional: Parse metadata immediately
+            // Create media from file path (NOT URI)
+            var media = new Media(_libVLC, cleanPath, FromType.FromPath);
+            media.Parse(MediaParseOptions.ParseLocal);
             
             _mediaPlayer.Play(media);
             
-            // media object ownership is transferred to MediaPlayer? No.
-            // But we don't need to keep a reference to it unless we want to access it later.
-            // Ideally we dispose it when done, but MediaPlayer play is async.
-            // Actually LibVLC C# wrapper handles reference counting mostly, but generally we should keep 'media' alive?
-            // "You can dispose the media immediately after calling Play".
-            // Let's verify documentation. LibVLCSharp examples often keep it locally.
+            Console.WriteLine($"[AudioPlayerService] Now playing: {cleanPath}");
         }
 
         public void Pause()

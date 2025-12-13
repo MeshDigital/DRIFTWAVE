@@ -68,8 +68,8 @@ public partial class ImportHistoryViewModel : INotifyPropertyChanged
         LoadHistoryCommand = new AsyncRelayCommand(LoadHistoryAsync);
         ReImportCommand = new RelayCommand<PlaylistJob>(ExecuteReImport);
 
-        // Initial Load
-        _ = LoadHistoryAsync();
+        // REMOVED: Eager loading - now loads only when page is accessed
+        // _ = LoadHistoryAsync();
     }
 
     private async Task LoadHistoryAsync()

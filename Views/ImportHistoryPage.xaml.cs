@@ -9,6 +9,9 @@ namespace SLSKDONET.Views
         {
             InitializeComponent();
             DataContext = viewModel;
+            
+            // Lazy-load history when page is accessed
+            Loaded += (s, e) => viewModel.LoadHistoryCommand.Execute(null);
         }
 
         private void DataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
