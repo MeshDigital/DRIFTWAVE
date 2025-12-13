@@ -490,6 +490,25 @@ public class LibraryViewModel : INotifyPropertyChanged
         if (targetPlaylist == null || sourceTrack == null || targetPlaylist.Id == Guid.Empty) return;
 
         _logger.LogInformation("Adding track {Track} to playlist {Playlist}", sourceTrack.Title, targetPlaylist.SourceTitle);
+        
+        // Get the actual file path - check both Model and live DownloadManager
+        string resolvedPath = sourceTrack.Model?.ResolvedFilePath ?? "";
+        
+        // If Model doesn't have the path, check the live DownloadManager
+        if (string.IsNullOrEmpty(resolvedPath))
+        {
+            var liveTrack = _downloadManager.AllGlobalTracks
+                .FirstOrDefault(t => t.GlobalId == sourceTrack.GlobalId);
+            
+            if (liveTrack != null)
+            {
+                resolvedPath = liveTrack.Model?.ResolvedFilePath ?? "";
+            }
+        }
+        
+        _logger.LogInformation("Source track state: {State}, ResolvedFilePath: {Path}", 
+            sourceTrack.State, 
+            string.IsNullOrEmpty(resolvedPath) ? "<empty>" : resolvedPath);
 
         try
         {
@@ -503,9 +522,13 @@ public class LibraryViewModel : INotifyPropertyChanged
                 Album = sourceTrack.Model?.Album ?? "",
                 SortOrder = targetPlaylist.TotalTracks + 1,
                 Status = sourceTrack.State == PlaylistTrackState.Completed ? TrackStatus.Downloaded : TrackStatus.Missing,
-                ResolvedFilePath = sourceTrack.Model?.ResolvedFilePath ?? "",
+                ResolvedFilePath = resolvedPath,  // Use the resolved path we found
                 TrackUniqueHash = sourceTrack.GlobalId.ToString()
             };
+
+            _logger.LogInformation("New track created with ResolvedFilePath: {Path}, Status: {Status}", 
+                string.IsNullOrEmpty(newTrack.ResolvedFilePath) ? "<empty>" : newTrack.ResolvedFilePath, 
+                newTrack.Status);
 
             // 2. Persist to Database
             await _libraryService.SavePlaylistTrackAsync(newTrack);
@@ -519,24 +542,22 @@ public class LibraryViewModel : INotifyPropertyChanged
             {
                 targetPlaylist.SuccessfulCount++;
             }
-            
-            // FIX: Force UI reload of the target playlist to ensure drag/drop changes are visible.
-            // This relies on the SelectedProject setter calling LoadProjectTracksAsync.
-            if (SelectedProject == targetPlaylist)
-            {
-                 // Clear and reset the selection to force setter to fire LoadProjectTracksAsync
-                 var temp = SelectedProject;
-                 SelectedProject = null;
-                 SelectedProject = temp;
-            }
 
             _logger.LogInformation("Successfully added track to playlist {Playlist}", targetPlaylist.SourceTitle);
+            
+            // 5. Reload the playlist view if it's currently selected (AFTER database operations complete)
+            if (SelectedProject == targetPlaylist)
+            {
+                // Reload tracks from database to show the newly added track
+                await LoadProjectTracksAsync(targetPlaylist);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to add track to playlist");
         }
     }
+
 
     private void ExecuteResumeProject(PlaylistJob? job)
     {
@@ -714,8 +735,10 @@ public class LibraryViewModel : INotifyPropertyChanged
             }
             else
             {
-                // N+1 Query Fix: Use the eagerly loaded tracks from the job object itself.
-                foreach (var track in job.PlaylistTracks.OrderBy(t => t.TrackNumber))
+                // IMPORTANT: Reload from database to get fresh data, not cached job.PlaylistTracks
+                var freshTracks = await _libraryService.LoadPlaylistTracksAsync(job.Id);
+                
+                foreach (var track in freshTracks.OrderBy(t => t.TrackNumber))
                 {
                     var vm = new PlaylistTrackViewModel(track);
 

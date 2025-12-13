@@ -8,7 +8,8 @@
     Height="800" 
     Width="1200"
     WindowStartupLocation="CenterScreen"
-    Background="#1E1E1E">
+    Background="#1E1E1E"
+    Icon="/app_icon.png">
 
     <Window.InputBindings>
         <KeyBinding Key="R" Modifiers="Control" Command="{Binding RunDiagnosticsCommand}"/>
@@ -319,11 +320,21 @@
                 </StackPanel>
 
                 <!-- Status Message (Center) - temporary status like "Searching...", "Connecting..." -->
-                <TextBlock Grid.Column="1" 
-                           Text="{Binding StatusText, FallbackValue=''}" 
-                           Foreground="#A0A0A0"
-                           FontSize="12"
-                           Margin="20,0,0,0"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusText, FallbackValue=''}" 
+                               Foreground="#A0A0A0"
+                               FontSize="12"
+                               Margin="20,0,0,0"/>
+                    
+                    <!-- Version Display -->
+                    <TextBlock Text="{Binding ApplicationVersion, StringFormat='v{0}'}" 
+                               Foreground="#666666"
+                               FontSize="11"
+                               FontStyle="Italic"
+                               Margin="20,0,0,0"
+                               VerticalAlignment="Center"
+                               ToolTip="Application Version"/>
+                </StackPanel>
 
                 <!-- Download Progress (Right) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">

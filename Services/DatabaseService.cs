@@ -293,13 +293,20 @@ public class DatabaseService
     {
         using var context = new AppDbContext();
 
-        // Apply the atomic upsert pattern. EF Core handles INSERT vs. UPDATE.
-        // Set AddedAt only if the entity is new (detached).
-        if (context.Entry(track).State == EntityState.Detached)
+        // Check if track already exists in database to decide between Add (INSERT) or Update (UPDATE)
+        var exists = await context.PlaylistTracks.AnyAsync(t => t.Id == track.Id);
+
+        if (exists)
         {
-            track.AddedAt = DateTime.UtcNow;
+            // Update existing track
+            context.PlaylistTracks.Update(track);
         }
-        context.PlaylistTracks.Update(track);
+        else
+        {
+            // Add new track
+            track.AddedAt = DateTime.UtcNow;
+            context.PlaylistTracks.Add(track);
+        }
 
         await UpdatePlaylistJobCountersAsync(context, track.PlaylistId);
         await context.SaveChangesAsync();
