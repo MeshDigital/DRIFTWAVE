@@ -24,29 +24,46 @@ namespace SLSKDONET.Services
         }
 
         private void Initialize()
+    {
+        if (_isInitialized) return;
+
+        try 
         {
-            if (_isInitialized) return;
-
-            try 
+            // Explicitly set LibVLC path to the output directory
+            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            var libVlcPath = Path.Combine(appDir, "libvlc", Environment.Is64BitProcess ? "win-x64" : "win-x86");
+            
+            Console.WriteLine($"[AudioPlayerService] Initializing LibVLC from: {libVlcPath}");
+            Console.WriteLine($"[AudioPlayerService] LibVLC path exists: {Directory.Exists(libVlcPath)}");
+            
+            if (!Directory.Exists(libVlcPath))
             {
-                Core.Initialize(); // Defines native library path
-                _libVLC = new LibVLC();
-                _mediaPlayer = new MediaPlayer(_libVLC);
-
-                _mediaPlayer.TimeChanged += (s, e) => TimeChanged?.Invoke(this, e.Time);
-                _mediaPlayer.PositionChanged += (s, e) => PositionChanged?.Invoke(this, e.Position);
-                _mediaPlayer.LengthChanged += (s, e) => LengthChanged?.Invoke(this, e.Length);
-                _mediaPlayer.EndReached += (s, e) => EndReached?.Invoke(this, EventArgs.Empty);
-                _mediaPlayer.PausableChanged += (s, e) => PausableChanged?.Invoke(this, EventArgs.Empty);
-
-                _isInitialized = true;
+                Console.WriteLine($"[AudioPlayerService] ERROR: LibVLC directory not found!");
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[AudioPlayerService] Initialization Failed: {ex.Message}");
-                // In production, log this properly.
-            }
+            
+            // Initialize with explicit path
+            Core.Initialize(libVlcPath);
+            
+            _libVLC = new LibVLC();
+            _mediaPlayer = new MediaPlayer(_libVLC);
+
+            _mediaPlayer.TimeChanged += (s, e) => TimeChanged?.Invoke(this, e.Time);
+            _mediaPlayer.PositionChanged += (s, e) => PositionChanged?.Invoke(this, e.Position);
+            _mediaPlayer.LengthChanged += (s, e) => LengthChanged?.Invoke(this, e.Length);
+            _mediaPlayer.EndReached += (s, e) => EndReached?.Invoke(this, EventArgs.Empty);
+            _mediaPlayer.PausableChanged += (s, e) => PausableChanged?.Invoke(this, EventArgs.Empty);
+
+            _isInitialized = true;
+            Console.WriteLine($"[AudioPlayerService] Initialization successful!");
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AudioPlayerService] Initialization Failed: {ex.Message}");
+            Console.WriteLine($"[AudioPlayerService] Stack trace: {ex.StackTrace}");
+        }
+    }
+        
 
         public bool IsInitialized => _isInitialized;
         
@@ -105,13 +122,17 @@ namespace SLSKDONET.Services
                 _mediaPlayer.Stop();
             }
             
-            // Create media from file path (NOT URI)
-            var media = new Media(_libVLC, cleanPath, FromType.FromPath);
+            // CRITICAL: Pass the RAW Windows path directly
+            // LibVLC handles Windows paths correctly without URI conversion
+            Console.WriteLine($"[AudioPlayerService] Creating media from path: {cleanPath}");
+            
+            // Create media from raw path
+            var media = new Media(_libVLC, cleanPath);
             media.Parse(MediaParseOptions.ParseLocal);
             
             _mediaPlayer.Play(media);
             
-            Console.WriteLine($"[AudioPlayerService] Now playing: {cleanPath}");
+            Console.WriteLine($"[AudioPlayerService] Playback started for: {Path.GetFileName(cleanPath)}");
         }
 
         public void Pause()

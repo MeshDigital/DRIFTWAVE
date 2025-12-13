@@ -46,15 +46,11 @@ public class OpenFolderAction : ILibraryAction
                 return Task.CompletedTask;
             }
 
-            var folderPath = Path.GetDirectoryName(trackWithFile.Model.ResolvedFilePath);
-            if (string.IsNullOrEmpty(folderPath))
-            {
-                _logger.LogWarning("Could not determine folder path for {File}", trackWithFile.Model.ResolvedFilePath);
-                return Task.CompletedTask;
-            }
-
-            _logger.LogInformation("Opening folder: {Folder}", folderPath);
-            Process.Start("explorer.exe", folderPath);
+            var filePath = trackWithFile.Model.ResolvedFilePath;
+            
+            // Use /select to highlight the file in Explorer
+            _logger.LogInformation("Opening folder and selecting file: {File}", filePath);
+            Process.Start("explorer.exe", $"/select,\"{filePath}\"");
         }
         catch (Exception ex)
         {
