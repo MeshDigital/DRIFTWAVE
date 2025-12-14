@@ -228,6 +228,99 @@
 
 ---
 
+## Phase 2B: Data Management & Resilience (8 hours) 🟡
+
+### 2.4 DB Backup & Restore (2 hours)
+**Priority**: ⭐⭐⭐ CRITICAL
+
+**What to Build**:
+- [ ] Backup library.db to external drive
+- [ ] Backup config.ini with database
+- [ ] Restore from backup
+- [ ] Scheduled auto-backup option
+- [ ] Backup verification
+
+**Files to Create**:
+- `Services/BackupService.cs` (new)
+- `Views/Avalonia/BackupPage.axaml` (new)
+
+**Implementation**:
+1. Use SQLite `VACUUM INTO` or `File.Copy`
+2. Create BackupService with atomic backup
+3. Add backup UI to Settings page
+4. Implement restore with validation
+5. Add auto-backup scheduler
+
+---
+
+### 2.5 DB Import/Export JSON (2 hours)
+**Priority**: ⭐⭐
+
+**What to Build**:
+- [ ] Export all playlists to JSON
+- [ ] Export library entries to JSON
+- [ ] Import from JSON (merge or replace)
+- [ ] Portable library format
+
+**Files to Modify**:
+- `Services/LibraryService.cs` (add Export/Import methods)
+
+**Implementation**:
+1. Serialize PlaylistJob + PlaylistTrack to JSON
+2. Include metadata and relationships
+3. Import with duplicate detection
+4. Validate JSON schema on import
+
+---
+
+### 2.6 Library Indexing Optimization (1 hour)
+**Priority**: ⭐⭐
+
+**What to Build**:
+- [ ] Add database indexes for faster queries
+- [ ] Index on PlaylistId, Status, TrackUniqueHash
+- [ ] Index on CreatedAt for sorting
+- [ ] Measure query performance improvement
+
+**Files to Modify**:
+- `Data/AppDbContext.cs` (add indexes)
+
+**Implementation**:
+```csharp
+modelBuilder.Entity<PlaylistTrackEntity>()
+    .HasIndex(t => t.PlaylistId);
+modelBuilder.Entity<PlaylistTrackEntity>()
+    .HasIndex(t => t.Status);
+modelBuilder.Entity<PlaylistTrackEntity>()
+    .HasIndex(t => t.TrackUniqueHash);
+modelBuilder.Entity<PlaylistJobEntity>()
+    .HasIndex(j => j.CreatedAt);
+```
+
+---
+
+### 2.7 True Pause/Resume Downloads (3 hours)
+**Priority**: ⭐⭐⭐
+
+**What to Build**:
+- [ ] Check for .part files on resume
+- [ ] Resume from file size offset
+- [ ] Validate partial downloads
+- [ ] Handle corrupted .part files
+
+**Files to Modify**:
+- `Services/DownloadManager.cs`
+- `Services/SoulseekAdapter.cs` (add startOffset support)
+
+**Implementation**:
+1. Check if .part file exists before download
+2. Get file size as resume offset
+3. Pass offset to Soulseek download
+4. Verify file integrity after resume
+5. Delete .part if corrupted
+
+---
+
 ## Phase 4: Advanced Features (Future)
 
 ### 4.1 Rekordbox Export
@@ -241,6 +334,100 @@
 ### 4.3 Cloud Backup
 - [ ] Backup library to cloud
 - [ ] Restore from backup
+
+---
+
+## Phase 5: Quality Control & Replacement System (16 hours) 🔵
+
+### 5.1 Audio Fingerprinting (4 hours)
+**Priority**: ⭐⭐⭐ ADVANCED
+
+**What to Build**:
+- [ ] Integrate SoundFingerprinting library
+- [ ] Generate fingerprint hash for each track
+- [ ] Store fingerprint in database
+- [ ] Compare fingerprints for duplicates
+
+**Files to Create**:
+- `Services/FingerprintService.cs` (new)
+- Add NuGet: `SoundFingerprinting` (MIT license)
+
+**Implementation**:
+1. Add SoundFingerprinting NuGet package
+2. Create FingerprintService
+3. Generate hash post-download
+4. Store in LibraryEntry.FingerprintHash
+5. Compare hashes for perceptual duplicates
+
+---
+
+### 5.2 Track Quality Data Model (2 hours)
+**Priority**: ⭐⭐⭐
+
+**What to Build**:
+- [ ] Add FingerprintHash to LibraryEntry
+- [ ] Add BitrateScore property
+- [ ] Add FingerprintQuality property
+- [ ] Add QualityFlags enum
+
+**Files to Modify**:
+- `Models/LibraryEntry.cs`
+- `Models/PlaylistTrack.cs`
+- `Data/Entities/` (corresponding entities)
+
+**Implementation**:
+```csharp
+public string? FingerprintHash { get; set; }
+public int BitrateScore { get; set; }
+public double FingerprintQuality { get; set; }
+public QualityFlags Flags { get; set; }
+```
+
+---
+
+### 5.3 Quality Analysis Service (6 hours)
+**Priority**: ⭐⭐⭐
+
+**What to Build**:
+- [ ] Post-download quality analysis
+- [ ] Compare against existing library
+- [ ] Flag duplicates for review
+- [ ] Suggest higher quality replacements
+- [ ] Auto-replace option (with confirmation)
+
+**Files to Create**:
+- `Services/QualityAnalysisService.cs` (new)
+
+**Implementation**:
+1. Run analysis after download completes
+2. Check fingerprint against all LibraryEntry
+3. Compare quality metrics (bitrate, format, length)
+4. Flag duplicates with lower quality
+5. Suggest replacement candidates
+6. Log analysis results
+
+---
+
+### 5.4 Quality Review UI (4 hours)
+**Priority**: ⭐⭐
+
+**What to Build**:
+- [ ] "Library Health" page
+- [ ] List flagged duplicates
+- [ ] Show quality comparison
+- [ ] Replace/Keep/Delete actions
+- [ ] Batch operations
+
+**Files to Create**:
+- `Views/Avalonia/QualityReviewPage.axaml` (new)
+- `ViewModels/QualityReviewViewModel.cs` (new)
+
+**Implementation**:
+1. Create QualityReviewViewModel
+2. Load flagged tracks from database
+3. Display side-by-side comparison
+4. Implement replace logic
+5. Add to navigation
 
 ---
 
