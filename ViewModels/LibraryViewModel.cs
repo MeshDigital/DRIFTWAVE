@@ -1208,14 +1208,14 @@ public class LibraryViewModel : INotifyPropertyChanged
             {
                 // CRITICAL FIX: Only load playlist metadata, NOT tracks
                 // Tracks will be loaded on-demand when user selects a playlist
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                
+                // Don't use Dispatcher - we're already on UI thread
+                // Using Dispatcher here causes deadlock when SelectedProject setter triggers
+                AllProjects.Clear();
+                foreach (var job in jobs.OrderByDescending(j => j.CreatedAt))
                 {
-                    AllProjects.Clear();
-                    foreach (var job in jobs.OrderByDescending(j => j.CreatedAt))
-                    {
-                        AllProjects.Add(job);
-                    }
-                });
+                    AllProjects.Add(job);
+                }
 
                 _initialLoadCompleted = true;
                 _logger.LogInformation("Initial load completed. Loaded {Count} playlists (tracks will load on-demand)", AllProjects.Count);
