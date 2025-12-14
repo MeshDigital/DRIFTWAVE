@@ -149,7 +149,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         
         foreach (var playlist in _libraryService.Playlists)
         {
-            var likedInPlaylist = playlist.Tracks
+            var likedInPlaylist = playlist.PlaylistTracks
                 .Where(t => t.IsLiked)
                 .Select(t => new PlaylistTrackViewModel(t))
                 .ToList();
