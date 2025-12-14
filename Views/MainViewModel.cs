@@ -77,6 +77,23 @@ public class MainViewModel : INotifyPropertyChanged
     public ImportPreviewViewModel? ImportPreviewViewModel { get; private set; }
     public PlayerViewModel PlayerViewModel { get; }
     
+    // Navigation - Current page being displayed
+    private object? _currentPage;
+    public object? CurrentPage
+    {
+        get => _currentPage;
+        set => SetProperty(ref _currentPage, value);
+    }
+    
+    // Page instances (lazy-loaded)
+    private object? _searchPage;
+    private object? _libraryPage;
+    private object? _downloadsPage;
+    private object? _settingsPage;
+    
+    // Store LibraryViewModel for navigation
+    private LibraryViewModel? _libraryViewModel;
+    
     private bool _isImportPreviewVisible;
     public bool IsImportPreviewVisible
     {
@@ -277,11 +294,11 @@ public class MainViewModel : INotifyPropertyChanged
             StatusText = "Settings saved successfully!";
         });
 
-        // Initialize navigation commands
-        NavigateSearchCommand = new RelayCommand(() => _navigationService.NavigateTo("Search"));
-        NavigateLibraryCommand = new RelayCommand(() => _navigationService.NavigateTo("Library"));
-        NavigateDownloadsCommand = new RelayCommand(() => _navigationService.NavigateTo("Downloads"));
-        NavigateSettingsCommand = new RelayCommand(() => _navigationService.NavigateTo("Settings"));
+        // Initialize        // Navigation commands
+        NavigateSearchCommand = new RelayCommand(NavigateToSearch);
+        NavigateLibraryCommand = new RelayCommand(NavigateToLibrary);
+        NavigateDownloadsCommand = new RelayCommand(NavigateToDownloads);
+        NavigateSettingsCommand = new RelayCommand(NavigateToSettings);
         
         // Initialize login overlay commands
         ShowLoginCommand = new RelayCommand(() => 
@@ -354,6 +371,51 @@ public class MainViewModel : INotifyPropertyChanged
         
         _logger.LogInformation($"MainViewModel initialized. IsConnected={_isConnected}, IsSearching={_isSearching}, StatusText={_statusText}");
         _logger.LogInformation("=== MainViewModel Constructor Completed ===");
+        
+        // Set default page to Search
+        NavigateToSearch();
+    }
+    
+    // Navigation Methods
+    private void NavigateToSearch()
+    {
+        if (_searchPage == null)
+        {
+            _searchPage = new Views.Avalonia.SearchPage { DataContext = this };
+        }
+        CurrentPage = _searchPage;
+    }
+    
+    private void NavigateToLibrary()
+    {
+        if (_libraryPage == null)
+        {
+            // Get LibraryViewModel from services if not already set
+            if (_libraryViewModel == null && App.Current is App app && app.Services != null)
+            {
+                _libraryViewModel = app.Services.GetService(typeof(LibraryViewModel)) as LibraryViewModel;
+            }
+            _libraryPage = new Views.Avalonia.LibraryPage { DataContext = _libraryViewModel };
+        }
+        CurrentPage = _libraryPage;
+    }
+    
+    private void NavigateToDownloads()
+    {
+        if (_downloadsPage == null)
+        {
+            _downloadsPage = new Views.Avalonia.DownloadsPage { DataContext = this };
+        }
+        CurrentPage = _downloadsPage;
+    }
+    
+    private void NavigateToSettings()
+    {
+        if (_settingsPage == null)
+        {
+            _settingsPage = new Views.Avalonia.SettingsPage { DataContext = this };
+        }
+        CurrentPage = _settingsPage;
     }
 
     // The field '_isLibraryLoaded' is assigned but its value is never used. It has been removed.
