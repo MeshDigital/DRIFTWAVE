@@ -55,12 +55,56 @@ public class DatabaseService
                 _logger.LogWarning("Schema Patch: Adding missing column 'IsDeleted' to PlaylistJobs");
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistJobs ADD COLUMN IsDeleted INTEGER DEFAULT 0");
             }
+
+            // 3. Check for Rating in PlaylistTracks (Phase 2)
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("SELECT Rating FROM PlaylistTracks LIMIT 1");
+            }
+            catch
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'Rating' to PlaylistTracks");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistTracks ADD COLUMN Rating INTEGER DEFAULT 0");
+            }
+
+            // 4. Check for IsLiked in PlaylistTracks (Phase 2)
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("SELECT IsLiked FROM PlaylistTracks LIMIT 1");
+            }
+            catch
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'IsLiked' to PlaylistTracks");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistTracks ADD COLUMN IsLiked INTEGER DEFAULT 0");
+            }
+
+            // 5. Check for PlayCount in PlaylistTracks (Phase 2)
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("SELECT PlayCount FROM PlaylistTracks LIMIT 1");
+            }
+            catch
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'PlayCount' to PlaylistTracks");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistTracks ADD COLUMN PlayCount INTEGER DEFAULT 0");
+            }
+
+            // 6. Check for LastPlayedAt in PlaylistTracks (Phase 2)
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("SELECT LastPlayedAt FROM PlaylistTracks LIMIT 1");
+            }
+            catch
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'LastPlayedAt' to PlaylistTracks");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE PlaylistTracks ADD COLUMN LastPlayedAt TEXT NULL");
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to patch database schema");
         }
-            // 3. Check for ActivityLogs table
+            // 7. Check for ActivityLogs table
             // Since it's a new table, we can check if it exists in sqlite_master
             try 
             {
