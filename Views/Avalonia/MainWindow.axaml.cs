@@ -18,6 +18,24 @@ namespace SLSKDONET.Views.Avalonia
             this.Closing += OnWindowClosing;
         }
 
+        // Tray Icon Event Handlers
+        private void ShowWindow_Click(object? sender, EventArgs e)
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+        }
+
+        private void HideWindow_Click(object? sender, EventArgs e)
+        {
+            Hide();
+        }
+
+        private void Exit_Click(object? sender, EventArgs e)
+        {
+            Close();
+        }
+
         private void OnWindowOpened(object? sender, EventArgs e)
         {
             // Try to get config from app services
