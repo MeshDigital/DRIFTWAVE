@@ -492,6 +492,10 @@ public class LibraryService : ILibraryService
             Status = entity.Status,
             ResolvedFilePath = entity.ResolvedFilePath,
             TrackNumber = entity.TrackNumber,
+            Rating = entity.Rating,
+            IsLiked = entity.IsLiked,
+            PlayCount = entity.PlayCount,
+            LastPlayedAt = entity.LastPlayedAt,
             AddedAt = entity.AddedAt,
             SortOrder = entity.SortOrder
         };
@@ -510,6 +514,10 @@ public class LibraryService : ILibraryService
             Status = track.Status,
             ResolvedFilePath = track.ResolvedFilePath,
             TrackNumber = track.TrackNumber,
+            Rating = track.Rating,
+            IsLiked = track.IsLiked,
+            PlayCount = track.PlayCount,
+            LastPlayedAt = track.LastPlayedAt,
             AddedAt = track.AddedAt,
             SortOrder = track.SortOrder
         };
