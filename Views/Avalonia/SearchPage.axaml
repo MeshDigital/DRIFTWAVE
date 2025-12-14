@@ -2,11 +2,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:SLSKDONET.Views.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="SLSKDONET.Views.Avalonia.SearchPage"
              Background="#1E1E1E" Foreground="White">
     
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <!-- Main Grid with Import Preview Overlay -->
+    <Grid>
+        <!-- Search Results (Main Content) -->
+        <Grid RowDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding !IsImportPreviewVisible}">
         
         <!-- Header -->
         <Border Grid.Row="0" Background="#252526" Padding="24,20" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1">
@@ -452,5 +456,10 @@
                 </StackPanel>
             </Grid>
         </Border>
+        </Grid>
+        
+        <!-- Import Preview Overlay -->
+        <views:ImportPreviewPage DataContext="{Binding ImportPreviewViewModel}"
+                                IsVisible="{Binding IsImportPreviewVisible}"/>
     </Grid>
 </UserControl>
