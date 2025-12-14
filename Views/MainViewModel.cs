@@ -151,6 +151,22 @@ public class MainViewModel : INotifyPropertyChanged
         get => _isNavigationCollapsed;
         set => SetProperty(ref _isNavigationCollapsed, value);
     }
+
+    // Player location toggle (sidebar vs bottom)
+    private bool _isPlayerAtBottom = false;
+    public bool IsPlayerAtBottom
+    {
+        get => _isPlayerAtBottom;
+        set
+        {
+            if (SetProperty(ref _isPlayerAtBottom, value))
+            {
+                OnPropertyChanged(nameof(IsPlayerInSidebar));
+            }
+        }
+    }
+
+    public bool IsPlayerInSidebar => !_isPlayerAtBottom;
     
     private bool _isPlayerSidebarVisible = true;
     public bool IsPlayerSidebarVisible
@@ -232,6 +248,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand NavigateSettingsCommand { get; }
     public ICommand ShowLoginCommand { get; }
     public ICommand DismissLoginCommand { get; }
+    public ICommand TogglePlayerLocationCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand ToggleNavigationCommand { get; }
     public ICommand TogglePlayerCommand { get; }
