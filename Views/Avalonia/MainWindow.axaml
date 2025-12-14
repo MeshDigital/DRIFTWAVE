@@ -8,6 +8,30 @@
         Width="1400" Height="900"
         Background="#1E1E1E">
     
+    <!-- Keyboard Shortcuts -->
+    <Window.KeyBindings>
+        <!-- Ctrl+F: Focus Search -->
+        <KeyBinding Gesture="Ctrl+F" Command="{Binding NavigateSearchCommand}"/>
+        
+        <!-- Ctrl+L: Go to Library -->
+        <KeyBinding Gesture="Ctrl+L" Command="{Binding NavigateLibraryCommand}"/>
+        
+        <!-- Ctrl+D: Go to Downloads -->
+        <KeyBinding Gesture="Ctrl+D" Command="{Binding NavigateDownloadsCommand}"/>
+        
+        <!-- Ctrl+Shift+S: Go to Settings (Ctrl+S conflicts with save) -->
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding NavigateSettingsCommand}"/>
+        
+        <!-- Ctrl+Q: Quit -->
+        <KeyBinding Gesture="Ctrl+Q" Command="{Binding QuitApplicationCommand}"/>
+        
+        <!-- Ctrl+P: Toggle Player -->
+        <KeyBinding Gesture="Ctrl+P" Command="{Binding TogglePlayerCommand}"/>
+        
+        <!-- Ctrl+N: Toggle Navigation -->
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding ToggleNavigationCommand}"/>
+    </Window.KeyBindings>
+    
     <Grid RowDefinitions="Auto,*">
         <!-- Top Status Bar -->
         <Border Grid.Row="0" Background="#252526" Padding="16,8">
