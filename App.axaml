@@ -7,6 +7,7 @@
     <Application.Resources>
         <converters:BoolToHeartConverter x:Key="BoolToHeartConverter"/>
         <converters:BoolToHeartColorConverter x:Key="BoolToHeartColorConverter"/>
+        <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
     </Application.Resources>
     
     <Application.Styles>
