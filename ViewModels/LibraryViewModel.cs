@@ -134,6 +134,37 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
 
+    // Smart Playlists
+    private ObservableCollection<SmartPlaylist> _smartPlaylists = new();
+    public ObservableCollection<SmartPlaylist> SmartPlaylists
+    {
+        get => _smartPlaylists;
+        set
+        {
+            if (_smartPlaylists != value)
+            {
+                _smartPlaylists = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private SmartPlaylist? _selectedSmartPlaylist;
+    public SmartPlaylist? SelectedSmartPlaylist
+    {
+        get => _selectedSmartPlaylist;
+        set
+        {
+            if (_selectedSmartPlaylist != value)
+            {
+                _selectedSmartPlaylist = value;
+                OnPropertyChanged();
+                if (value != null)
+                    RefreshSmartPlaylist(value);
+            }
+        }
+    }
+
     private void RefreshFilteredTracks()
     {
         var filtered = CurrentProjectTracks.Where(FilterTracks).ToList();
@@ -164,6 +195,87 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
         
         OnPropertyChanged(nameof(LikedTracks));
+    }
+
+    private void RefreshSmartPlaylist(SmartPlaylist smartPlaylist)
+    {
+        // Get all tracks from all playlists
+        var allTracks = new List<PlaylistTrack>();
+        foreach (var playlist in _libraryService.Playlists)
+        {
+            allTracks.AddRange(playlist.PlaylistTracks);
+        }
+
+        // Apply filter and sort
+        var filteredTracks = smartPlaylist.Filter(allTracks);
+        var sortedTracks = smartPlaylist.Sort(filteredTracks);
+
+        // Update CurrentProjectTracks
+        CurrentProjectTracks.Clear();
+        foreach (var track in sortedTracks)
+        {
+            CurrentProjectTracks.Add(new PlaylistTrackViewModel(track));
+        }
+    }
+
+    private void InitializeSmartPlaylists()
+    {
+        var now = DateTime.UtcNow;
+        var thirtyDaysAgo = now.AddDays(-30);
+
+        SmartPlaylists.Clear();
+
+        // Recently Added
+        SmartPlaylists.Add(new SmartPlaylist
+        {
+            Name = "Recently Added",
+            Icon = "🆕",
+            Description = "Tracks added in the last 30 days",
+            Filter = tracks => tracks.Where(t => t.AddedAt >= thirtyDaysAgo),
+            Sort = tracks => tracks.OrderByDescending(t => t.AddedAt)
+        });
+
+        // Most Played
+        SmartPlaylists.Add(new SmartPlaylist
+        {
+            Name = "Most Played",
+            Icon = "🔥",
+            Description = "Your top 50 most played tracks",
+            Filter = tracks => tracks.Where(t => t.PlayCount > 0).Take(50),
+            Sort = tracks => tracks.OrderByDescending(t => t.PlayCount)
+        });
+
+        // High Quality
+        SmartPlaylists.Add(new SmartPlaylist
+        {
+            Name = "High Quality",
+            Icon = "💎",
+            Description = "FLAC files with high bitrate",
+            Filter = tracks => tracks.Where(t => 
+                t.ResolvedFilePath != null && 
+                t.ResolvedFilePath.EndsWith(".flac", StringComparison.OrdinalIgnoreCase)),
+            Sort = tracks => tracks.OrderByDescending(t => t.AddedAt)
+        });
+
+        // Failed Downloads
+        SmartPlaylists.Add(new SmartPlaylist
+        {
+            Name = "Failed Downloads",
+            Icon = "❌",
+            Description = "Tracks that failed to download",
+            Filter = tracks => tracks.Where(t => t.Status == TrackStatus.Failed),
+            Sort = tracks => tracks.OrderByDescending(t => t.AddedAt)
+        });
+
+        // Never Played
+        SmartPlaylists.Add(new SmartPlaylist
+        {
+            Name = "Never Played",
+            Icon = "🎧",
+            Description = "Discover tracks you haven't played yet",
+            Filter = tracks => tracks.Where(t => t.PlayCount == 0 && t.Status == TrackStatus.Downloaded),
+            Sort = tracks => tracks.OrderBy(t => t.AddedAt)
+        });
     }
 
     private string _searchText = "";
