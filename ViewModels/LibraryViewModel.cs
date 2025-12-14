@@ -88,12 +88,23 @@ public class LibraryViewModel : INotifyPropertyChanged
             {
                 _selectedProject = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSelectedProject));
+                OnPropertyChanged(nameof(CanDeleteProject));
+                
+                // LAZY LOAD: Load tracks only when playlist is selected
                 if (value != null)
+                {
                     _ = LoadProjectTracksAsync(value);
+                }
+                else
+                {
+                    CurrentProjectTracks.Clear();
+                }
             }
         }
     }
 
+    public bool HasSelectedProject => SelectedProject != null;
     public ObservableCollection<PlaylistTrackViewModel> CurrentProjectTracks
     {
         get => _currentProjectTracks;
@@ -1148,70 +1159,43 @@ public class LibraryViewModel : INotifyPropertyChanged
         {
             _logger.LogInformation("LoadProjectsAsync ENTRY. Current AllProjects.Count: {Count}", AllProjects.Count);
             _logger.LogInformation("Loading all playlist jobs from database...");
-
-            var jobs = await _libraryService.LoadAllPlaylistJobsAsync();
             
+            var jobs = await _libraryService.LoadAllPlaylistJobsAsync();
             _logger.LogInformation("LoadProjectsAsync: Loaded {Count} jobs from database", jobs.Count);
+
             foreach (var job in jobs)
             {
-                _logger.LogInformation("  - Job {JobId}: '{Title}' with {TrackCount} tracks, Created: {Created}", 
+                _logger.LogInformation("  - Job {Id}: '{Title}' with {TrackCount} tracks, Created: {Created}", 
                     job.Id, job.SourceTitle, job.TotalTracks, job.CreatedAt);
             }
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            if (_initialLoadCompleted)
             {
-                if (_initialLoadCompleted)
-                {
-                    _logger.LogWarning("LoadProjectsAsync called after initial load, performing a safe sync.");
-                    // Safe sync: add missing, remove deleted, then re-sort
-                    var loadedJobIds = new HashSet<Guid>(jobs.Select(j => j.Id));
-                    var currentJobIds = new HashSet<Guid>(AllProjects.Select(j => j.Id));
+                _logger.LogWarning("LoadProjectsAsync called after initial load, performing a safe sync.");
+                // Safe sync: add missing, remove deleted, then re-sort
+                var loadedJobIds = new HashSet<Guid>(jobs.Select(j => j.Id));
+                var currentJobIds = new HashSet<Guid>(AllProjects.Select(j => j.Id));
 
-                    // Add new jobs not in the current collection
-                    foreach (var job in jobs)
-                    {
-                        if (!currentJobIds.Contains(job.Id))
-                        {
-                            _logger.LogInformation("Adding missing job {JobId} to AllProjects", job.Id);
-                            AllProjects.Add(job);
-                        }
-                    }
-
-                    // Remove jobs from collection that are no longer in the database
-                    var jobsToRemove = AllProjects.Where(j => !loadedJobIds.Contains(j.Id)).ToList();
-                    foreach (var job in jobsToRemove)
-                    {
-                        _logger.LogInformation("Removing deleted job {JobId} from AllProjects", job.Id);
-                        AllProjects.Remove(job);
-                    }
-                }
-                else
+                // Add new jobs not in the current collection
+                foreach (var job in jobs)
                 {
-                    // Initial load: clear and add all
-                    _logger.LogInformation("Initial load: clearing AllProjects and adding {Count} jobs", jobs.Count);
-                    AllProjects.Clear();
-                    foreach (var job in jobs)
+                    if (!currentJobIds.Contains(job.Id))
                     {
+                        _logger.LogInformation("Adding missing job {JobId} to AllProjects", job.Id);
                         AllProjects.Add(job);
                     }
                 }
 
-                // Re-sort the entire collection to ensure order is correct
-                var sorted = AllProjects.OrderByDescending(j => j.CreatedAt).ToList();
-                for (int i = 0; i < sorted.Count; i++)
+                // Remove jobs from collection that are no longer in the database
+                var jobsToRemove = AllProjects.Where(j => !loadedJobIds.Contains(j.Id)).ToList();
+                foreach (var job in jobsToRemove)
                 {
-                    var job = sorted[i];
-                    int currentIndex = AllProjects.IndexOf(job);
-                    if (currentIndex != i)
-                    {
-                        AllProjects.Move(currentIndex, i);
-                    }
+                    _logger.LogInformation("Removing deleted job {JobId} from AllProjects", job.Id);
+                    AllProjects.Remove(job);
                 }
 
-                // OPTIMIZATION: Don't load tracks on initial startup
-                // Set the selected project without triggering track load
-                if (SelectedProject == null && AllProjects.Any() && !_initialLoadCompleted)
-                {
+                // Re-sort by CreatedAt descending
+                var sorted = AllProjects.OrderByDescending(j => j.CreatedAt).ToList();
                     _selectedProject = AllProjects.First(); // Direct field assignment to avoid triggering setter
                     OnPropertyChanged(nameof(SelectedProject));
                 }
