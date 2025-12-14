@@ -1196,18 +1196,6 @@ public class LibraryViewModel : INotifyPropertyChanged
 
                 // Re-sort by CreatedAt descending
                 var sorted = AllProjects.OrderByDescending(j => j.CreatedAt).ToList();
-                    _selectedProject = AllProjects.First(); // Direct field assignment to avoid triggering setter
-                    OnPropertyChanged(nameof(SelectedProject));
-                }
-                else if (SelectedProject == null && AllProjects.Any())
-                {
-                    SelectedProject = AllProjects.First(); // Normal assignment after initial load
-                }
-
-                if (!_initialLoadCompleted)
-                {
-                    _initialLoadCompleted = true;
-                    _logger.LogInformation("Initial load of {count} projects completed (tracks deferred).", AllProjects.Count);
                 }
             });
         }
