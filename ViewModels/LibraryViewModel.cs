@@ -119,17 +119,51 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
 
+    // Liked Songs - Smart Playlist
+    private ObservableCollection<PlaylistTrackViewModel> _likedTracks = new();
+    public ObservableCollection<PlaylistTrackViewModel> LikedTracks
+    {
+        get => _likedTracks;
+        set
+        {
+            if (_likedTracks != value)
+            {
+                _likedTracks = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     private void RefreshFilteredTracks()
     {
-        var filtered = _currentProjectTracks
-            .Where(FilterTracks)
-            .ToList();
-        
-        _filteredTracks.Clear();
+        var filtered = CurrentProjectTracks.Where(FilterTracks).ToList();
+        FilteredTracks.Clear();
         foreach (var track in filtered)
+            FilteredTracks.Add(track);
+    }
+
+    private void RefreshLikedTracks()
+    {
+        // Get all liked tracks from all playlists
+        var allLikedTracks = new List<PlaylistTrackViewModel>();
+        
+        foreach (var playlist in _libraryService.Playlists)
         {
-            _filteredTracks.Add(track);
+            var likedInPlaylist = playlist.Tracks
+                .Where(t => t.IsLiked)
+                .Select(t => new PlaylistTrackViewModel(t))
+                .ToList();
+                
+            allLikedTracks.AddRange(likedInPlaylist);
         }
+        
+        _likedTracks.Clear();
+        foreach (var track in allLikedTracks.OrderByDescending(t => t.Model.AddedAt))
+        {
+            _likedTracks.Add(track);
+        }
+        
+        OnPropertyChanged(nameof(LikedTracks));
     }
 
     private string _searchText = "";
