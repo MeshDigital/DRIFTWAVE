@@ -21,7 +21,8 @@
                     Background="Transparent"
                     Foreground="White"
                     Padding="12,8"
-                    Margin="0,0,0,20">
+                    Margin="0,0,0,20"
+                    ToolTip.Tip="Return to Library">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="←" FontSize="20"/>
                     <TextBlock Text="Back to Library" FontSize="14"/>
