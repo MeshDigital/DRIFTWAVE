@@ -181,9 +181,25 @@ public class LibraryViewModel : INotifyPropertyChanged
     private void RefreshFilteredTracks()
     {
         var filtered = CurrentProjectTracks.Where(FilterTracks).ToList();
+        
+        _logger.LogInformation("🔍 RefreshFilteredTracks:");
+        _logger.LogInformation("  - Input: {Input} tracks", CurrentProjectTracks.Count);
+        _logger.LogInformation("  - Filtered: {Filtered} tracks", filtered.Count);
+        _logger.LogInformation("  - Filters: All={All}, Downloaded={Down}, Pending={Pend}", 
+            IsFilterAll, IsFilterDownloaded, IsFilterPending);
+        
+        if (filtered.Any())
+        {
+            var sample = filtered.First();
+            _logger.LogInformation("  - Sample: {Artist} - {Title} (State: {State})", 
+                sample.Artist, sample.Title, sample.State);
+        }
+        
         FilteredTracks.Clear();
         foreach (var track in filtered)
             FilteredTracks.Add(track);
+            
+        _logger.LogInformation("✅ FilteredTracks.Count = {Count}", FilteredTracks.Count);
     }
 
     private void RefreshLikedTracks()
