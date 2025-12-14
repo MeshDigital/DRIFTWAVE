@@ -1,0 +1,216 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
+             x:Class="SLSKDONET.Views.Avalonia.NowPlayingPage"
+             Background="#121212">
+    
+    <Design.DataContext>
+        <vm:PlayerViewModel />
+    </Design.DataContext>
+    
+    <Border Padding="40">
+        <Grid RowDefinitions="*,Auto">
+        
+        <!-- Main Content -->
+        <Grid Grid.Row="0" RowDefinitions="Auto,*,Auto,Auto" MaxWidth="800">
+            
+            <!-- Back Button -->
+            <Button Grid.Row="0" 
+                    HorizontalAlignment="Left"
+                    Background="Transparent"
+                    Foreground="White"
+                    Padding="12,8"
+                    Margin="0,0,0,20">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="←" FontSize="20"/>
+                    <TextBlock Text="Back to Library" FontSize="14"/>
+                </StackPanel>
+            </Button>
+            
+            <!-- Album Art & Track Info -->
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*" VerticalAlignment="Center">
+                
+                <Border Grid.Column="1" 
+                        Width="400" 
+                        Height="400"
+                        CornerRadius="8"
+                        BoxShadow="0 8 32 #40000000">
+                    <Panel>
+                        <!-- Album Art -->
+                        <Image Source="{Binding CurrentTrack.Model.CoverArtUrl}"
+                               Stretch="UniformToFill"
+                               IsVisible="{Binding !!CurrentTrack.Model.CoverArtUrl}"/>
+                        
+                        <!-- Placeholder -->
+                        <Border Background="#282828" 
+                                IsVisible="{Binding !CurrentTrack.Model.CoverArtUrl}">
+                            <TextBlock Text="🎵" 
+                                       FontSize="120" 
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="#404040"/>
+                        </Border>
+                    </Panel>
+                </Border>
+            </Grid>
+            
+            <!-- Track Info -->
+            <StackPanel Grid.Row="2" 
+                        HorizontalAlignment="Center"
+                        Margin="0,40,0,0"
+                        Spacing="8">
+                <TextBlock Text="{Binding TrackTitle}" 
+                           FontSize="32" 
+                           FontWeight="Bold"
+                           Foreground="White"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding TrackArtist}" 
+                           FontSize="20" 
+                           Foreground="#B3B3B3"
+                           TextAlignment="Center"/>
+            </StackPanel>
+            
+            <!-- Progress Bar -->
+            <Grid Grid.Row="3" 
+                  ColumnDefinitions="Auto,*,Auto"
+                  Margin="0,40,0,0">
+                
+                <TextBlock Grid.Column="0" 
+                           Text="{Binding CurrentTimeStr}" 
+                           Foreground="#B3B3B3"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+                
+                <Slider Grid.Column="1" 
+                        Minimum="0" 
+                        Maximum="1" 
+                        Value="{Binding Position}"
+                        VerticalAlignment="Center"
+                        Height="4">
+                    <Slider.Styles>
+                        <Style Selector="Slider">
+                            <Setter Property="Foreground" Value="#1DB954"/>
+                        </Style>
+                    </Slider.Styles>
+                </Slider>
+                
+                <TextBlock Grid.Column="2" 
+                           Text="{Binding TotalTimeStr}" 
+                           Foreground="#B3B3B3"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"/>
+            </Grid>
+            
+        </Grid>
+        
+        <!-- Playback Controls -->
+        <Grid Grid.Row="1" 
+              ColumnDefinitions="*,Auto,*"
+              Margin="0,40,0,0">
+            
+            <!-- Left Controls -->
+            <StackPanel Grid.Column="0" 
+                        Orientation="Horizontal" 
+                        Spacing="16"
+                        HorizontalAlignment="Left">
+                
+                <!-- Like Button -->
+                <Button Background="Transparent"
+                        Padding="12"
+                        ToolTip.Tip="Like">
+                    <TextBlock Text="♡" FontSize="24" Foreground="White"/>
+                </Button>
+                
+            </StackPanel>
+            
+            <!-- Center Controls -->
+            <StackPanel Grid.Column="1" 
+                        Orientation="Horizontal" 
+                        Spacing="16"
+                        HorizontalAlignment="Center">
+                
+                <!-- Shuffle -->
+                <ToggleButton IsChecked="{Binding IsShuffling}"
+                              Command="{Binding ToggleShuffleCommand}"
+                              Padding="12"
+                              ToolTip.Tip="Shuffle">
+                    <TextBlock Text="🔀" FontSize="20"/>
+                </ToggleButton>
+                
+                <!-- Previous -->
+                <Button Command="{Binding PreviousTrackCommand}"
+                        Background="#282828"
+                        Foreground="White"
+                        Padding="16"
+                        CornerRadius="50"
+                        ToolTip.Tip="Previous">
+                    <TextBlock Text="⏮" FontSize="20"/>
+                </Button>
+                
+                <!-- Play/Pause -->
+                <Button Command="{Binding TogglePlayPauseCommand}"
+                        Background="#1DB954"
+                        Foreground="Black"
+                        Padding="20"
+                        CornerRadius="50"
+                        Width="64"
+                        Height="64"
+                        ToolTip.Tip="{Binding IsPlaying, Converter={StaticResource BoolToPlayPauseTextConverter}}">
+                    <TextBlock Text="{Binding IsPlaying, Converter={StaticResource BoolToPlayPauseIconConverter}}" 
+                               FontSize="28"/>
+                </Button>
+                
+                <!-- Next -->
+                <Button Command="{Binding NextTrackCommand}"
+                        Background="#282828"
+                        Foreground="White"
+                        Padding="16"
+                        CornerRadius="50"
+                        ToolTip.Tip="Next">
+                    <TextBlock Text="⏭" FontSize="20"/>
+                </Button>
+                
+                <!-- Repeat -->
+                <Button Command="{Binding ToggleRepeatCommand}"
+                        Padding="12"
+                        ToolTip.Tip="{Binding RepeatMode}">
+                    <TextBlock FontSize="20">
+                        <TextBlock.Text>
+                            <MultiBinding Converter="{StaticResource RepeatModeIconConverter}">
+                                <Binding Path="RepeatMode"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </Button>
+                
+            </StackPanel>
+            
+            <!-- Right Controls -->
+            <StackPanel Grid.Column="2" 
+                        Orientation="Horizontal" 
+                        Spacing="12"
+                        HorizontalAlignment="Right">
+                
+                <!-- Volume -->
+                <TextBlock Text="🔊" 
+                           FontSize="20" 
+                           Foreground="White"
+                           VerticalAlignment="Center"/>
+                
+                <Slider Minimum="0" 
+                        Maximum="100" 
+                        Value="{Binding Volume}"
+                        Width="120"
+                        VerticalAlignment="Center"/>
+                
+            </StackPanel>
+            
+        </Grid>
+        
+        </Grid>
+    </Border>
+    
+</UserControl>
