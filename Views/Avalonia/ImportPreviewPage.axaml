@@ -100,22 +100,22 @@
                 
                 <!-- Artist -->
                 <DataGridTextColumn Header="Artist" 
-                                    Binding="{Binding Artist}" 
+                                    Binding="{Binding Model.Artist}" 
                                     Width="2*"/>
                 
                 <!-- Title -->
                 <DataGridTextColumn Header="Title" 
-                                    Binding="{Binding Title}" 
+                                    Binding="{Binding Model.Title}" 
                                     Width="3*"/>
                 
                 <!-- Album -->
                 <DataGridTextColumn Header="Album" 
-                                    Binding="{Binding Album}" 
+                                    Binding="{Binding Model.Album}" 
                                     Width="2*"/>
                 
                 <!-- Length -->
                 <DataGridTextColumn Header="Length" 
-                                    Binding="{Binding Length, StringFormat='{}{0:mm\\:ss}'}" 
+                                    Binding="{Binding Model.Length, StringFormat='{}{0:mm\\:ss}'}" 
                                     Width="80"/>
                 
                 <!-- In Library Status -->
@@ -125,8 +125,8 @@
                             <Border CornerRadius="4" 
                                     Padding="6,3" 
                                     HorizontalAlignment="Center"
-                                    Background="{Binding IsInLibrary, Converter={StaticResource BoolToLibraryStatusColorConverter}}">
-                                <TextBlock Text="{Binding IsInLibrary, Converter={StaticResource BoolToLibraryStatusTextConverter}}" 
+                                    Background="{Binding Model.IsInLibrary, Converter={StaticResource BoolToLibraryStatusColorConverter}}">
+                                <TextBlock Text="{Binding Model.IsInLibrary, Converter={StaticResource BoolToLibraryStatusTextConverter}}" 
                                            FontSize="10" 
                                            Foreground="White"
                                            FontWeight="SemiBold"/>

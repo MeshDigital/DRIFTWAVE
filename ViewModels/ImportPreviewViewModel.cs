@@ -27,7 +27,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     
     private string _sourceTitle = "Import Preview";
     private string _sourceType = "";
-    private ObservableCollection<Track> _importedTracks = new();
+    private ObservableCollection<SelectableTrack> _importedTracks = new();
     private ObservableCollection<AlbumGroupViewModel> _albumGroups = new();
     private bool _isLoading;
     private string _statusMessage = "Ready to import";
@@ -45,7 +45,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         set { _sourceType = value; OnPropertyChanged(); }
     }
 
-    public ObservableCollection<Track> ImportedTracks
+    public ObservableCollection<SelectableTrack> ImportedTracks
     {
         get => _importedTracks;
         set { _importedTracks = value; OnPropertyChanged(); }
@@ -159,7 +159,17 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         ImportedTracks.Clear();
         foreach (var track in tempTracks)
         {
-            ImportedTracks.Add(track);
+            var selectableTrack = new SelectableTrack(track);
+            
+            // Wire up notification so the ViewModel knows when selection changes
+            selectableTrack.OnSelectionChanged = () => 
+            {
+                 UpdateSelectedCount();
+                 // Re-evaluate command can-execute
+                 ((AsyncRelayCommand)AddToLibraryCommand).RaiseCanExecuteChanged();
+            };
+            
+            ImportedTracks.Add(selectableTrack);
         }
 
         // Group by album for display
@@ -172,8 +182,8 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         
         _logger.LogInformation("Import preview initialized with {Count} tracks from {Source}. First track: {Artist} - {Title}", 
             ImportedTracks.Count, sourceTitle, 
-            ImportedTracks.FirstOrDefault()?.Artist ?? "None", 
-            ImportedTracks.FirstOrDefault()?.Title ?? "None");
+            ImportedTracks.FirstOrDefault()?.Model.Artist ?? "None", 
+            ImportedTracks.FirstOrDefault()?.Model.Title ?? "None");
     }
 
     /// <summary>
@@ -184,7 +194,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         AlbumGroups.Clear();
 
         var groupedByAlbum = ImportedTracks
-            .GroupBy(t => t.Album ?? "[Unknown Album]")
+            .GroupBy(t => t.Model.Album ?? "[Unknown Album]")
             .OrderBy(g => g.Key)
             .ToList();
 
@@ -193,7 +203,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
             var albumGroup = new AlbumGroupViewModel
             {
                 Album = group.Key,
-                Tracks = new ObservableCollection<Track>(group.ToList())
+                Tracks = new ObservableCollection<SelectableTrack>(group.ToList())
             };
             AlbumGroups.Add(albumGroup);
         }
@@ -204,7 +214,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     /// </summary>
     private async Task AddToLibraryAsync()
     {
-        var selectedTracks = ImportedTracks.Where(t => t.IsSelected).ToList();
+        var selectedTracks = ImportedTracks.Where(t => t.IsSelected).Select(t => t.Model).ToList();
 
         if (!selectedTracks.Any())
         {
@@ -350,11 +360,8 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     }
 }
 
-/// <summary>
-/// Represents a group of tracks from the same album for display
-/// </summary>
 public class AlbumGroupViewModel
 {
     public string Album { get; set; } = "[Unknown]";
-    public ObservableCollection<Track> Tracks { get; set; } = new();
+    public ObservableCollection<SelectableTrack> Tracks { get; set; } = new();
 }
