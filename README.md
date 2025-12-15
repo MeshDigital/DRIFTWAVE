@@ -1,138 +1,335 @@
-# SLSKDONET – Soulseek Music Downloader
+# 🎵 QMUSICSLSK – The AI-Powered Spotify Clone for Soulseek
 
-A modern Windows desktop application for orchestrating music downloads from the Soulseek network. Import playlists from Spotify or CSV, manage downloads with a visual queue, organize your library, and play your music—all in one place.
+> **"I'm not a real developer. I'm just vibing my way to the ultimate music app with AI."**  
+> *– A non-developer's journey to building a cross-platform music library curator*
 
-## ✨ Key Features
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/MeshDigital/QMUSICSLSK)
+[![.NET](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com/)
+[![UI](https://img.shields.io/badge/UI-Avalonia-orange)](https://avaloniaui.net/)
+[![License](https://img.shields.io/badge/license-GPL--3.0-green)](LICENSE)
+[![Status](https://img.shields.io/badge/status-Active%20Development-brightgreen)](https://github.com/MeshDigital/QMUSICSLSK)
 
-- **Multi-Source Import**: Import from Spotify playlists, CSV files, or manual queries
-- **Smart Download Management**: Concurrent downloads with progress tracking and automatic retries
-- **Library Organization**: Drag-and-drop playlist management with SQLite persistence
-- **Built-in Audio Player**: Play your downloaded tracks with LibVLC integration
-- **Console Diagnostics**: Debug mode with detailed logging (no Visual Studio required)
-- **Modern UI**: Clean, dark-themed interface with WPF-UI controls
+---
+
+## 🚀 What Is This?
+
+A **cross-platform music downloader and library manager** that turns Soulseek into your personal Spotify. Import playlists, download tracks, organize your library, and play music—all with a beautiful, responsive UI that works on Windows, macOS, and Linux.
+
+**But here's the twist**: This entire project is built by a **non-developer using AI** (Claude, Gemini, ChatGPT). Every feature, every bug fix, every architectural decision—all vibed into existence through AI pair programming.
+
+---
+
+## ✨ Current Features (Phase 1-3 Complete!)
+
+### 🎯 Phase 1: Foundation & Critical Fixes ✅
+- ✅ **Cross-Platform UI**: Migrated from WPF to Avalonia (Windows/macOS/Linux)
+- ✅ **Spotify Integration**: Import playlists directly from Spotify URLs
+- ✅ **CSV Import**: Bulk import from CSV files
+- ✅ **Smart Download Manager**: Concurrent downloads with progress tracking
+- ✅ **SQLite Library**: Persistent music library with metadata
+- ✅ **Built-in Player**: LibVLC-powered audio playback
+- ✅ **Drag & Drop**: Organize tracks between playlists
+- ✅ **File Path Resolution**: Auto-fix broken file paths
+
+### 📥 Phase 2: Advanced Import Features ✅
+- ✅ **Paste Tracklist**: Copy/paste tracklists from YouTube, SoundCloud, etc.
+- ✅ **Timestamp Removal**: Auto-removes timestamps like `[00:00]` from pasted text
+- ✅ **Advanced Search Filters**: Bitrate, file format, ranking presets
+- ✅ **Import Preview**: Review tracks before downloading
+
+### 📱 Phase 3: Responsive UI & Player ✅
+- ✅ **Responsive Layout**: Works from 360px (mobile) to 4K displays
+- ✅ **Auto-Collapse Navigation**: Sidebar collapses on small screens (<800px)
+- ✅ **Adaptive DataGrids**: Columns hide/show based on screen size
+- ✅ **Shuffle & Repeat**: Full playback queue management
+- ✅ **Dynamic Player Docking**: Toggle player between bottom bar and sidebar (in progress)
+
+---
+
+## 🔮 Future Roadmap
+
+### Phase 4: Quality & Polish (Planned)
+- Error handling & user-friendly messages
+- Performance optimization
+- Unit tests & documentation
+
+### Phase 5: Self-Healing Library (The Big One!)
+- **🧬 Acoustic Fingerprinting**: Detect duplicates by audio DNA, not filename
+- **⬆️ Auto-Upgrade**: "You have a 128kbps MP3. Replace with FLAC?"
+- **🔧 Broken Link Repair**: Moved files? App finds them automatically
+- **🎭 Fake Quality Detection**: Detect upsampled 320kbps files
+- **📁 USB/Folder Import**: Import existing libraries with quality analysis
+- **🏥 Library Health Dashboard**: View duplicates, low-quality tracks, corrupt files
+
+**Inspired by**: `audio-duplicates` (C++ performance) + `rekordbox-library-fixer` (TypeScript intelligence)
+
+---
+
+## 🎨 Screenshots
+
+### Main Interface (Responsive Design)
+*Desktop view with player sidebar*
+
+### Import Preview
+*Review tracks before downloading*
+
+### Library Health Dashboard (Coming Soon)
+*Duplicate detection and quality analysis*
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Windows 10/11
-- .NET SDK 8.0+
+- **Windows 10/11**, **macOS 10.15+**, or **Linux** (Ubuntu, Fedora, Arch, etc.)
+- .NET 8.0 SDK ([Download](https://dotnet.microsoft.com/download))
 - Soulseek account (free at [slsknet.org](https://www.slsknet.org))
 
-### Build & Run
+### Installation
 
-```powershell
-# Clone and build
-git clone <repository-url>
+```bash
+# Clone the repository
+git clone https://github.com/MeshDigital/QMUSICSLSK.git
 cd QMUSICSLSK
+
+# Restore dependencies
 dotnet restore
+
+# Build the application
 dotnet build
 
-# Run the application
-dotnet run --project SLSKDONET.csproj
+# Run it!
+dotnet run
 ```
 
 ### First-Time Setup
-
-1. **Sign in** with your Soulseek credentials (stored securely)
-2. **Configure download directory** in Settings
-3. **Import music** from Spotify, CSV, or manual search
-4. **Start downloading** and monitor progress in Library view
-
-## 📖 Typical Workflow
-
-1. **Import** → Add tracks from Spotify playlist or CSV file
-2. **Review** → Preview imported tracks in the import dialog
-3. **Download** → Tracks are queued and downloaded automatically
-4. **Organize** → Drag tracks between playlists in Library view
-5. **Play** → Double-click or drag tracks to the built-in player
-
-## 🎵 Audio Playback
-
-The application includes a built-in audio player powered by LibVLC:
-- Play downloaded tracks directly from the Library
-- Drag-and-drop tracks to the player sidebar
-- Supports MP3, FLAC, and other common formats
-
-**Note**: LibVLC native libraries are included automatically. If playback fails, check the console output for diagnostic messages.
-
-## 🐛 Diagnostics & Troubleshooting
-
-### Debug Mode (Console Output)
-
-Debug builds show a console window with detailed diagnostics:
-
-```powershell
-# Build in Debug mode
-dotnet build --configuration Debug
-
-# Run and view console output
-cd bin\Debug\net8.0-windows
-.\SLSKDONET.exe
-```
-
-The console displays:
-- `[DRAG]` - Drag-and-drop operations
-- `[PLAYBACK]` - Audio player events
-- `info/warn/fail` - Service-level diagnostics
-
-### Common Issues
-
-**Audio playback fails**:
-- Check console for LibVLC initialization errors
-- Ensure `libvlc` folder exists in output directory
-- Player sidebar shows "Player Initialization Failed" if libraries are missing
-
-**Drag-and-drop not working**:
-- Console shows detailed drag events for troubleshooting
-- Check for `AdornerLayer` warnings in console output
-
-**Tracks don't appear after drag-and-drop**:
-- Fixed in latest version - tracks now reload from database immediately
-
-## 📁 Configuration
-
-Configuration is stored in `%AppData%\SLSKDONET\config.ini`:
-
-```ini
-[Soulseek]
-Username = your-username
-Password = your-password
-Server = server.slsknet.org
-Port = 2242
-
-[Download]
-Directory = C:\Users\you\Music\SLSKDONET
-MaxConcurrentDownloads = 2
-NameFormat = {artist} - {title}
-PreferredFormats = mp3,flac
-```
-
-## 🏗️ Architecture
-
-- **UI Layer**: WPF with MVVM pattern, WPF-UI controls
-- **Services**: Download orchestration, Soulseek adapter, audio player
-- **Persistence**: SQLite via Entity Framework Core
-- **Import Providers**: Spotify API, CSV parser, manual input
-
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for detailed system design.
-
-## 📚 Documentation
-
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) - System architecture and data flows
-- [`FEATURES.md`](FEATURES.md) - Complete feature list
-- [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) - Common issues and solutions
-- [`DEVELOPMENT.md`](DEVELOPMENT.md) - Developer setup and contribution guide
-
-## 🔒 Security
-
-- Passwords encrypted using Windows Data Protection API (DPAPI)
-- No credentials stored in plain text
-- SQLite database stored locally in user's AppData folder
-
-## 📝 License
-
-GPL-3.0
+1. **Sign in** with your Soulseek credentials
+2. **Configure** download directory in Settings
+3. **Import** music from Spotify, CSV, or paste a tracklist
+4. **Download** and enjoy!
 
 ---
 
-**Version**: 1.0.0 | **Status**: Active Development
+## 🎵 How It Works
+
+### Typical Workflow
+1. **Import** → Paste a Spotify playlist URL or tracklist from YouTube
+2. **Preview** → Review imported tracks, adjust search queries
+3. **Download** → Tracks are queued and downloaded automatically
+4. **Organize** → Drag tracks between playlists in Library view
+5. **Play** → Built-in player with shuffle, repeat, and queue management
+
+### Smart Features
+- **Timestamp Removal**: Paste `[00:00] Artist - Title` → Auto-cleans to `Artist - Title`
+- **Duplicate Detection**: Won't download the same track twice
+- **Bitrate Filtering**: Only download 320kbps or FLAC
+- **Auto-Retry**: Failed downloads retry automatically
+
+---
+
+## 🤖 The AI Development Story
+
+### "I'm Not a Real Developer"
+
+This project is a **proof of concept** that you don't need to be a "real developer" to build complex software. Every line of code, every architectural decision, every bug fix—**all created through AI pair programming**.
+
+**Tools Used:**
+- **Claude** (Anthropic) - Primary coding assistant
+- **Gemini** (Google) - Architecture planning
+- **ChatGPT** (OpenAI) - Problem-solving
+
+**Development Process:**
+1. Describe feature in plain English
+2. AI generates implementation plan
+3. Review, iterate, refine
+4. AI writes the code
+5. Test, debug, repeat
+
+**Result**: A **cross-platform music app** with features rivaling commercial software, built by someone who "vibes their way through coding."
+
+### Why This Matters
+
+This project demonstrates:
+- **AI democratizes software development** - You don't need a CS degree
+- **Non-developers can build real products** - Just need vision and persistence
+- **AI pair programming works** - When you know what you want, AI helps you build it
+
+---
+
+## 🏗️ Architecture
+
+### Tech Stack
+- **UI Framework**: Avalonia (cross-platform XAML)
+- **Backend**: .NET 8.0 (C#)
+- **Database**: SQLite + Entity Framework Core
+- **Audio**: LibVLC (VLC media player core)
+- **Network**: Soulseek.NET
+- **Pattern**: MVVM (Model-View-ViewModel)
+
+### Project Structure
+```
+QMUSICSLSK/
+├── Views/Avalonia/          # UI (XAML + code-behind)
+├── ViewModels/              # Business logic
+├── Services/                # Download, import, player services
+├── Models/                  # Data models
+├── Configuration/           # App config & settings
+└── Database/                # SQLite + EF Core
+```
+
+---
+
+## 📊 Progress Tracker
+
+### Completed Features
+- [x] Cross-platform UI (Avalonia)
+- [x] Spotify playlist import
+- [x] CSV import
+- [x] Paste tracklist feature
+- [x] Advanced search filters
+- [x] Responsive layout (360px - 4K)
+- [x] Player queue (shuffle, repeat)
+- [x] Drag & drop organization
+
+### In Progress
+- [ ] Dynamic player docking (bottom bar / sidebar)
+- [ ] Queue visualization panel
+- [ ] "Add to Queue" from Library/Search
+
+### Planned (Phase 5)
+- [ ] Acoustic fingerprinting
+- [ ] Duplicate detection
+- [ ] Auto-upgrade (MP3 → FLAC)
+- [ ] Broken link repair
+- [ ] USB/folder import with quality analysis
+- [ ] Library health dashboard
+
+**Total Tasks**: 38 planned for Phase 5 (Self-Healing Library)
+
+---
+
+## 🐛 Troubleshooting
+
+### Audio Playback Issues
+- **Problem**: "Player Initialization Failed"
+- **Solution**: Ensure `libvlc` folder exists in output directory
+- **Check**: Console output for LibVLC errors
+
+### Import Not Working
+- **Problem**: Spotify import fails
+- **Solution**: Check Spotify API credentials in Settings
+- **Alternative**: Use CSV import or paste tracklist
+
+### UI Not Responsive
+- **Problem**: Window too small
+- **Solution**: Minimum window size is 360x500px
+- **Note**: Navigation auto-collapses below 800px width
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more details.
+
+---
+
+## 🤝 Contributing
+
+**This is an AI-assisted project**, so contributions are welcome from both humans and AI enthusiasts!
+
+### How to Contribute
+1. Fork the repository
+2. Create a feature branch
+3. Use AI to help implement your feature
+4. Submit a pull request with detailed description
+
+### Contribution Ideas
+- UI/UX improvements
+- Bug fixes
+- New import sources (YouTube Music, Apple Music, etc.)
+- Performance optimizations
+- Documentation improvements
+
+---
+
+## 📝 Documentation
+
+- [FEATURES.md](FEATURES.md) - Complete feature list
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System design
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Developer guide
+
+---
+
+## 🔒 Security & Privacy
+
+- **Passwords**: Encrypted using Windows Data Protection API (DPAPI)
+- **Local Storage**: All data stored locally in SQLite
+- **No Telemetry**: Zero tracking, zero analytics
+- **Open Source**: Audit the code yourself
+
+---
+
+## 📜 License
+
+GPL-3.0 - See [LICENSE](LICENSE) for details.
+
+---
+
+## 🙏 Acknowledgments
+
+### Technology
+- [Avalonia UI](https://avaloniaui.net/) - Cross-platform XAML framework
+- [Soulseek.NET](https://github.com/jpdillingham/Soulseek.NET) - Soulseek client library
+- [LibVLC](https://www.videolan.org/vlc/libvlc.html) - Audio playback
+- [SoundFingerprinting](https://github.com/AddictedCS/soundfingerprinting) - Acoustic fingerprinting (planned)
+
+### AI Assistants
+- **Claude** (Anthropic) - Primary development partner
+- **Gemini** (Google) - Architecture & planning
+- **ChatGPT** (OpenAI) - Problem-solving
+
+### Inspiration
+- [audio-duplicates](https://github.com/Phidelux/audio-duplicates) - C++ performance patterns
+- [rekordbox-library-fixer](https://github.com/m4b3l/rekordbox-library-fixer) - Library health concepts
+
+---
+
+## 🌟 Star History
+
+If this project inspires you to build something with AI, give it a star! ⭐
+
+---
+
+## 💬 Contact
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/MeshDigital/QMUSICSLSK/issues)
+- **Discussions**: [Join the conversation](https://github.com/MeshDigital/QMUSICSLSK/discussions)
+
+---
+
+## 🎯 Project Status
+
+**Current Version**: 1.0.0-beta  
+**Status**: Active Development  
+**Last Updated**: December 2025
+
+### Recent Updates
+- ✅ Migrated to Avalonia UI (cross-platform)
+- ✅ Implemented responsive layout
+- ✅ Added player queue management
+- 🚧 Working on dynamic player docking
+- 📋 Planning Phase 5: Self-Healing Library
+
+---
+
+## 🔥 The Bottom Line
+
+**This is what happens when a non-developer gets access to AI and refuses to give up.**
+
+From "I don't know how to code" to "I'm building a cross-platform music app with acoustic fingerprinting"—all through the power of AI pair programming and sheer determination.
+
+**If I can do it, you can too.** 🚀
+
+---
+
+> **Note**: The legacy Windows-only WPF version is available on the `wpf-legacy` branch.  
+> This branch is no longer actively maintained.
+
+**Built with ❤️ and AI** | **Vibing since 2024**
