@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Serilog.Extensions.Logging;
 using SLSKDONET.Configuration;
 using SLSKDONET.Services;
 using SLSKDONET.Services.InputParsers;
@@ -63,7 +64,7 @@ public partial class App : Application
             catch (Exception ex)
             {
                 // Log startup error
-                Console.WriteLine($"Startup failed: {ex.Message}\n{ex.StackTrace}");
+                Serilog.Log.Fatal(ex, "Startup failed during framework initialization");
                 throw;
             }
         }
@@ -112,12 +113,11 @@ public partial class App : Application
     /// </summary>
     public static void ConfigureSharedServices(IServiceCollection services)
     {
-        // Logging
-        services.AddLogging(config =>
+        // Logging - Use Serilog
+        services.AddLogging(builder =>
         {
-            config.ClearProviders();
-            config.AddConsole();
-            config.SetMinimumLevel(LogLevel.Information);
+            builder.ClearProviders();
+            builder.Services.AddSingleton<ILoggerProvider>(new SerilogLoggerProvider(Serilog.Log.Logger, dispose: true));
         });
 
         // Configuration
