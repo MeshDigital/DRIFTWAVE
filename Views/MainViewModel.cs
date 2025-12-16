@@ -60,7 +60,9 @@ public class MainViewModel : INotifyPropertyChanged
         LibraryViewModel libraryViewModel,
         SearchViewModel searchViewModel,
         ConnectionViewModel connectionViewModel,
-        SettingsViewModel settingsViewModel)
+        SettingsViewModel settingsViewModel,
+        IEventBus eventBus,
+        DownloadManager downloadManager)
     {
         _logger = logger;
         _config = config;
@@ -68,6 +70,10 @@ public class MainViewModel : INotifyPropertyChanged
         _soulseek = soulseek;
         _credentialService = credentialService;
         _navigationService = navigationService;
+        
+        // Assign missing fields
+        _eventBus = eventBus;
+        _downloadManager = downloadManager;
 
         PlayerViewModel = playerViewModel;
         LibraryViewModel = libraryViewModel;
@@ -203,93 +209,6 @@ public class MainViewModel : INotifyPropertyChanged
     private object? _libraryPage;
     private object? _downloadsPage;
     private object? _settingsPage;
-
-    public MainViewModel(
-        ILogger<MainViewModel> logger,
-        AppConfig config,
-        ConfigManager configManager,
-        SoulseekAdapter soulseek,
-        ISoulseekCredentialService credentialService,
-        INavigationService navigationService,
-        PlayerViewModel playerViewModel,
-        LibraryViewModel libraryViewModel,
-        SearchViewModel searchViewModel,
-        ConnectionViewModel connectionViewModel,
-        SettingsViewModel settingsViewModel, // Restored this parameter
-        IEventBus eventBus,
-        DownloadManager downloadManager) // Added this parameter
-    {
-        _logger = logger;
-        _config = config;
-        _configManager = configManager;
-        _soulseek = soulseek;
-        _credentialService = credentialService;
-        _navigationService = navigationService;
-        _eventBus = eventBus; // Initialized
-        _downloadManager = downloadManager; // Initialized
-
-        PlayerViewModel = playerViewModel;
-        LibraryViewModel = libraryViewModel;
-        SearchViewModel = searchViewModel;
-        ConnectionViewModel = connectionViewModel;
-        SettingsViewModel = settingsViewModel; // Assigned from parameter
-
-        // Initialize commands
-        NavigateSearchCommand = new RelayCommand(NavigateToSearch);
-        NavigateLibraryCommand = new RelayCommand(NavigateToLibrary);
-        NavigateDownloadsCommand = new RelayCommand(NavigateToDownloads);
-        NavigateSettingsCommand = new RelayCommand(NavigateToSettings);
-        ToggleNavigationCommand = new RelayCommand(() => IsNavigationCollapsed = !IsNavigationCollapsed);
-        TogglePlayerCommand = new RelayCommand(() => IsPlayerSidebarVisible = !IsPlayerSidebarVisible);
-        TogglePlayerLocationCommand = new RelayCommand(() => IsPlayerAtBottom = !IsPlayerAtBottom);
-        ZoomInCommand = new RelayCommand(ZoomIn);
-        ZoomOutCommand = new RelayCommand(ZoomOut);
-        ResetZoomCommand = new RelayCommand(ResetZoom);
-
-
-
-        ToggleNavigationCommand = new RelayCommand(() => IsNavigationCollapsed = !IsNavigationCollapsed);
-        TogglePlayerCommand = new RelayCommand(() => IsPlayerSidebarVisible = !IsPlayerSidebarVisible);
-        
-        // Subscribe to EventBus events
-        eventBus.GetEvent<TrackUpdatedEvent>().Subscribe(evt => OnTrackUpdated(this, evt.Track));
-        eventBus.GetEvent<SoulseekStateChangedEvent>().Subscribe(evt => HandleStateChange(evt.State));
-        
-        _downloadManager.AllGlobalTracks.CollectionChanged += (s, e) => 
-        {
-             OnPropertyChanged(nameof(SuccessfulCount));
-             OnPropertyChanged(nameof(FailedCount));
-             OnPropertyChanged(nameof(TodoCount));
-             OnPropertyChanged(nameof(DownloadProgressPercentage));
-        };
-        
-        
-        // Set application version from assembly
-        try
-        {
-            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            ApplicationVersion = version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to get application version");
-            ApplicationVersion = "1.0.0";
-        }
-
-        // Set LibraryViewModel's MainViewModel reference
-        LibraryViewModel.SetMainViewModel(this);
-
-        _logger.LogInformation("MainViewModel initialized");
-
-        // Register pages for navigation service
-        _navigationService.RegisterPage("ImportPreview", typeof(Avalonia.ImportPreviewPage));
-        
-        // Subscribe to navigation events
-        _navigationService.Navigated += OnNavigated;
-
-        // Navigate to Search page by default
-        NavigateToSearch();
-    }
 
     private void OnNavigated(object? sender, global::Avalonia.Controls.UserControl page)
     {
