@@ -1,7 +1,7 @@
 # 🎵 QMUSICSLSK – The AI-Powered Spotify Clone for Soulseek
 
-> **"I'm not a real developer. I'm just vibing my way to the ultimate music app with AI."**  
-> *– A non-developer's journey to building a cross-platform music library curator*
+> **"I'm not a developer. I'm a Project Manager guiding AI agents to build the ultimate music app."**  
+> *– A non-developer's journey to building complex software through AI direction*
 
 [![Platform](https://img.shields.io/badge/platform-Windows%20(in%20dev)%20%7C%20macOS%2FLinux%20(planned)-blue)](https://github.com/MeshDigital/QMUSICSLSK)
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com/)
@@ -22,7 +22,7 @@ A **cross-platform music downloader and library manager** that turns Soulseek in
 **Current Goal**: Stable, feature-complete Windows version  
 **End Goal**: True multi-platform support (Windows, macOS, Linux)
 
-**But here's the twist**: This entire project is built by a **non-developer using AI** (Claude, Gemini, ChatGPT). Every feature, every bug fix, every architectural decision—all vibed into existence through AI pair programming.
+**The Story**: This entire project is built by a **non-developer serving as Project Manager**. I don't write the code—I guide AI agents (Claude, Gemini, ChatGPT) to build it. I define the vision, manage the roadmap, and direct the agents through successful development, proving that you don't need to be a coder to build complex software.
 
 ---
 
@@ -181,7 +181,7 @@ To import playlists from Spotify, you need to create a Spotify Developer account
 
 ### "I'm Not a Real Developer"
 
-This project is a **proof of concept** that you don't need to be a "real developer" to build complex software. Every line of code, every architectural decision, every bug fix—**all created through AI pair programming**.
+This project is a **proof of concept** that you don't need to be a "real developer" to build complex software. I act as the **Project Manager and Lead Architect**, while AI agents serve as the engineering team. Every line of code, every architectural decision, every bug fix—**all created through AI execution under human guidance**.
 
 **Tools Used:**
 - **Claude** (Anthropic) - Primary coding assistant
@@ -362,7 +362,8 @@ If this project inspires you to build something with AI, give it a star! ⭐
 
 ### 🔄 Recent Changes (v1.0.0)
 
-- ✅ **Architectural Overhaul**: Refactored `MainViewModel` and `LibraryViewModel` (3,200+ lines removed, 86% reduction) for massive maintainability gains.
+- ✅ **Secure & Stable**: Fixed critical startup crashes and implemented secure credential storage.
+- ✅ **Architectural Overhaul**: Refactored `MainViewModel` into `SearchViewModel` and `ConnectionViewModel`, ensuring modularity and stability.
 - ✅ **New Feature**: "Add to Queue" directly from Library view.
 - ✅ Fixed database concurrency exception in drag-and-drop
 - ✅ Added UI refresh after playlist modifications

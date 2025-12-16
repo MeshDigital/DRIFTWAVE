@@ -1,0 +1,48 @@
+using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using SLSKDONET.Models;
+
+namespace SLSKDONET.ViewModels;
+
+public class SearchResult : INotifyPropertyChanged
+{
+    public Track Model { get; }
+
+    public SearchResult(Track track)
+    {
+        Model = track;
+    }
+
+    public string Artist => Model.Artist;
+    public string Title => Model.Title;
+    public string Album => Model.Album;
+    public int Bitrate => Model.Bitrate;
+    public long Size => Model.Size ?? 0;
+    public string Username => Model.Username;
+    public bool HasFreeUploadSlot => Model.HasFreeUploadSlot;
+    
+    // Rank is updated on the Model by ResultSorter, we just expose it
+    public double CurrentRank => Model.CurrentRank;
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}

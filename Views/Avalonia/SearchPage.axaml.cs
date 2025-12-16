@@ -39,21 +39,22 @@ namespace SLSKDONET.Views.Avalonia
                 var files = e.Data.GetFiles();
                 var csvFile = files?.FirstOrDefault(f => f.Name.EndsWith(".csv", System.StringComparison.OrdinalIgnoreCase));
 
-                if (csvFile != null && DataContext is MainViewModel vm)
+                if (csvFile != null && DataContext is SLSKDONET.ViewModels.SearchViewModel vm)
                 {
                     // Auto-switch to CSV mode and populate path
-                    vm.CurrentSearchMode = Models.SearchInputMode.CsvFile;
-                    vm.SearchQuery = System.Uri.UnescapeDataString(csvFile.Path.AbsolutePath);
-                    // Handle file URI if needed (Avalonia returns file:///... on some platforms, usually LocalPath is better if available, but IStorageItem is abstract)
-                    // For System.IO compatibility we often need to strip file schema if present.
-                    // However, GetFiles returns IStorageItem.
-                    // Let's safe cast to try get a local path string if possible or use the Path property.
-                    // Note: Avalonia 11 IStorageItem.Path is a Uri.
+                    // vm.CurrentSearchMode = Models.SearchInputMode.CsvFile; // Logic is now inferred from extension in SearchViewModel
                     
                     if (csvFile.Path.IsAbsoluteUri && csvFile.Path.Scheme == "file")
                     {
                         vm.SearchQuery = csvFile.Path.LocalPath;
                     }
+                    else
+                    {
+                        vm.SearchQuery = System.Uri.UnescapeDataString(csvFile.Path.ToString());
+                    }
+                    
+                    // Optional: Trigger browse/preview automatically if desired?
+                    // vm.BrowseCsvCommand.Execute(null); 
                 }
             }
         }

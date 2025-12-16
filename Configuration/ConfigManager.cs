@@ -109,8 +109,7 @@ public class ConfigManager
         iniContent.AppendLine($"UseUPnP = {config.UseUPnP}");
         iniContent.AppendLine($"ConnectTimeout = {config.ConnectTimeout}");
         iniContent.AppendLine($"SearchTimeout = {config.SearchTimeout}");
-        iniContent.AppendLine($"ConnectTimeout = {config.ConnectTimeout}");
-        iniContent.AppendLine($"SearchTimeout = {config.SearchTimeout}");
+
         iniContent.AppendLine($"RememberPassword = {config.RememberPassword}");
         iniContent.AppendLine($"AutoConnectEnabled = {config.AutoConnectEnabled}");
 

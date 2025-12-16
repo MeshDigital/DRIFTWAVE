@@ -239,6 +239,8 @@ public partial class App : Application
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
+        services.AddSingleton<SearchViewModel>();
+        services.AddSingleton<ConnectionViewModel>();
         
         // Phase 0: ViewModel Refactoring - Library child ViewModels
         services.AddTransient<ViewModels.Library.ProjectListViewModel>();
