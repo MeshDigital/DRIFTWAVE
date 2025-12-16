@@ -360,12 +360,21 @@
                 </DataGrid.ContextMenu>
                 
                 <DataGrid.Styles>
+                    <Style Selector="DataGridRow">
+                        <Setter Property="Foreground" Value="White"/>
+                    </Style>
                     <Style Selector="DataGridRow:pointerover">
                         <Setter Property="Background" Value="#1AFFFFFF"/>
+                        <Setter Property="Foreground" Value="White"/>
                         <Setter Property="Cursor" Value="Hand"/>
                     </Style>
                     <Style Selector="DataGridRow:selected">
                         <Setter Property="Background" Value="#2A0078D4"/>
+                        <Setter Property="Foreground" Value="White"/>
+                    </Style>
+                    <Style Selector="DataGridColumnHeader">
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
                     </Style>
                 </DataGrid.Styles>
                 
