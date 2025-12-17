@@ -1,43 +1,26 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using SLSKDONET.Models;
+using SpotifyAPI.Web;
 
 namespace SLSKDONET.Services;
 
 public interface ISpotifyMetadataService
 {
     /// <summary>
-    /// Search for a track by Artist and Title to find its Spotify metadata.
+    /// Smart search for a track with fuzzy matching and confidence scoring.
     /// </summary>
-    Task<SpotifyMetadata?> SearchTrackAsync(string artist, string title);
+    Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null);
 
     /// <summary>
-    /// Enrich a playlist track with Spotify metadata using its SpotifyID or fuzzy search.
+    /// Fetches audio features (Key, BPM) for a track.
+    /// </summary>
+    Task<TrackAudioFeatures?> GetAudioFeaturesAsync(string spotifyId);
+
+    /// <summary>
+    /// Enriches a PlaylistTrack with Spotify metadata (ID, Art, Key, BPM).
+    /// Used by MetadataEnrichmentOrchestrator.
     /// </summary>
     Task<bool> EnrichTrackAsync(PlaylistTrack track);
-
-    /// <summary>
-    /// Enrich a list of tracks in batch to optimize API usage.
-    /// </summary>
-    Task<int> EnrichTracksAsync(IEnumerable<PlaylistTrack> tracks);
-    
-    /// <summary>
-    /// Get metadata by Spotify ID.
-    /// </summary>
-    Task<SpotifyMetadata?> GetTrackByIdAsync(string spotifyId);
 }
 
-public record SpotifyMetadata(
-    string Id,
-    string Title,
-    string Artist,
-    string Album,
-    string AlbumArtUrl,
-    string ArtistImageUrl,
-    string ReleaseDate,
-    int? Popularity,
-    int? DurationMs,
-    List<string> Genres,
-    string SpotifyAlbumId,
-    string SpotifyArtistId
-);

@@ -950,61 +950,6 @@ public class DatabaseService
         await context.SaveChangesAsync();
         _logger.LogInformation("Cleared saved queue");
     }
-
-    // ===== Spotify Metadata Cache Methods (Phase 0) =====
-
-    public async Task<SpotifyMetadata?> GetCachedSpotifyMetadataAsync(string cacheKey)
-    {
-        using var context = new AppDbContext();
-        var entity = await context.SpotifyMetadataCache.FindAsync(cacheKey);
-
-        if (entity == null) return null;
-        if (DateTime.UtcNow > entity.ExpiresAt)
-        {
-            // Expired - delete and return null
-            context.SpotifyMetadataCache.Remove(entity);
-            await context.SaveChangesAsync();
-            return null;
-        }
-
-        try
-        {
-            return System.Text.Json.JsonSerializer.Deserialize<SpotifyMetadata>(entity.DataJson);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to deserialize cached metadata for {Key}", cacheKey);
-            return null;
-        }
-    }
-
-    public async Task CacheSpotifyMetadataAsync(string cacheKey, SpotifyMetadata metadata)
-    {
-        using var context = new AppDbContext();
-        var json = System.Text.Json.JsonSerializer.Serialize(metadata);
-        
-        var entity = new Data.Entities.SpotifyMetadataCacheEntity
-        {
-            SpotifyId = cacheKey,
-            DataJson = json,
-            CachedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddDays(7) // Cache for 7 days
-        };
-
-        // Upsert
-        var existing = await context.SpotifyMetadataCache.FindAsync(cacheKey);
-        if (existing != null)
-        {
-            existing.DataJson = json;
-            existing.CachedAt = entity.CachedAt;
-            existing.ExpiresAt = entity.ExpiresAt;
-            context.SpotifyMetadataCache.Update(existing);
-        }
-        else
-        {
-            context.SpotifyMetadataCache.Add(entity);
-        }
-
-        await context.SaveChangesAsync();
-    }
 }
+
+

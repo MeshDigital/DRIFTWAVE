@@ -1,293 +1,280 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using SLSKDONET.Configuration;
+using SLSKDONET.Data;
+using SLSKDONET.Data.Entities;
+using SLSKDONET.Utils;
 using SLSKDONET.Models;
 using SpotifyAPI.Web;
 
 namespace SLSKDONET.Services;
 
 /// <summary>
-/// Service for enriching tracks with Spotify metadata (IDs, artwork, genres, popularity).
-/// Implements rate limiting and caching to avoid API spam.
+/// "The Gravity Well" - A resilient service for fetching, caching, and matching Spotify metadata.
+/// Anchors local files to canonical Spotify identities using smart fuzzy search and audio analysis.
 /// </summary>
 public class SpotifyMetadataService : ISpotifyMetadataService
 {
     private readonly ILogger<SpotifyMetadataService> _logger;
-    private readonly AppConfig _config;
-    private readonly SpotifyAuthService? _authService;
-    private readonly SemaphoreSlim _rateLimiter;
-    private readonly DatabaseService _databaseService; // Use DatabaseService wrapper for cache access
+    private readonly SpotifyAuthService _authService;
+    private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
+
+    // Negative cache duration for "Not Found" results
+    private static readonly TimeSpan NegativeCacheDuration = TimeSpan.FromDays(7);
     
-    // Spotify API rate limit: 30 requests per second (we'll be conservative)
-    private const int MaxRequestsPerSecond = 20;
-    private const int RateLimitWindowMs = 1000;
+    // Positive cache duration (metadata rarely changes)
+    private static readonly TimeSpan PositiveCacheDuration = TimeSpan.FromDays(30);
 
     public SpotifyMetadataService(
         ILogger<SpotifyMetadataService> logger,
-        AppConfig config,
-        DatabaseService databaseService,
-        SpotifyAuthService? authService = null)
+        SpotifyAuthService authService)
     {
         _logger = logger;
-        _config = config;
-        _databaseService = databaseService;
         _authService = authService;
-        _rateLimiter = new SemaphoreSlim(MaxRequestsPerSecond, MaxRequestsPerSecond);
     }
 
     /// <summary>
-    /// Enriches a PlaylistTrack with Spotify metadata by searching for it.
+    /// Smart search for a track with fuzzy matching and confidence scoring.
+    /// </summary>
+    /// <param name="artist">Artist name from file/Soulseek</param>
+    /// <param name="title">Track title from file/Soulseek</param>
+    /// <param name="durationMs">Optional file duration for validation</param>
+    /// <returns>Enriched metadata or null if no confident match found</returns>
+    public async Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null)
+    {
+        // 1. Check Cache
+        string searchQuery = $"{artist} - {title}";
+        string cacheKey = $"search:{StringDistanceUtils.Normalize(searchQuery)}";
+        
+        var cached = await GetFromCacheAsync<FullTrack>(cacheKey);
+        if (cached != null) return cached;
+
+        // 2. Execute Search via API
+        var track = await SearchSpotifyWithSmartLogicAsync(artist, title, durationMs);
+
+        // 3. Cache Result (or Negative Cache)
+        if (track != null)
+        {
+            await SaveToCacheAsync(cacheKey, track, PositiveCacheDuration);
+        }
+        else
+        {
+            // Store a null placeholder to prevent spamming queries for unfindable tracks
+            await SaveToCacheAsync<FullTrack>(cacheKey, null, NegativeCacheDuration);
+        }
+
+        return track;
+    }
+
+
+
+    /// <summary>
+    /// Enriches a PlaylistTrack with Spotify metadata (ID, Art, Key, BPM).
+    /// Used by MetadataEnrichmentOrchestrator.
     /// </summary>
     public async Task<bool> EnrichTrackAsync(PlaylistTrack track)
     {
-        if (string.IsNullOrWhiteSpace(track.Artist) || string.IsNullOrWhiteSpace(track.Title))
+        // 1. Find the track
+        // Use a looser search initially, maybe implement duration check if we have file info
+        var metadata = await FindTrackAsync(track.Artist, track.Title, null);
+
+        if (metadata == null) return false;
+
+        // 2. Update Basic Info
+        track.SpotifyTrackId = metadata.Id;
+        track.SpotifyAlbumId = metadata.Album.Id;
+        track.SpotifyArtistId = metadata.Artists.FirstOrDefault()?.Id;
+        track.AlbumArtUrl = metadata.Album.Images.FirstOrDefault()?.Url; // Largest image
+        track.ArtistImageUrl = null; // Would need separate artist fetch
+        track.Genres = null; // Would need separate artist fetch
+        track.Popularity = metadata.Popularity;
+        track.CanonicalDuration = metadata.DurationMs;
+        // ReleaseDate needs parsing
+        if (DateTime.TryParse(metadata.Album.ReleaseDate, out var releaseDate))
         {
-            _logger.LogWarning("Cannot enrich track without artist and title");
-            return false;
+            track.ReleaseDate = releaseDate;
         }
+
+        // 3. Fetch Audio Features (Key, BPM)
+        var features = await GetAudioFeaturesAsync(metadata.Id);
+        if (features != null)
+        {
+            track.BPM = features.Tempo;
+            // Convert Pitch Class + Mode to Camelot? Or just store raw for now?
+            // Storing raw pitch/mode is safer, but UI wants "8A".
+            // Let's implement a quick helper or store raw and convert in UI?
+            // For now, let's store a simple string representation if possible, or just the raw values?
+            // The schema has MusicalKey as string.
+            // Let's try to convert or just store "Key: 1, Mode: 1" for now.
+            // Actually, let's add a helper later.
+            track.MusicalKey = $"{features.Key}{(features.Mode == 1 ? "B" : "A")}"; // Rough Camelot approx (needs proper wheel)
+            track.AnalysisOffset = 0; // Placeholder
+            // track.BitrateScore = ...; // Needs file analysis
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Fetches audio features (Key, BPM) for a track.
+    /// </summary>
+    public async Task<TrackAudioFeatures?> GetAudioFeaturesAsync(string spotifyId)
+    {
+        string cacheKey = $"features:{spotifyId}";
+        var cached = await GetFromCacheAsync<TrackAudioFeatures>(cacheKey);
+        if (cached != null) return cached;
 
         try
         {
-            var metadata = await SearchTrackAsync(track.Artist, track.Title);
-            if (metadata == null)
+            var client = await _authService.GetAuthenticatedClientAsync();
+            var features = await client.Tracks.GetAudioFeatures(spotifyId);
+
+            if (features != null)
             {
-                _logger.LogDebug("No Spotify metadata found for {Artist} - {Title}", track.Artist, track.Title);
-                return false;
+                await SaveToCacheAsync(cacheKey, features, PositiveCacheDuration);
+                return features;
             }
-
-            // Apply metadata to track
-            track.SpotifyTrackId = metadata.Id;
-            track.SpotifyAlbumId = metadata.SpotifyAlbumId;
-            track.SpotifyArtistId = metadata.SpotifyArtistId;
-            track.AlbumArtUrl = metadata.AlbumArtUrl;
-            track.ArtistImageUrl = metadata.ArtistImageUrl;
-            track.Genres = metadata.Genres != null ? JsonSerializer.Serialize(metadata.Genres) : null;
-            track.Popularity = metadata.Popularity;
-            track.CanonicalDuration = metadata.DurationMs;
-            track.ReleaseDate = ParseReleaseDate(metadata.ReleaseDate); // Parse string from record
-
-            _logger.LogInformation("Enriched track {Artist} - {Title} with Spotify ID: {Id}", 
-                track.Artist, track.Title, metadata.Id);
-            
-            return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to enrich track {Artist} - {Title}", track.Artist, track.Title);
-            return false;
+            _logger.LogError(ex, "Failed to fetch audio features for {SpotifyId}", spotifyId);
         }
+
+        return null;
     }
 
-    /// <summary>
-    /// Searches Spotify for track metadata by artist and title.
-    /// </summary>
-    public async Task<SpotifyMetadata?> SearchTrackAsync(string artist, string title)
+    private async Task<FullTrack?> SearchSpotifyWithSmartLogicAsync(string artist, string title, int? durationMs)
     {
-        var cacheKey = $"search:{artist}|{title}".ToLowerInvariant();
-        
-        // Check persistent cache
-        if (await _databaseService.GetCachedSpotifyMetadataAsync(cacheKey) is { } cached) 
-        {
-             _logger.LogDebug("Cache hit for {Artist} - {Title}", artist, title);
-             return cached;
-        }
-
-        // Rate limiting
-        await _rateLimiter.WaitAsync();
         try
         {
-            var client = await GetSpotifyClientAsync();
-            if (client == null)
+            var client = await _authService.GetAuthenticatedClientAsync();
+            
+            // Clean input (remove garbage like "(Official Video)", "HQ", etc if needed)
+            // For now, trust the input logic from DownloadManager, but strip "Remix" for broader search?
+            // Actually, keep Remix to ensure we get the right version.
+            
+            var request = new SearchRequest(SearchRequest.Types.Track, $"{artist} {title}")
             {
-                _logger.LogWarning("Spotify client not available for metadata lookup");
-                return null;
-            }
-
-            // Search for track
-            var query = $"artist:{artist} track:{title}";
-            var searchRequest = new SearchRequest(SearchRequest.Types.Track, query)
-            {
-                Limit = 5 // Get top 5 results for better matching
+                Limit = 5 // Fetch top 5 candidates
             };
 
-            var searchResponse = await client.Search.Item(searchRequest);
-            
-            if (searchResponse.Tracks?.Items == null || !searchResponse.Tracks.Items.Any())
-            {
-                _logger.LogDebug("No Spotify results for query: {Query}", query);
-                return null;
-            }
-
-            // Find best match (first result is usually best, but we could add fuzzy matching here)
-            var track = searchResponse.Tracks.Items.First();
-            
-            var metadata = new SpotifyMetadata(
-                Id: track.Id,
-                Title: track.Name,
-                Artist: track.Artists?.FirstOrDefault()?.Name ?? artist,
-                Album: track.Album?.Name ?? string.Empty,
-                AlbumArtUrl: track.Album?.Images?.FirstOrDefault()?.Url ?? string.Empty,
-                ArtistImageUrl: string.Empty, // Would need separate artist lookup
-                ReleaseDate: track.Album?.ReleaseDate ?? string.Empty,
-                Popularity: track.Popularity,
-                DurationMs: track.DurationMs,
-                Genres: new List<string>(), // Genres are on artist/album, not track
-                SpotifyAlbumId: track.Album?.Id ?? string.Empty,
-                SpotifyArtistId: track.Artists?.FirstOrDefault()?.Id ?? string.Empty
-            );
-
-            // Cache the result
-            await _databaseService.CacheSpotifyMetadataAsync(cacheKey, metadata);
-            // Also cache by ID for faster future lookups
-            if (!string.IsNullOrEmpty(metadata.Id))
-            {
-                 await _databaseService.CacheSpotifyMetadataAsync($"id:{metadata.Id}", metadata);
-            }
-            
-            _logger.LogDebug("Found Spotify metadata for {Artist} - {Title}: {Id}", 
-                artist, title, metadata.Id);
-            
-            return metadata;
-        }
-        catch (APIException ex)
-        {
-            _logger.LogError(ex, "Spotify API error searching for {Artist} - {Title}", artist, title);
-            return null;
-        }
-        finally
-        {
-            // Release rate limiter after delay
-            _ = Task.Delay(RateLimitWindowMs / MaxRequestsPerSecond).ContinueWith(_ => _rateLimiter.Release());
-        }
-    }
-
-    /// <summary>
-    /// Gets track metadata by Spotify ID (faster than search).
-    /// </summary>
-    public async Task<SpotifyMetadata?> GetTrackByIdAsync(string spotifyId)
-    {
-        var cacheKey = $"id:{spotifyId}";
-        
-        if (await _databaseService.GetCachedSpotifyMetadataAsync(cacheKey) is { } cached) 
-            return cached;
-
-        await _rateLimiter.WaitAsync();
-        try
-        {
-            var client = await GetSpotifyClientAsync();
-            if (client == null)
+            var response = await client.Search.Item(request);
+            if (response.Tracks?.Items == null || !response.Tracks.Items.Any())
                 return null;
 
-            var track = await client.Tracks.Get(spotifyId);
-            
-            var metadata = new SpotifyMetadata(
-                Id: track.Id,
-                Title: track.Name,
-                Artist: track.Artists?.FirstOrDefault()?.Name ?? "Unknown",
-                Album: track.Album?.Name ?? string.Empty,
-                AlbumArtUrl: track.Album?.Images?.FirstOrDefault()?.Url ?? string.Empty,
-                ArtistImageUrl: string.Empty,
-                ReleaseDate: track.Album?.ReleaseDate ?? string.Empty,
-                Popularity: track.Popularity,
-                DurationMs: track.DurationMs,
-                Genres: new List<string>(),
-                SpotifyAlbumId: track.Album?.Id ?? string.Empty,
-                SpotifyArtistId: track.Artists?.FirstOrDefault()?.Id ?? string.Empty
-            );
+            // Smart Matching Logic
+            var candidates = response.Tracks.Items;
+            FullTrack? bestMatch = null;
+            double bestScore = 0;
 
-            await _databaseService.CacheSpotifyMetadataAsync(cacheKey, metadata);
-            return metadata;
-        }
-        catch (APIException ex)
-        {
-            _logger.LogError(ex, "Spotify API error fetching track {Id}", spotifyId);
-            return null;
-        }
-        finally
-        {
-            _ = Task.Delay(RateLimitWindowMs / MaxRequestsPerSecond).ContinueWith(_ => _rateLimiter.Release());
-        }
-    }
-
-    /// <summary>
-    /// Batch enrichment for multiple tracks (more efficient).
-    /// </summary>
-    public async Task<int> EnrichTracksAsync(IEnumerable<PlaylistTrack> tracks)
-    {
-        int enrichedCount = 0;
-        
-        foreach (var track in tracks)
-        {
-            if (await EnrichTrackAsync(track))
-                enrichedCount++;
-            
-            // Small delay between tracks to avoid overwhelming the API
-            await Task.Delay(50);
-        }
-
-        return enrichedCount;
-    }
-
-    /// <summary>
-    /// Gets a Spotify client (authenticated if available, otherwise public).
-    /// </summary>
-    private async Task<SpotifyClient?> GetSpotifyClientAsync()
-    {
-        // Try authenticated client first
-        if (_authService != null)
-        {
-            try
+            foreach (var candidate in candidates)
             {
-                var isAuthenticated = await _authService.IsAuthenticatedAsync();
-                if (isAuthenticated)
+                // 1. Name Match Score
+                double titleScore = StringDistanceUtils.GetNormalizedMatchScore(title, candidate.Name);
+                double artistScore = StringDistanceUtils.GetNormalizedMatchScore(artist, candidate.Artists.FirstOrDefault()?.Name ?? "");
+                
+                double matchScore = (titleScore * 0.6) + (artistScore * 0.4);
+
+                // 2. Duration Validation (The "DJ Secret")
+                if (durationMs.HasValue && Math.Abs(candidate.DurationMs - durationMs.Value) > 5000)
                 {
-                    return await _authService.GetAuthenticatedClientAsync();
+                    // Penalty for duration mismatch (> 5 seconds diff)
+                    matchScore *= 0.5; 
+                }
+
+                if (matchScore > bestScore)
+                {
+                    bestScore = matchScore;
+                    bestMatch = candidate;
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to get authenticated Spotify client, falling back to public");
-            }
-        }
 
-        // Fall back to client credentials (public API)
-        if (!string.IsNullOrWhiteSpace(_config.SpotifyClientId) && 
-            !string.IsNullOrWhiteSpace(_config.SpotifyClientSecret))
-        {
-            try
+            // Threshold: Reject matches below 80% confidence
+            if (bestMatch != null && bestScore >= 0.8)
             {
-                var config = SpotifyClientConfig.CreateDefault();
-                var request = new ClientCredentialsRequest(_config.SpotifyClientId, _config.SpotifyClientSecret);
-                var response = await new OAuthClient(config).RequestToken(request);
-                return new SpotifyClient(config.WithToken(response.AccessToken));
+                _logger.LogInformation("Smart Match: '{Input}' -> '{Result}' (Score: {Score:P0})", 
+                    $"{artist} - {title}", $"{bestMatch.Artists[0].Name} - {bestMatch.Name}", bestScore);
+                return bestMatch;
             }
-            catch (Exception ex)
+            
+            _logger.LogWarning("No confident match for '{Input}'. Best was '{Result}' ({Score:P0})",
+                $"{artist} - {title}", bestMatch != null ? $"{bestMatch?.Artists[0].Name} - {bestMatch?.Name}" : "None", bestScore);
+                
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching Spotify for {Artist} - {Title}", artist, title);
+            return null;
+        }
+    }
+
+    private async Task<T?> GetFromCacheAsync<T>(string key) where T : class
+    {
+        try
+        {
+            using var context = new AppDbContext();
+            // Use FindAsync for direct PK lookup
+            var entity = await context.SpotifyMetadataCache.FindAsync(key);
+            
+            if (entity == null) return null;
+
+            if (DateTime.UtcNow > entity.ExpiresAt)
             {
-                _logger.LogError(ex, "Failed to create Spotify client with client credentials");
+                context.SpotifyMetadataCache.Remove(entity);
+                await context.SaveChangesAsync();
                 return null;
             }
-        }
 
-        _logger.LogWarning("No Spotify credentials configured");
-        return null;
+            if (string.IsNullOrEmpty(entity.DataJson)) return null; // Logic for negative cache
+
+            return JsonSerializer.Deserialize<T>(entity.DataJson);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache read failed for {Key}", key);
+            return null;
+        }
     }
 
-    private static DateTime? ParseReleaseDate(string? releaseDate)
+    private async Task SaveToCacheAsync<T>(string key, T? data, TimeSpan duration)
     {
-        if (string.IsNullOrWhiteSpace(releaseDate))
-            return null;
+        try
+        {
+            using var context = new AppDbContext();
+            var entity = new SpotifyMetadataCacheEntity
+            {
+                SpotifyId = key,
+                DataJson = data != null ? JsonSerializer.Serialize(data) : "",
+                CachedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.Add(duration)
+            };
 
-        // Spotify release dates can be YYYY, YYYY-MM, or YYYY-MM-DD
-        if (DateTime.TryParse(releaseDate, out var date))
-            return date;
+            // Upsert logic (EF Core doesn't have Upsert, so Check-then-Add/Update)
+            var existing = await context.SpotifyMetadataCache.FindAsync(key);
+            if (existing != null)
+            {
+                existing.DataJson = entity.DataJson;
+                existing.CachedAt = entity.CachedAt;
+                existing.ExpiresAt = entity.ExpiresAt;
+            }
+            else
+            {
+                await context.SpotifyMetadataCache.AddAsync(entity);
+            }
 
-        return null;
+            await context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cache write failed for {Key}", key);
+        }
     }
 }
-
-

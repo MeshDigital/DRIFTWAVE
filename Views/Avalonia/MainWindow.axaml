@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
         x:Class="SLSKDONET.Views.Avalonia.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="QMusic SLSK"
+        Title="Driftwave"
         Width="1400" Height="900"
         MinWidth="360" MinHeight="500"
         FontSize="{Binding BaseFontSize}"
