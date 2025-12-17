@@ -192,6 +192,12 @@ public partial class App : Application
         // Session 2: Performance Optimization - Extracted services
         services.AddSingleton<LibraryOrganizationService>();
         services.AddSingleton<ArtworkPipeline>();
+        
+        // Session 3: Performance Optimization - Polymorphic taggers
+        services.AddSingleton<Services.Tagging.Id3Tagger>();
+        services.AddSingleton<Services.Tagging.VorbisTagger>();
+        services.AddSingleton<Services.Tagging.M4ATagger>();
+        services.AddSingleton<Services.Tagging.TaggerFactory>();
 
         // Services
         services.AddSingleton<SoulseekAdapter>();
