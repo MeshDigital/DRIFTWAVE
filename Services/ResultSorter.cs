@@ -87,6 +87,10 @@ public static class ResultSorter
             TitleSimilarity = CalculateSimilarity(result.Title ?? "", searchTrack.Title ?? ""),
             ArtistSimilarity = CalculateSimilarity(result.Artist ?? "", searchTrack.Artist ?? ""),
             AlbumSimilarity = CalculateSimilarity(result.Album ?? "", searchTrack.Album ?? ""),
+            
+            // Phase 1: Musical Intelligence
+            BpmProximity = CalculateBpmProximity(result, searchTrack),
+            IsSuspicious = IsSuspiciousFile(result, searchTrack),
 
             // Tiebreaker
             RandomTiebreaker = random.Next()
@@ -169,6 +173,82 @@ public static class ResultSorter
 
         return d[s1.Length, s2.Length];
     }
+    
+    /// <summary>
+    /// Phase 1: Calculates BPM proximity score based on filename parsing.
+    /// Returns 0.5 (neutral) if no BPM found in filename (no penalty for casual files).
+    /// </summary>
+    private static double CalculateBpmProximity(Track result, Track searchTrack)
+    {
+        if (!searchTrack.BPM.HasValue) return 0.5; // Neutral if target has no BPM
+        
+        // Extract BPM from filename (e.g., "124bpm", "124 BPM", "(124)")
+        double? fileBpm = ExtractBpmFromFilename(result.Filename ?? "");
+        if (!fileBpm.HasValue) return 0.5; // Neutral if no BPM in filename (common for casual music)
+        
+        double diff = Math.Abs(fileBpm.Value - searchTrack.BPM.Value);
+        if (diff < 2.0) return 1.0;   // Perfect match (+300 pts in OverallScore)
+        if (diff < 5.0) return 0.75;  // Close match (+225 pts)
+        if (diff < 10.0) return 0.5;  // Acceptable (+150 pts)
+        return 0.0;                   // Mismatch (0 pts)
+    }
+    
+    /// <summary>
+    /// Phase 1: Extracts BPM from filename using common patterns.
+    /// Patterns: "128bpm", "128 BPM", "(128)", "[128]"
+    /// </summary>
+    private static double? ExtractBpmFromFilename(string filename)
+    {
+        if (string.IsNullOrEmpty(filename)) return null;
+        
+        // Pattern 1: "128bpm" or "128 bpm" (case insensitive)
+        var bpmMatch = System.Text.RegularExpressions.Regex.Match(filename, @"(\d{2,3})\s*bpm", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (bpmMatch.Success && double.TryParse(bpmMatch.Groups[1].Value, out double bpm1))
+            return bpm1;
+        
+        // Pattern 2: Standalone number in parentheses/brackets near end of filename
+        // (Common DJ convention: "Artist - Title (128).mp3")
+        var bracketMatch = System.Text.RegularExpressions.Regex.Match(filename, @"[\(\[](\d{2,3})[\)\]]");
+        if (bracketMatch.Success && double.TryParse(bracketMatch.Groups[1].Value, out double bpm2))
+        {
+            // Sanity check: BPM typically 60-200 for most music
+            if (bpm2 >= 60 && bpm2 <= 200)
+                return bpm2;
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Phase 1: Detects suspicious/fake files via filesize and duration validation.
+    /// Strict gating: flagged files get -Infinity score.
+    /// </summary>
+    private static bool IsSuspiciousFile(Track result, Track searchTrack)
+    {
+        // Check 1: Duration mismatch (already handled by Phase 0.4 Smart Duration Gating)
+        // We re-check here for completeness, but this is redundant with DownloadDiscoveryService
+        if (result.Length.HasValue && searchTrack.CanonicalDuration.HasValue)
+        {
+            double expectedSec = searchTrack.CanonicalDuration.Value / 1000.0;
+            if (Math.Abs(result.Length.Value - expectedSec) > 30)
+                return true; // Wrong version (Radio vs Extended)
+        }
+        
+        // Check 2: Filesize impossibly small for claimed duration
+        // Detects corrupted files or metadata lies (e.g., 10-min file that's only 3MB)
+        if (result.Size.HasValue && result.Length.HasValue && result.Length.Value > 0)
+        {
+            // Minimum acceptable: ~64kbps (8000 bytes/sec)
+            double minBytesPerSecond = 8000;
+            double expectedMinSize = result.Length.Value * minBytesPerSecond;
+            
+            // If filesize is less than 50% of minimum expected, it's suspicious
+            if (result.Size.Value < expectedMinSize * 0.5)
+                return true;
+        }
+        
+        return false;
+    }
 }
 
 /// <summary>
@@ -191,6 +271,10 @@ public class SortingCriteria : IComparable<SortingCriteria>
     public double ArtistSimilarity { get; set; }
     public double AlbumSimilarity { get; set; }
     public int RandomTiebreaker { get; set; }
+    
+    // Phase 1: Musical Intelligence
+    public double BpmProximity { get; set; }      // 0-1 score for BPM match from filename
+    public bool IsSuspicious { get; set; }        // True if filesize/duration mismatch
 
     /// <summary>
     /// Calculated overall score for sorting.
@@ -199,6 +283,9 @@ public class SortingCriteria : IComparable<SortingCriteria>
     {
         get
         {
+            // Phase 1: STRICT GATING - Suspicious files are completely hidden
+            if (IsSuspicious) return double.NegativeInfinity;
+            
             double score = 0.0;
             
             // 0. Availability (The most critical factor for speed)
@@ -211,6 +298,9 @@ public class SortingCriteria : IComparable<SortingCriteria>
 
             // 2. Preferred conditions
             score += PreferredScore * 500;
+            
+            // Phase 1: Musical Intelligence (BEFORE bitrate to prioritize identity over quality)
+            score += BpmProximity * 300; // Higher weight than bitrate
 
             // 3. Metadata quality
             if (HasValidLength) score += 100;

@@ -30,6 +30,10 @@ public class Track
     public int? CanonicalDuration { get; set; }
     public DateTime? ReleaseDate { get; set; } // Use DateTime? instead of string for better type safety where possible
     
+    // Phase 1: Musical Intelligence (from Spotify Audio Features)
+    public double? BPM { get; set; }           // Tempo from Spotify (e.g., 128.005)
+    public string? MusicalKey { get; set; }    // Camelot notation (e.g., "8A")
+    
     // Intelligence Metrics
     public bool HasFreeUploadSlot { get; set; }
     public int QueueLength { get; set; }
