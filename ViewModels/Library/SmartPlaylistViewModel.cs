@@ -17,7 +17,7 @@ namespace SLSKDONET.ViewModels.Library;
 public class SmartPlaylistViewModel : INotifyPropertyChanged
 {
     private readonly ILogger<SmartPlaylistViewModel> _logger;
-    private readonly DownloadManager _downloadManager;
+    private readonly MainViewModel _mainViewModel;
 
     public ObservableCollection<SmartPlaylist> SmartPlaylists { get; } = new();
 
@@ -43,10 +43,10 @@ public class SmartPlaylistViewModel : INotifyPropertyChanged
 
     public SmartPlaylistViewModel(
         ILogger<SmartPlaylistViewModel> logger,
-        DownloadManager downloadManager)
+        MainViewModel mainViewModel)
     {
         _logger = logger;
-        _downloadManager = downloadManager;
+        _mainViewModel = mainViewModel;
 
         InitializeSmartPlaylists();
     }
@@ -116,7 +116,7 @@ public class SmartPlaylistViewModel : INotifyPropertyChanged
 
         try
         {
-            var allTracks = _downloadManager.AllGlobalTracks;
+            var allTracks = _mainViewModel.AllGlobalTracks;
             var filtered = playlist.Filter(allTracks).ToList();
 
             _logger.LogInformation("Smart playlist '{Name}' has {Count} tracks", 
@@ -142,7 +142,7 @@ public class SmartPlaylistViewModel : INotifyPropertyChanged
     {
         try
         {
-            var likedTracks = _downloadManager.AllGlobalTracks
+            var likedTracks = _mainViewModel.AllGlobalTracks
                 .Where(t => t.Model?.IsLiked == true)
                 .OrderByDescending(t => t.Model?.AddedAt)
                 .ToList();

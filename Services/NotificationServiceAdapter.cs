@@ -9,7 +9,8 @@ namespace SLSKDONET.Services;
 /// Adapter that implements the view-level INotificationService for Avalonia.
 /// Falls back to logging when no UI notification service is available.
 /// </summary>
-public class NotificationServiceAdapter : SLSKDONET.Views.INotificationService
+/// </summary>
+public class NotificationServiceAdapter : global::SLSKDONET.Views.INotificationService
 {
     private readonly ILogger<NotificationServiceAdapter> _logger;
 

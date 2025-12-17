@@ -255,6 +255,8 @@ public partial class App : Application
         // Orchestration Services
         services.AddSingleton<SearchOrchestrationService>();
         services.AddSingleton<DownloadOrchestrationService>();
+        services.AddSingleton<DownloadDiscoveryService>(); // Phase 3.1
+        services.AddSingleton<MetadataEnrichmentOrchestrator>(); // Phase 3.1
         
         // Phase 0: ViewModel Refactoring - Library child ViewModels
         services.AddTransient<ViewModels.Library.ProjectListViewModel>();

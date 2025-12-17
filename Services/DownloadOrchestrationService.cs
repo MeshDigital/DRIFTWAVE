@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.ViewModels;
+using SLSKDONET.Models; // Added for PlaylistTrackState
 
 namespace SLSKDONET.Services;
 
@@ -58,12 +59,12 @@ public class DownloadOrchestrationService
     {
         try
         {
-            var tracks = _downloadManager.AllGlobalTracks.ToList(); // Snapshot to avoid collection modification
+            var tracks = _downloadManager.ActiveDownloads.ToList(); // Snapshot
             int cancelled = 0;
             
             foreach (var track in tracks)
             {
-                if (track.CanCancel)
+                if (track.State != PlaylistTrackState.Completed && track.State != PlaylistTrackState.Cancelled)
                 {
                     _downloadManager.CancelTrack(track.GlobalId);
                     cancelled++;
@@ -96,12 +97,12 @@ public class DownloadOrchestrationService
     {
         try
         {
-            var tracks = _downloadManager.AllGlobalTracks.ToList(); // Snapshot to avoid collection modification
+            var tracks = _downloadManager.ActiveDownloads.ToList(); // Snapshot
             int paused = 0;
             
             foreach (var track in tracks)
             {
-                if (track.CanPause)
+                if (track.IsActive)
                 {
                     _downloadManager.PauseTrack(track.GlobalId);
                     paused++;
@@ -132,15 +133,15 @@ public class DownloadOrchestrationService
     /// </summary>
     public DownloadStatistics GetStatistics()
     {
-        var allTracks = _downloadManager.AllGlobalTracks;
+        var allTracks = _downloadManager.ActiveDownloads;
         
         return new DownloadStatistics
         {
             SuccessfulCount = allTracks.Count(t => t.State == PlaylistTrackState.Completed),
             FailedCount = allTracks.Count(t => t.State == PlaylistTrackState.Failed),
-            PendingCount = allTracks.Count(t => t.State == PlaylistTrackState.Pending || 
-                                                 t.State == PlaylistTrackState.Downloading || 
-                                                 t.State == PlaylistTrackState.Searching),
+            PendingCount = allTracks.Count(t => t.State == SLSKDONET.Models.PlaylistTrackState.Pending || 
+                                                 t.State == SLSKDONET.Models.PlaylistTrackState.Downloading || 
+                                                 t.State == SLSKDONET.Models.PlaylistTrackState.Searching),
             TotalCount = allTracks.Count
         };
     }

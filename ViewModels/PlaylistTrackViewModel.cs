@@ -9,17 +9,7 @@ using SLSKDONET.Views; // For RelayCommand
 
 namespace SLSKDONET.ViewModels;
 
-public enum PlaylistTrackState
-{
-    Pending,
-    Searching,
-    Queued,
-    Downloading,
-    Paused,
-    Completed,
-    Failed,
-    Cancelled
-}
+
 
 /// <summary>
 /// ViewModel representing a track in the download queue.
@@ -138,8 +128,11 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged
     public ICommand CancelCommand { get; }
     public ICommand FindNewVersionCommand { get; }
 
-    public PlaylistTrackViewModel(PlaylistTrack track)
+    private readonly IEventBus? _eventBus;
+
+    public PlaylistTrackViewModel(PlaylistTrack track, IEventBus? eventBus = null)
     {
+        _eventBus = eventBus;
         Model = track;
         SourceId = track.PlaylistId;
         GlobalId = track.TrackUniqueHash;
@@ -159,6 +152,51 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged
         ResumeCommand = new RelayCommand(Resume, () => CanResume);
         CancelCommand = new RelayCommand(Cancel, () => CanCancel);
         FindNewVersionCommand = new RelayCommand(FindNewVersion, () => CanHardRetry);
+        
+        // Smart Subscription
+        if (_eventBus != null)
+        {
+            _eventBus.GetEvent<Events.TrackStateChangedEvent>().Subscribe(OnStateChanged);
+            _eventBus.GetEvent<Events.TrackProgressChangedEvent>().Subscribe(OnProgressChanged);
+            _eventBus.GetEvent<Events.TrackMetadataUpdatedEvent>().Subscribe(OnMetadataUpdated);
+        }
+    }
+    
+    private void OnMetadataUpdated(Events.TrackMetadataUpdatedEvent evt)
+    {
+        if (evt.TrackGlobalId != GlobalId) return;
+        
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+             OnPropertyChanged(nameof(Artist));
+             OnPropertyChanged(nameof(Title));
+             OnPropertyChanged(nameof(Album));
+             OnPropertyChanged(nameof(CoverArtUrl));
+             OnPropertyChanged(nameof(SpotifyTrackId));
+        });
+    }
+
+    private void OnStateChanged(Events.TrackStateChangedEvent evt)
+    {
+        if (evt.TrackGlobalId != GlobalId) return;
+        
+        // Marshal to UI Thread
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+             State = evt.NewState;
+             if (evt.ErrorMessage != null) ErrorMessage = evt.ErrorMessage;
+        });
+    }
+
+    private void OnProgressChanged(Events.TrackProgressChangedEvent evt)
+    {
+        if (evt.TrackGlobalId != GlobalId) return;
+        
+        // Throttling could be added here if needed, but for now we rely on simple marshaling
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+             Progress = evt.Progress;
+        });
     }
 
     public PlaylistTrackState State
@@ -246,6 +284,21 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged
     }
 
     public string? AlbumArtUrl => Model.AlbumArtUrl;
+    
+    // Phase 3.1: Expose Spotify Metadata ID
+    public string? SpotifyTrackId
+    {
+        get => Model.SpotifyTrackId;
+        set
+        {
+            if (Model.SpotifyTrackId != value)
+            {
+                Model.SpotifyTrackId = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public string? SpotifyAlbumId => Model.SpotifyAlbumId;
 
     // Phase 1: UI Metadata

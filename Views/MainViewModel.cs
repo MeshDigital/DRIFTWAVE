@@ -11,6 +11,7 @@ using Avalonia.Threading;
 using System.Collections.Generic; // Added this using directive
 using SLSKDONET.Models;
 
+using SLSKDONET.Events;
 namespace SLSKDONET.Views;
 
 /// <summary>
@@ -94,10 +95,14 @@ public class MainViewModel : INotifyPropertyChanged
         ResetZoomCommand = new RelayCommand(ResetZoom);
         
         // Subscribe to EventBus events
+        // Subscribe to EventBus events
         _eventBus.GetEvent<TrackUpdatedEvent>().Subscribe(evt => OnTrackUpdated(this, evt.Track));
         _eventBus.GetEvent<SoulseekStateChangedEvent>().Subscribe(evt => HandleStateChange(evt.State));
+        _eventBus.GetEvent<TrackAddedEvent>().Subscribe(evt => OnTrackAdded(evt.TrackModel));
+        _eventBus.GetEvent<TrackRemovedEvent>().Subscribe(evt => OnTrackRemoved(evt.TrackGlobalId));
         
-        _downloadManager.AllGlobalTracks.CollectionChanged += (s, e) => 
+        // Local collection monitoring for stats
+        AllGlobalTracks.CollectionChanged += (s, e) => 
         {
              OnPropertyChanged(nameof(SuccessfulCount));
              OnPropertyChanged(nameof(FailedCount));
@@ -222,8 +227,8 @@ public class MainViewModel : INotifyPropertyChanged
         set => SetProperty(ref _isInitializing, value);
     }
 
-    // Expose download manager for backward compatibility
-    public System.Collections.ObjectModel.ObservableCollection<PlaylistTrackViewModel> AllGlobalTracks => _downloadManager.AllGlobalTracks;
+    // Event-Driven Collection
+    public System.Collections.ObjectModel.ObservableCollection<PlaylistTrackViewModel> AllGlobalTracks { get; } = new();
 
     // Navigation Commands
 
@@ -301,16 +306,16 @@ public class MainViewModel : INotifyPropertyChanged
     private void ResetZoom() => BaseFontSize = 14.0;
 
     // Download Progress Properties (computed from AllGlobalTracks)
-    public int SuccessfulCount => _downloadManager?.AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Completed) ?? 0;
-    public int FailedCount => _downloadManager?.AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Failed) ?? 0;
-    public int TodoCount => _downloadManager?.AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Pending || t.State == PlaylistTrackState.Searching) ?? 0;
+    public int SuccessfulCount => AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Completed);
+    public int FailedCount => AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Failed);
+    public int TodoCount => AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Pending || t.State == PlaylistTrackState.Searching);
     public double DownloadProgressPercentage
     {
         get
         {
-            var total = _downloadManager?.AllGlobalTracks.Count ?? 0;
+            var total = AllGlobalTracks.Count;
             if (total == 0) return 0;
-            var completed = _downloadManager?.AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Completed) ?? 0;
+            var completed = AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Completed);
             return (double)completed / total * 100;
         }
     }
@@ -340,6 +345,27 @@ public class MainViewModel : INotifyPropertyChanged
             else if (state.Contains("Connected", StringComparison.OrdinalIgnoreCase))
             {
                 StatusText = "Ready";
+            }
+        });
+    }
+
+    private void OnTrackAdded(PlaylistTrack trackModel)
+    {
+        global::Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+        {
+            var vm = new PlaylistTrackViewModel(trackModel, _eventBus);
+            AllGlobalTracks.Add(vm);
+        });
+    }
+
+    private void OnTrackRemoved(string globalId)
+    {
+        global::Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+        {
+            var toRemove = System.Linq.Enumerable.FirstOrDefault(AllGlobalTracks, t => t.GlobalId == globalId);
+            if (toRemove != null)
+            {
+                AllGlobalTracks.Remove(toRemove);
             }
         });
     }

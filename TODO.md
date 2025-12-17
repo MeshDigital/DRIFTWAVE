@@ -450,34 +450,46 @@
 - `Services/MetadataEnrichmentOrchestrator.cs` (new)
 - `Services/DownloadManager.cs` (cleanup)
 
-### 3.2 Input Processing Service (3 hours)
-**Priority**: ⭐⭐ MEDIUM
-**Goal**: Decouple ViewModels from specific input formats.
+### 3.2 Event-Driven UI Architecture (3 hours)
+**Priority**: ⭐⭐⭐ HIGH
+**Goal**: Decouple logic from UI threads and eliminate stuttering.
 
 **What to Build**:
-- [ ] `InputAbstractionService`: Unify CSV, Clipboard, and URL handling
-- [ ] `SearchIntent`: Standardized input object
+- [ ] Migrate `DownloadManager` to publish `TrackStatusChangedEvent`
+- [ ] Migrate `LibraryService` to publish `LibraryUpdatedEvent`
+- [ ] Update ViewModels to subscribe via `IEventBus`
+- [ ] Remove `Dispatcher.UIThread` calls from Services
 
 **Files**:
-- `Services/InputAbstractionService.cs` (new)
-- `Models/SearchIntent.cs` (new)
+- `Services/EventBusService.cs` (existing)
+- `Events/TrackEvents.cs` (new)
+- `ViewModels/PlaylistTrackViewModel.cs` (subscribe)
 
-### 3.3 Generic OAuth Loopback (2 hours)
-**Priority**: ⭐⭐
+### 3.3 Data Access Layer Thinning (1 hour)
+**Priority**: ⭐⭐ MEDIUM
+**Goal**: Cleaner service code by extracting mapping logic.
+
+**What to Build**:
+- [ ] `Extensions/MappingExtensions.cs`
+- [ ] Move `EntityToPlaylistTrack` logic to extensions
+- [ ] Move `PlaylistTrackToEntity` logic to extensions
+
+### 3.4 Generic OAuth Loopback (2 hours)
+**Priority**: ⭐⭐ MEDIUM
 **Goal**: Reusable OAuth listener for future integrations.
 
 **What to Build**:
 - [ ] Generic `OAuthLoopbackServer`
 - [ ] Configurable HTML success/failure pages
-- [ ] `NameValueCollection` return type
+- [ ] `NameValueCollection` return type from `WaitForCallbackAsync`
 
-### 3.4 Database Mapping Extensions (1 hour)
+### 3.5 Input Processing Service (3 hours)
 **Priority**: ⭐ LOW
-**Goal**: Cleaner service code.
+**Goal**: Decouple ViewModels from specific input formats.
 
 **What to Build**:
-- [ ] `Extensions/MappingExtensions.cs`
-- [ ] Extension methods for Entity <-> Model conversion
+- [ ] `InputAbstractionService`: Unify CSV, Clipboard, and URL handling
+- [ ] `SearchIntent`: Standardized input object
 
 ---
 
@@ -708,6 +720,47 @@ public QualityFlags Flags { get; set; }
 3. Display side-by-side comparison
 4. Implement replace logic
 5. Add to navigation
+
+---
+
+### 5.5 Advanced Audio Analysis (Musical Key & Cues) (8 hours)
+**Priority**: ⭐⭐⭐ DIFFERETIATOR
+
+**What to Build**:
+- [ ] Chromagram Analysis (Essentia/LibRosa wrapper)
+- [ ] Key Detection (Camelot wheel notation)
+- [ ] Cue Point Extraction (Rekordbox XML & ID3 GEOB tags)
+- [ ] `CuePoint` data model
+
+**Files to Create**:
+- `Services/AudioAnalysisService.cs` (new)
+- `Services/RekordboxXmlImporter.cs` (new)
+- `Models/CuePoint.cs` (new)
+
+**Implementation**:
+1. Integrate audio analysis library (Essentia/LibRosa)
+2. Implement key detection algorithm
+3. Store Average Harmonic Profile in database
+4. Extract cue points from existing files/XML
+5. Parse `Pioneer DJ Cue` GEOB tags from ID3
+
+---
+
+### 5.6 Self-Healing Migration System (10 hours)
+**Priority**: ⭐⭐⭐ REVOLUTIONARY
+
+**What to Build**:
+- [ ] "The Replacement Logic": Move cues from MP3 to FLAC
+- [ ] Cross-Correlation time alignment (fix silence offsets)
+- [ ] Automatic cue point shifting (+/- ms)
+- [ ] Rekordbox XML Export with new file paths
+
+**Implementation Advice**:
+1. **Acoustic Match**: Verify `FingerprintService` match first.
+2. **Time Alignment**: Calculate offset between signals.
+3. **Migration**: Apply offset to old cue points -> save to new track.
+4. **Validation**: "Library Health" dashboard approval step.
+
 
 ---
 

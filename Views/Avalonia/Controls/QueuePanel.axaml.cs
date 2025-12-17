@@ -148,11 +148,7 @@ public partial class QueuePanel : UserControl
             // Adding from library - find the track and add to queue
             var mainWindow = this.VisualRoot as MainWindow;
             var mainViewModel = mainWindow?.DataContext as MainViewModel;
-            var downloadManager = mainViewModel?.GetType()
-                .GetField("_downloadManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.GetValue(mainViewModel) as DownloadManager;
-            
-            var track = downloadManager?.AllGlobalTracks
+            var track = mainViewModel?.AllGlobalTracks
                 .FirstOrDefault(t => t.GlobalId == trackHash);
             
             if (track != null)

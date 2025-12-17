@@ -78,9 +78,11 @@
 
 #### 4. Architecture Refactoring (Technical Debt Reduction)
 - **DownloadManager**: Split into Discovery, Orchestration, and Enrichment services
-- **Input Processing**: Abstract input handling from ViewModels
+- **Event-Driven UI**: Unify service-to-UI communication via EventBus
+- **Library Mapping**: Move entity mapping to extension methods
 - **OAuth Server**: Generic loopback server for future integrations
-- **Impact**: Maintainability and Testability
+- **Input Processing**: Abstract input handling from ViewModels
+- **Impact**: Maintainability, Performance, and Testability
 
 #### 2. Album Download Completion
 - Recursive directory parsing for album mode
@@ -140,6 +142,15 @@
 - Custom color schemes
 - User-defined themes
 - **Impact**: Personalization
+
+### Advanced Audio Features (differentiators)
+
+#### 10. Self-Healing Library (Phase 5)
+- **Automatic Upgrades**: Replace 128kbps MP3s with FLACs automatically
+- **Cue Point Preservation**: Transfer DJ hot cues and memory points to new files
+- **Smart Time Alignment**: Cross-correlation to fix silence offsets during transfer
+- **Key Detection**: Chromagram analysis for Camelot key notation
+- **Impact**: **REVOLUTIONARY** for DJ workflow
 
 ---
 

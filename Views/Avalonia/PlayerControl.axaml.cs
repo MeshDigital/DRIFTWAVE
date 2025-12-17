@@ -69,11 +69,7 @@ public partial class PlayerControl : UserControl
             // Try to find in download manager's global tracks
             var mainWindow = this.VisualRoot as MainWindow;
             var mainViewModel = mainWindow?.DataContext as MainViewModel;
-            var downloadManager = mainViewModel?.GetType()
-                .GetField("_downloadManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.GetValue(mainViewModel) as DownloadManager;
-            
-            track = downloadManager?.AllGlobalTracks
+            track = mainViewModel?.AllGlobalTracks
                 .FirstOrDefault(t => t.GlobalId == trackGlobalId);
         }
 

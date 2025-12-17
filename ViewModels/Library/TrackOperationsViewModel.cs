@@ -17,6 +17,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
 {
     private readonly ILogger<TrackOperationsViewModel> _logger;
     private readonly DownloadManager _downloadManager;
+    private readonly MainViewModel _mainViewModel;
     private readonly PlayerViewModel _playerViewModel;
     private readonly IFileInteractionService _fileInteractionService;
 
@@ -36,11 +37,13 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
     public TrackOperationsViewModel(
         ILogger<TrackOperationsViewModel> logger,
         DownloadManager downloadManager,
+        MainViewModel mainViewModel,
         PlayerViewModel playerViewModel,
         IFileInteractionService fileInteractionService)
     {
         _logger = logger;
         _downloadManager = downloadManager;
+        _mainViewModel = mainViewModel;
         _playerViewModel = playerViewModel;
         _fileInteractionService = fileInteractionService;
 
@@ -132,7 +135,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
             _logger.LogInformation("Removing track: {Title}", track.Title);
             
             // Remove from download manager
-            await _downloadManager.DeleteTrackFromDiskAndHistoryAsync(track);
+            await _downloadManager.DeleteTrackFromDiskAndHistoryAsync(track.GlobalId);
             
             _logger.LogInformation("Track removed successfully");
         }
@@ -148,7 +151,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
         {
             _logger.LogInformation("Retrying all offline tracks");
             
-            var offlineTracks = _downloadManager.AllGlobalTracks
+            var offlineTracks = _mainViewModel.AllGlobalTracks
                 .Where(t => t.State == PlaylistTrackState.Failed)
                 .ToList();
 

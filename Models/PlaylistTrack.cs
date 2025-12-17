@@ -103,3 +103,15 @@ public enum TrackStatus
     Failed = 2,       // Download was attempted but failed
     Skipped = 3       // Track was skipped during import
 }
+
+public enum PlaylistTrackState
+{
+    Pending,
+    Searching,
+    Queued,
+    Downloading,
+    Paused,
+    Completed,
+    Failed,
+    Cancelled
+}

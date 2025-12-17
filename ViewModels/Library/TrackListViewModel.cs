@@ -21,7 +21,9 @@ public class TrackListViewModel : INotifyPropertyChanged
     private readonly ILogger<TrackListViewModel> _logger;
     private readonly ILibraryService _libraryService;
     private readonly DownloadManager _downloadManager;
+    private readonly MainViewModel _mainViewModel; // Injected
     private readonly ArtworkCacheService _artworkCache;
+    private readonly IEventBus _eventBus;
 
     // Track collections
     private ObservableCollection<PlaylistTrackViewModel> _currentProjectTracks = new();
@@ -118,13 +120,16 @@ public class TrackListViewModel : INotifyPropertyChanged
         ILogger<TrackListViewModel> logger,
         ILibraryService libraryService,
         DownloadManager downloadManager,
+        MainViewModel mainViewModel,
         ArtworkCacheService artworkCache,
         IEventBus eventBus)
     {
         _logger = logger;
         _libraryService = libraryService;
         _downloadManager = downloadManager;
+        _mainViewModel = mainViewModel;
         _artworkCache = artworkCache;
+        _eventBus = eventBus;
 
         // Subscribe to global track updates
         // Subscribe to global track updates
@@ -151,7 +156,7 @@ public class TrackListViewModel : INotifyPropertyChanged
             {
                 var all = await Task.Run(() =>
                 {
-                    return _downloadManager.AllGlobalTracks
+                    return _mainViewModel.AllGlobalTracks
                         .OrderByDescending(t => t.IsActive)
                         .ThenBy(t => t.Artist)
                         .ToList();
@@ -166,10 +171,12 @@ public class TrackListViewModel : INotifyPropertyChanged
 
                 foreach (var track in freshTracks.OrderBy(t => t.TrackNumber))
                 {
-                    var vm = new PlaylistTrackViewModel(track);
+                    // Create Smart VM with EventBus subscription
+                    var vm = new PlaylistTrackViewModel(track, _eventBus);
 
-                    // Sync with live DownloadManager state
-                    var liveTrack = _downloadManager.AllGlobalTracks
+                    // Sync with live MainViewModel state to get initial values
+                    // Note: This is still useful for initial state (e.g. if download is 50% done when validation opens)
+                    var liveTrack = _mainViewModel.AllGlobalTracks
                         .FirstOrDefault(t => t.GlobalId == track.TrackUniqueHash);
 
                     if (liveTrack != null)
@@ -178,26 +185,8 @@ public class TrackListViewModel : INotifyPropertyChanged
                         vm.Progress = liveTrack.Progress;
                         vm.CurrentSpeed = liveTrack.CurrentSpeed;
                         vm.ErrorMessage = liveTrack.ErrorMessage;
-
-                        // Sync file path
-                        if (string.IsNullOrEmpty(vm.Model.ResolvedFilePath) &&
-                            !string.IsNullOrEmpty(liveTrack.Model?.ResolvedFilePath))
-                        {
-                            vm.Model.ResolvedFilePath = liveTrack.Model.ResolvedFilePath;
-
-                            // Persist to database
-                            _ = Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    await _libraryService.UpdatePlaylistTrackAsync(vm.Model);
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogWarning(ex, "Failed to persist ResolvedFilePath for track {Id}", vm.Model.Id);
-                                }
-                            });
-                        }
+                        vm.CancellationTokenSource = liveTrack.CancellationTokenSource; // Share token? careful.
+                        // Actually, sharing state is enough because events will drive updates.
                     }
 
                     tracks.Add(vm);
