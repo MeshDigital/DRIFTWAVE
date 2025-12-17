@@ -183,6 +183,55 @@
 - **Impact**: Cleaner state transitions, easier to add VBR verification step
 - **Reference**: [Refactoring.Guru - State](https://refactoring.guru/design-patterns/state)
 
+### Phase 6: Modern UI Redesign (Bento Grid & Glassmorphism) ✨ NEW
+
+#### 1. Bento-Box Dashboard Layout
+- **Problem**: Current UI feels like standard Windows form (single massive DataGrid)
+- **Solution**: 3-column modular layout (Navigation | Content | Inspector)
+- **Layout**:
+  - Left (250px): Source trees (Library, USB, Playlists)
+  - Middle (flex): Hero header + tracklist with rounded corners
+  - Right (300px): Track inspector with large album art, BPM/Key visualizer
+- **Impact**: Premium 2025-era desktop app aesthetic
+- **Reference**: [Fluent Design System](https://www.youtube.com/watch?v=vcBGj4U75zk)
+
+#### 2. Glassmorphism & Depth
+- **Problem**: Flat UI lacks visual hierarchy and polish
+- **Solution**: `ExperimentalAcrylicBorder` with blur effects
+- **Implementation**:
+  - Dark navy background (#0D0D0D)
+  - Orbit Blue accent (#00A3FF) for active states
+  - Soft colored glows (5% opacity) on hover
+  - Blur effects on sidebar and player controls
+- **Impact**: Weightless, high-end feel
+
+#### 3. TreeDataGrid for Performance
+- **Problem**: Standard DataGrid stutters with 50,000+ tracks
+- **Solution**: Avalonia TreeDataGrid with hierarchical views
+- **Features**:
+  - Smooth inertial scrolling (macOS/iOS-like)
+  - Expand Artist → Albums → Tracks
+  - Virtualization for massive libraries
+- **Impact**: Professional-grade performance
+
+#### 4. Professional Typography & Micro-Interactions
+- **Typography**:
+  - Variable font (Inter or Geist)
+  - SemiBold for titles, 50% opacity for metadata
+- **Micro-Interactions**:
+  - 150ms hover transitions
+  - Play icon overlay on album art hover
+  - Skeleton screens instead of spinners
+  - Scale(1.01) on track row hover
+- **Impact**: Polished, product-quality feel
+
+#### 5. DJ-Focused Visuals
+- **Camelot Wheel**: Visual key wheel in inspector panel
+- **Bitrate Progress Bars**: Visual quality scanning (full bar = FLAC, half = 192kbps)
+- **Waveform Preview**: Mini waveform in track row (planned)
+- **BPM/Key Badges**: Color-coded badges for quick scanning
+- **Impact**: Professional DJ tool aesthetic
+
 ### Medium Priority
 
 #### 4. Advanced Filters
