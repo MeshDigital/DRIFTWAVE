@@ -311,6 +311,202 @@ public class TrackIdentityProfile
 
 ---
 
+### 2.7 Observer Pattern - Event-Driven Architecture (2 hours)
+**Reference**: [Refactoring.Guru - Observer](https://refactoring.guru/design-patterns/observer)
+
+**Files to Modify**:
+- `Services/EventBusService.cs` - Enhance existing event bus
+- `Services/TrackAnalysisOrchestrator.cs` - Emit progress events
+- `ViewModels/*` - Subscribe to events instead of direct calls
+
+**Events to Define**:
+```csharp
+public class TrackAnalysisProgressEvent
+{
+    public string TrackId { get; set; }
+    public int PercentComplete { get; set; }
+    public string CurrentStep { get; set; } // "Extracting BPM", "Detecting Key"
+}
+
+public class DownloadProgressEvent
+{
+    public string JobId { get; set; }
+    public long BytesDownloaded { get; set; }
+    public long TotalBytes { get; set; }
+}
+```
+
+**Impact**: Multi-core analysis engine decoupled from UI, multiple observers can listen
+
+---
+
+### 2.8 Null Object Pattern - Metadata Handling (1 hour)
+**Reference**: [Refactoring.Guru - Null Object](https://refactoring.guru/introduce-null-object)
+
+**Files to Create**:
+- `Models/NullSpotifyMetadata.cs`
+
+**Implementation**:
+```csharp
+public class NullSpotifyMetadata : SpotifyMetadata
+{
+    public NullSpotifyMetadata()
+    {
+        BPM = 0;
+        MusicalKey = "Unknown";
+        Confidence = 0.0;
+        SpotifyId = null;
+        AlbumArtUrl = null;
+    }
+    
+    public override bool IsValid => false;
+}
+```
+
+**Files to Modify**:
+- `Services/SpotifyMetadataService.cs` - Return `NullSpotifyMetadata` instead of null
+- `Services/ResultSorter.cs` - Remove null checks, use `metadata.IsValid`
+
+**Impact**: Cleaner scoring logic, no `?.` operators, fewer `NullReferenceException` crashes
+
+---
+
+### 2.9 Command Pattern - Undo/Redo for Library (3 hours)
+**Reference**: [Refactoring.Guru - Command](https://refactoring.guru/design-patterns/command)
+
+**Files to Create**:
+- `Commands/ILibraryCommand.cs` (interface)
+- `Commands/DeleteTrackCommand.cs`
+- `Commands/UpgradeTrackCommand.cs`
+- `Commands/CommandHistory.cs` (undo stack)
+
+**Implementation**:
+```csharp
+public interface ILibraryCommand
+{
+    void Execute();
+    void Undo();
+    string Description { get; }
+}
+
+public class DeleteTrackCommand : ILibraryCommand
+{
+    private readonly Track _track;
+    private readonly string _originalPath;
+    
+    public void Execute()
+    {
+        // Delete file, mark as deleted in DB
+    }
+    
+    public void Undo()
+    {
+        // Restore from recycle bin or backup
+    }
+}
+```
+
+**Impact**: Ctrl+Z support for Self-Healing Library, safer bulk operations
+
+---
+
+### 2.10 Proxy Pattern - Lazy-Loading Artwork (2 hours)
+**Reference**: [Refactoring.Guru - Proxy](https://refactoring.guru/design-patterns/proxy)
+
+**Files to Create**:
+- `Services/ArtworkProxy.cs`
+
+**Implementation**:
+```csharp
+public class ArtworkProxy
+{
+    private BitmapImage? _realImage;
+    private readonly string _artworkUrl;
+    private static readonly BitmapImage PlaceholderImage = LoadPlaceholder();
+    
+    public BitmapImage GetImage(bool isVisible)
+    {
+        if (!isVisible) return PlaceholderImage;
+        
+        if (_realImage == null)
+        {
+            _realImage = LoadFromCache(_artworkUrl) ?? DownloadImage(_artworkUrl);
+        }
+        
+        return _realImage;
+    }
+}
+```
+
+**Impact**: Smooth scrolling in 1000+ track libraries, 80% reduction in memory usage
+
+---
+
+### 2.11 Template Method - Import Provider Skeleton (2 hours)
+**Reference**: [Refactoring.Guru - Template Method](https://refactoring.guru/design-patterns/template-method)
+
+**Files to Create**:
+- `Services/ImportProviders/BaseImportProvider.cs`
+
+**Implementation**:
+```csharp
+public abstract class BaseImportProvider
+{
+    // Template method
+    public async Task<List<Track>> ImportAsync()
+    {
+        var rawTracks = await ParseSourceAsync(); // Abstract
+        var enrichedTracks = await EnrichWithSpotifyAsync(rawTracks); // Concrete
+        await PersistToDatabase(enrichedTracks); // Concrete
+        return enrichedTracks;
+    }
+    
+    protected abstract Task<List<Track>> ParseSourceAsync();
+}
+```
+
+**Impact**: All import providers automatically follow "Gravity Well" enrichment
+
+---
+
+### 2.12 State Pattern - Download Job State Machine (3 hours)
+**Reference**: [Refactoring.Guru - State](https://refactoring.guru/design-patterns/state)
+
+**Files to Create**:
+- `Services/DownloadStates/IDownloadState.cs`
+- `Services/DownloadStates/QueuedState.cs`
+- `Services/DownloadStates/DownloadingState.cs`
+- `Services/DownloadStates/VerifyingState.cs`
+- `Services/DownloadStates/EnrichingState.cs`
+
+**Implementation**:
+```csharp
+public interface IDownloadState
+{
+    Task HandleAsync(DownloadJob job);
+    IDownloadState GetNextState(DownloadJob job);
+}
+
+public class DownloadingState : IDownloadState
+{
+    public async Task HandleAsync(DownloadJob job)
+    {
+        // Download file logic
+    }
+    
+    public IDownloadState GetNextState(DownloadJob job)
+    {
+        return job.DownloadComplete 
+            ? new VerifyingState() 
+            : this;
+    }
+}
+```
+
+**Impact**: Cleaner state transitions, easier to add VBR verification step
+
+---
+
 ## Phase 4: Performance Optimization (Multi-core & Hardware Acceleration) (6-8 hours) ✨ NEW
 
 **Priority**: ⭐⭐ HIGH - Critical for Phase 5 (Self-Healing Library)

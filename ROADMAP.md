@@ -147,6 +147,42 @@
 - **Impact**: Runtime switching between "Quality First" and "BPM Match" modes
 - **Reference**: [Refactoring.Guru - Strategy](https://refactoring.guru/design-patterns/strategy)
 
+#### 7. Observer Pattern - Event-Driven Architecture
+- **Problem**: Hard dependencies between analysis engine and UI (tight coupling)
+- **Solution**: Use `EventBusService` for `TrackAnalysisProgressEvent`, `DownloadProgressEvent`
+- **Impact**: Multi-core analysis doesn't "know" about UI, multiple observers can listen
+- **Reference**: [Refactoring.Guru - Observer](https://refactoring.guru/design-patterns/observer)
+
+#### 8. Null Object Pattern - Metadata Handling
+- **Problem**: Constant null checks (`if (metadata != null)`, `if (bpm.HasValue)`)
+- **Solution**: `NullSpotifyMetadata` with default values (BPM=0, Key="Unknown", Confidence=0)
+- **Impact**: Cleaner scoring logic, no null-conditional operators, fewer crashes
+- **Reference**: [Refactoring.Guru - Null Object](https://refactoring.guru/introduce-null-object)
+
+#### 9. Command Pattern - Undo/Redo for Library Actions
+- **Problem**: No way to undo library upgrades or deletions
+- **Solution**: Encapsulate actions as objects with `Execute()` and `Undo()` methods
+- **Impact**: Ctrl+Z support for Self-Healing Library, safer bulk operations
+- **Reference**: [Refactoring.Guru - Command](https://refactoring.guru/design-patterns/command)
+
+#### 10. Proxy Pattern - Lazy-Loading Artwork
+- **Problem**: Loading 1000+ album arts simultaneously crashes UI
+- **Solution**: Virtual Proxy returns placeholder, loads high-res only when visible
+- **Impact**: Smooth scrolling in large libraries, reduced memory usage
+- **Reference**: [Refactoring.Guru - Proxy](https://refactoring.guru/design-patterns/proxy)
+
+#### 11. Template Method - Import Provider Skeleton
+- **Problem**: Each import provider (CSV, Spotify, Tracklist) duplicates enrichment logic
+- **Solution**: Base `ImportProvider` with template method defining skeleton
+- **Impact**: Ensures all providers follow "Gravity Well" enrichment automatically
+- **Reference**: [Refactoring.Guru - Template Method](https://refactoring.guru/design-patterns/template-method)
+
+#### 12. State Pattern - Download Job State Machine
+- **Problem**: Massive `switch(status)` blocks in `DownloadManager`
+- **Solution**: `DownloadingState`, `QueuedState`, `EnrichingState` classes
+- **Impact**: Cleaner state transitions, easier to add VBR verification step
+- **Reference**: [Refactoring.Guru - State](https://refactoring.guru/design-patterns/state)
+
 ### Medium Priority
 
 #### 4. Advanced Filters
