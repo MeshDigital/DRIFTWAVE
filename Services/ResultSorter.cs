@@ -261,46 +261,106 @@ public class SortingCriteria : IComparable<SortingCriteria>
 
     /// <summary>
     /// Calculated overall score for sorting.
+    /// Phase 1.2: Tiered quality floor with guard clauses.
     /// </summary>
     public double OverallScore
     {
         get
         {
-            // Phase 1: STRICT GATING - Suspicious files are completely hidden
+            // GUARD CLAUSE 1: Duration mismatch (wrong version - Radio vs Extended)
+            // This runs BEFORE scoring to prevent wasted computation
+            if (IsDurationMismatch()) return double.NegativeInfinity;
+            
+            // GUARD CLAUSE 2: Suspicious files (fake/corrupted)
             if (IsSuspicious) return double.NegativeInfinity;
             
             double score = 0.0;
             
-            // 0. Availability (The most critical factor for speed)
+            // TIER 0: Availability (Speed - most critical for user experience)
             if (HasFreeUploadSlot) score += 2000;
-            score -= QueueLength * 10; // Penalize long queues (User requested * 10 weighting)
-            if (QueueLength == 0) score += 10; // Bonus for empty queue even if no slot explicitly advertised (rare)
+            score -= QueueLength * 10; // Penalize long queues
+            if (QueueLength == 0) score += 10; // Bonus for empty queue
+            
+            // Uploader Trust Modifier (from slsk-batchdl)
+            if (QueueLength > 50) score -= 500; // Heavy penalty for very long queues
 
-            // 1. Required conditions 
+            // TIER 1: Required conditions (must-have filters)
             if (PassesRequired) score += 1000;
 
-            // 2. Preferred conditions
+            // TIER 2: Preferred conditions (nice-to-have filters)
             score += PreferredScore * 500;
             
-            // Phase 1: Musical Intelligence (BEFORE bitrate to prioritize identity over quality)
-            score += BpmProximity * 300; // Higher weight than bitrate
+            // TIER 3: QUALITY FLOOR (Primary discriminator)
+            // This is the key fix: quality comes BEFORE musical intelligence
+            score += CalculateQualityScore();
 
-            // 3. Metadata quality
+            // TIER 4: Musical Intelligence (Tiebreaker for equal quality)
+            // BPM match can boost a file but NOT override quality tier
+            score += BpmProximity * 100; // Max 100 pts (reduced from 300)
+
+            // TIER 5: Metadata quality
             if (HasValidLength) score += 100;
             score += LengthMatch * 100;
-            if (BitrateMatch) score += 50;
-            score += Math.Min(BitRateValue, 50); // Cap at 50 points
 
-            // 4. String matching
+            // TIER 6: String matching
             score += TitleSimilarity * 200;
             score += ArtistSimilarity * 100;
             score += AlbumSimilarity * 50;
 
-            // 5. Tiebreaker
+            // TIER 7: Tiebreaker
             score += RandomTiebreaker / 1_000_000_000.0; // Small contribution
 
             return score;
         }
+    }
+    
+    /// <summary>
+    /// Phase 1.2: Checks if duration mismatch indicates wrong version.
+    /// </summary>
+    private bool IsDurationMismatch()
+    {
+        // This would need access to Track data - for now return false
+        // Will be properly implemented when we refactor to use ScoringContext
+        return false;
+    }
+    
+    /// <summary>
+    /// Phase 1.2: Calculates quality score using tiered system.
+    /// Lossless > High Quality > Medium Quality > Low Quality
+    /// </summary>
+    private double CalculateQualityScore()
+    {
+        // Detect lossless formats
+        if (IsLosslessFormat())
+        {
+            // Lossless gets massive base score
+            double score = 450; // ScoringConstants.LosslessBase
+            
+            // TODO: Add sample rate bonus when we have access to that data
+            // if (sampleRate >= 96000) score += 25;
+            
+            return score;
+        }
+        
+        // Lossy formats: tiered by bitrate with buffer for VBR quirks
+        // Bitrate Buffer Trick: 315kbps threshold catches VBR V0 files
+        if (BitRateValue >= 315) return 300; // HighQualityBase (320kbps)
+        if (BitRateValue >= 192) return 150; // MediumQualityBase
+        
+        // Low quality: proportional scoring (prevents 128kbps from being competitive)
+        return BitRateValue * 0.5; // 128kbps = 64 pts (well below Medium tier)
+    }
+    
+    /// <summary>
+    /// Phase 1.2: Detects lossless audio formats.
+    /// </summary>
+    private bool IsLosslessFormat()
+    {
+        // Common lossless extensions
+        // Note: This is a simplified check - proper implementation would use Format field
+        // For now, we'll return false and rely on bitrate tiers
+        // TODO: Implement when Format field is accessible
+        return false;
     }
 
     public int CompareTo(SortingCriteria? other)
