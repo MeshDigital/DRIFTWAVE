@@ -259,6 +259,14 @@ public class DatabaseService
                     // CoverArtUrl was already there but check just in case
                     if (!tracksColumns.Contains("CoverArtUrl")) newCols.Add(("CoverArtUrl", "TEXT NULL"));
                     
+                    // Phase 0.1: Musical Intelligence & ORBIT
+                    if (!tracksColumns.Contains("MusicalKey")) newCols.Add(("MusicalKey", "TEXT NULL"));
+                    if (!tracksColumns.Contains("BPM")) newCols.Add(("BPM", "REAL NULL"));
+                    if (!tracksColumns.Contains("CuePointsJson")) newCols.Add(("CuePointsJson", "TEXT NULL"));
+                    if (!tracksColumns.Contains("AudioFingerprint")) newCols.Add(("AudioFingerprint", "TEXT NULL"));
+                    if (!tracksColumns.Contains("BitrateScore")) newCols.Add(("BitrateScore", "INTEGER NULL"));
+                    if (!tracksColumns.Contains("AnalysisOffset")) newCols.Add(("AnalysisOffset", "REAL NULL"));
+                    
                     foreach (var (col, def) in newCols)
                     {
                          _logger.LogWarning("Schema Patch: Adding missing column '{Col}' to Tracks", col);
