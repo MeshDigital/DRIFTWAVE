@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SLSKDONET.Configuration;
 using SLSKDONET.Models;
+using SLSKDONET.Services.Ranking;
 using SLSKDONET.Utils;
 using Soulseek;
 
@@ -14,6 +15,21 @@ namespace SLSKDONET.Services;
 /// </summary>
 public static class ResultSorter
 {
+    // Phase 2.4: Strategy Pattern for user-configurable ranking
+    private static ISortingStrategy _currentStrategy = new BalancedStrategy();
+    
+    /// <summary>
+    /// Sets the current sorting strategy.
+    /// </summary>
+    public static void SetStrategy(ISortingStrategy strategy)
+    {
+        _currentStrategy = strategy ?? new BalancedStrategy();
+    }
+    
+    /// <summary>
+    /// Gets the current sorting strategy.
+    /// </summary>
+    public static ISortingStrategy GetCurrentStrategy() => _currentStrategy;
     /// <summary>
     /// Orders search results by multiple criteria for optimal download selection.
     /// Prioritizes:
@@ -313,6 +329,7 @@ public class SortingCriteria : IComparable<SortingCriteria>
     /// <summary>
     /// Calculated overall score for sorting.
     /// Phase 2.2: Composing Methods pattern - reads like high-level summary.
+    /// Phase 2.4: Strategy Pattern - uses configurable ranking strategy.
     /// </summary>
     public double OverallScore
     {
@@ -323,14 +340,16 @@ public class SortingCriteria : IComparable<SortingCriteria>
             if (IsDurationMismatch()) return double.NegativeInfinity;
             if (IsSuspicious) return double.NegativeInfinity;
             
-            // Composing Methods: Each tier is independently testable
-            return CalculateAvailabilityScore()
-                 + CalculateConditionsScore()
-                 + CalculateQualityScore()
-                 + CalculateMusicalIntelligenceScore()
-                 + CalculateMetadataScore()
-                 + CalculateStringMatchingScore()
-                 + CalculateTiebreakerScore();
+            // Phase 2.4: Use strategy pattern for configurable ranking
+            return ResultSorter.GetCurrentStrategy().CalculateScore(
+                CalculateAvailabilityScore(),
+                CalculateConditionsScore(),
+                CalculateQualityScore(),
+                CalculateMusicalIntelligenceScore(),
+                CalculateMetadataScore(),
+                CalculateStringMatchingScore(),
+                CalculateTiebreakerScore()
+            );
         }
     }
     
