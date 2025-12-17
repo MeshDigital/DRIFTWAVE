@@ -330,7 +330,15 @@ public class DatabaseService
                         existingTrack.Popularity = track.Popularity;
                         existingTrack.CanonicalDuration = track.CanonicalDuration;
                         existingTrack.ReleaseDate = track.ReleaseDate;
-                        
+                    
+                        // Phase 0.1: Musical Intelligence
+                        existingTrack.MusicalKey = track.MusicalKey;
+                        existingTrack.BPM = track.BPM;
+                        existingTrack.AnalysisOffset = track.AnalysisOffset;
+                        existingTrack.BitrateScore = track.BitrateScore;
+                        existingTrack.AudioFingerprint = track.AudioFingerprint;
+                        existingTrack.CuePointsJson = track.CuePointsJson;
+                    
                         // Don't update AddedAt - preserve original
                         // context.Tracks.Update() is not needed - EF Core tracks changes automatically
                     }
@@ -777,7 +785,15 @@ public class DatabaseService
                         Genres = track.Genres,
                         Popularity = track.Popularity,
                         CanonicalDuration = track.CanonicalDuration,
-                        ReleaseDate = track.ReleaseDate
+                        ReleaseDate = track.ReleaseDate,
+                        
+                        // Phase 0.1: Musical Intelligence
+                        MusicalKey = track.MusicalKey,
+                        BPM = track.BPM,
+                        CuePointsJson = track.CuePointsJson,
+                        AudioFingerprint = track.AudioFingerprint,
+                        BitrateScore = track.BitrateScore,
+                        AnalysisOffset = track.AnalysisOffset
                     };
 
                     if (existingTrackIdSet.Contains(track.Id))
@@ -947,7 +963,15 @@ public class DatabaseService
                     Genres = trackEntity.Genres,
                     Popularity = trackEntity.Popularity,
                     CanonicalDuration = trackEntity.CanonicalDuration,
-                    ReleaseDate = trackEntity.ReleaseDate
+                    ReleaseDate = trackEntity.ReleaseDate,
+                    
+                    // Phase 0.1: Musical Intelligence
+                    MusicalKey = trackEntity.MusicalKey,
+                    BPM = trackEntity.BPM,
+                    CuePointsJson = trackEntity.CuePointsJson,
+                    AudioFingerprint = trackEntity.AudioFingerprint,
+                    BitrateScore = trackEntity.BitrateScore,
+                    AnalysisOffset = trackEntity.AnalysisOffset
                 };
                 
                 result.Add((track, queueItem.IsCurrentTrack));

@@ -35,6 +35,14 @@ public class TrackEntity
     public int? Popularity { get; set; }
     public int? CanonicalDuration { get; set; }
     public DateTime? ReleaseDate { get; set; }
+
+    // Phase 0.1: Musical Intelligence & Antigravity
+    public string? MusicalKey { get; set; } // e.g. "8A"
+    public double? BPM { get; set; } // e.g. 128.0
+    public string? CuePointsJson { get; set; } // Rekordbox/DJ cue points blob
+    public string? AudioFingerprint { get; set; } // Chromaprint/SoundFingerprinting hash
+    public int? BitrateScore { get; set; } // Quality score for replacement
+    public double? AnalysisOffset { get; set; } // Silence offset for time alignment
 }
 
 /// <summary>

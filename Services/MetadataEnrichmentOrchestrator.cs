@@ -79,17 +79,29 @@ public class MetadataEnrichmentOrchestrator : IDisposable
             await EnrichTrackAsync(track);
 
             // 2. Write ID3 Tags
-            // Create a lightweight Track object for tagging
+            // Create a rich Track object for tagging
             var trackInfo = new Track 
             { 
                 Artist = track.Artist, 
                 Title = track.Title, 
-                Album = track.Album 
+                Album = track.Album,
+                Metadata = new Dictionary<string, object>()
             };
+
+            // Populate Metadata for the Tagger
+            if (track.TrackNumber > 0) trackInfo.Metadata["TrackNumber"] = track.TrackNumber;
+            if (track.ReleaseDate.HasValue) trackInfo.Metadata["ReleaseDate"] = track.ReleaseDate.Value;
+            if (!string.IsNullOrEmpty(track.Genres)) trackInfo.Metadata["Genre"] = track.Genres; // Json parsing logic might be needed in model, but for now passing raw
+            if (!string.IsNullOrEmpty(track.AlbumArtUrl)) trackInfo.Metadata["AlbumArtUrl"] = track.AlbumArtUrl;
             
-            // If we have Spotify metadata, use it? The current TaggerService likely uses basic info.
-            // TODO: Enhance TaggerService to use enriched metadata (Cover Art etc)
+            // Phase 0.5: Enriched Metadata
+            if (!string.IsNullOrEmpty(track.SpotifyTrackId)) trackInfo.Metadata["SpotifyTrackId"] = track.SpotifyTrackId;
+            if (!string.IsNullOrEmpty(track.SpotifyAlbumId)) trackInfo.Metadata["SpotifyAlbumId"] = track.SpotifyAlbumId;
+            if (!string.IsNullOrEmpty(track.SpotifyArtistId)) trackInfo.Metadata["SpotifyArtistId"] = track.SpotifyArtistId;
             
+            if (!string.IsNullOrEmpty(track.MusicalKey)) trackInfo.Metadata["MusicalKey"] = track.MusicalKey;
+            if (track.BPM.HasValue) trackInfo.Metadata["BPM"] = track.BPM.Value;
+
             await _taggerService.TagFileAsync(trackInfo, track.ResolvedFilePath);
             _logger.LogInformation("Tagged file: {File}", track.ResolvedFilePath);
         }
@@ -160,7 +172,15 @@ public class MetadataEnrichmentOrchestrator : IDisposable
                    State = track.Status == TrackStatus.Downloaded ? "Completed" : "Missing", // Approximate
                    Filename = track.ResolvedFilePath ?? "",
                    CoverArtUrl = track.AlbumArtUrl,
-                   SpotifyTrackId = track.SpotifyTrackId
+                   SpotifyTrackId = track.SpotifyTrackId,
+                   
+                   // Phase 0.5: Persistence
+                   MusicalKey = track.MusicalKey,
+                   BPM = track.BPM,
+                   AnalysisOffset = track.AnalysisOffset,
+                   BitrateScore = track.BitrateScore,
+                   AudioFingerprint = track.AudioFingerprint,
+                   CuePointsJson = track.CuePointsJson
                    // Other fields as necessary
                 });
             }

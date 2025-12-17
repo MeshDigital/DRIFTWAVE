@@ -106,12 +106,48 @@ public class MetadataTaggerService : ITaggerService
                     }
                 }
 
-                // Download and embed album art if URL is available
-                if (track.Metadata != null && track.Metadata.TryGetValue("AlbumArtUrl", out var artUrlObj))
+                // Write standard DJ tags
+                if (track.Metadata != null)
                 {
-                    if (artUrlObj is string artUrl && !string.IsNullOrWhiteSpace(artUrl))
+                    // 1. Initial Key (TKEY)
+                    // DJs often use Camelot keys (8A, 1B). TagLib maps InitialKey to TKEY.
+                    if (track.Metadata.TryGetValue("MusicalKey", out var keyObj) && keyObj is string keyStr && !string.IsNullOrWhiteSpace(keyStr))
                     {
-                        await TryAddAlbumArtAsync(file, artUrl);
+                         file.Tag.InitialKey = keyStr;
+                    }
+
+                    // 2. BPM (TBPM)
+                    // Standard is integer, but precision is good. TagLib handles uint.
+                    if (track.Metadata.TryGetValue("BPM", out var bpmObj))
+                    {
+                        if (bpmObj is double bpmDouble)
+                             file.Tag.BeatsPerMinute = (uint)Math.Round(bpmDouble);
+                        else if (bpmObj is int bpmInt)
+                             file.Tag.BeatsPerMinute = (uint)bpmInt;
+                    }
+
+                    // 3. Custom Tags via TXXX (Spotify Anchors)
+                    // This allows "Self-Healing" later.
+                    var customTags = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2);
+                    if (customTags != null)
+                    {
+                         if (track.Metadata.TryGetValue("SpotifyTrackId", out var tid) && tid is string tidStr)
+                         {
+                             var frame = TagLib.Id3v2.UserTextInformationFrame.Get(customTags, "SPOTIFY_TRACK_ID", true);
+                             frame.Text = new[] { tidStr };
+                         }
+                         
+                         if (track.Metadata.TryGetValue("SpotifyAlbumId", out var aid) && aid is string aidStr)
+                         {
+                             var frame = TagLib.Id3v2.UserTextInformationFrame.Get(customTags, "SPOTIFY_ALBUM_ID", true);
+                             frame.Text = new[] { aidStr };
+                         }
+                         
+                         if (track.Metadata.TryGetValue("SpotifyArtistId", out var arid) && arid is string aridStr)
+                         {
+                             var frame = TagLib.Id3v2.UserTextInformationFrame.Get(customTags, "SPOTIFY_ARTIST_ID", true);
+                             frame.Text = new[] { aridStr };
+                         }
                     }
                 }
 
