@@ -188,6 +188,10 @@ public partial class App : Application
         
         // Session 1: Performance Optimization - Smart caching layer
         services.AddSingleton<LibraryCacheService>();
+        
+        // Session 2: Performance Optimization - Extracted services
+        services.AddSingleton<LibraryOrganizationService>();
+        services.AddSingleton<ArtworkPipeline>();
 
         // Services
         services.AddSingleton<SoulseekAdapter>();
