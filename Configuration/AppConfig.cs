@@ -69,6 +69,10 @@ public class AppConfig
     public int UpgradeMinGainKbps { get; set; } = 128; // Only upgrade if gain is significant
     public bool UpgradeAutoQueueEnabled { get; set; } = false; // Auto-queue vs just notify
 
+    // Phase 8: Dependency Management
+    public bool IsFfmpegAvailable { get; set; } = false; // Updated on startup and manual checks
+    public string FfmpegVersion { get; set; } = ""; // Detected version (e.g., "6.0.1")
+
     public override string ToString()
     {
         return $"AppConfig(User={Username}, Port={ListenPort}, Downloads={DownloadDirectory})";

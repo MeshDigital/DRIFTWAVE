@@ -29,6 +29,7 @@
         │  AudioPlayerService (LibVLC)    │
         │  ImportOrchestrator             │
         │  MetadataService                │
+        │  SonicIntegrityService ✨       │
         └────────────┬────────────────────┘
                      │
         ┌────────────▼────────────────┐
@@ -43,7 +44,79 @@
         └─────────────────────────────┘
 ```
 
+✨ **Phase 8 (Dec 2025)**: Added `SonicIntegrityService` for spectral analysis and quality validation.
+
 The application uses `Microsoft.Extensions.DependencyInjection` for service wiring in `App.axaml.cs` (Avalonia). All services are singletons unless otherwise specified.
+
+## Phase 8: Sonic Integrity Architecture
+
+### Producer-Consumer Pattern for Batch Analysis
+
+```
+User Downloads Track
+        │
+        ▼
+MetadataEnrichmentOrchestrator
+        │
+        ▼
+┌───────────────────────────────┐
+│ SonicIntegrityService         │
+│  - Channel<string> queue      │
+│  - 2 concurrent workers       │
+│  - FFmpeg validation          │
+└──────────────┬────────────────┘
+               │
+               ▼
+        FFmpeg Process
+        (spectral analysis)
+               │
+               ▼
+┌───────────────────────────────┐
+│ SonicAnalysisResult           │
+│  - IsTrustworthy (bool)       │
+│  - SpectralHash (string)      │
+│  - FrequencyCutoff (int)      │
+│  - QualityConfidence (0-1)    │
+└──────────────┬────────────────┘
+               │
+               ▼
+     DatabaseService.UpdateTrack()
+        (Persists to TrackEntity)
+```
+
+**Key Features**:
+- **Non-Blocking**: Channel<T> queue prevents UI freezes during batch analysis
+- **Concurrency Limit**: Max 2 workers prevent CPU thrashing
+- **Graceful Degradation**: If FFmpeg missing, service returns safe defaults
+- **Atomic Updates**: Results persisted only after successful analysis
+
+### Maintenance Task Architecture
+
+```
+App Startup
+     │
+     ▼
+RunMaintenanceTasksAsync()
+     │
+     ├─ Wait 5 minutes (initial delay)
+     │
+     └─ Loop (every 24 hours)
+            │
+            ▼
+     PerformMaintenanceAsync()
+            │
+            ├─ Clean .backup files >7 days
+            │  (from File.Replace operations)
+            │
+            └─ VacuumDatabaseAsync()
+               (Reclaim space, optimize indexes)
+```
+
+**Design Decisions**:
+- **5-Minute Delay**: Prevents interference with startup performance
+- **24-Hour Interval**: Balances freshness vs. overhead
+- **Non-Blocking**: Fire-and-forget with full error handling
+- **Graceful Failures**: Never crashes app, only logs warnings
 
 ## ViewModel Composition Pattern
 

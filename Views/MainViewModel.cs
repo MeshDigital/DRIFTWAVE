@@ -10,8 +10,8 @@ using SLSKDONET.ViewModels;
 using Avalonia.Threading;
 using System.Collections.Generic; // Added this using directive
 using SLSKDONET.Models;
+using SpotifyAPI.Web; // For SimplePlaylist
 
-using SLSKDONET.Events;
 namespace SLSKDONET.Views;
 
 /// <summary>

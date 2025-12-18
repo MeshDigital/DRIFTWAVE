@@ -161,7 +161,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         Tracks.Hierarchical.Source.Selection.SelectionChanged += OnTrackSelectionChanged;
     }
 
-    private void OnTrackSelectionChanged(object? sender, Avalonia.Controls.Selection.TreeDataGridSelectionEventArgs<object> e)
+    private void OnTrackSelectionChanged(object? sender, EventArgs e)
     {
         var selectedItem = Tracks.Hierarchical.Source.Selection.SelectedItem;
         if (selectedItem is PlaylistTrackViewModel trackVm)
@@ -263,18 +263,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// Adds selected tracks to a playlist.
-    /// Used by drag-drop operations in LibraryPage.
-    /// </summary>
-    public void AddToPlaylist(PlaylistJob sourcePlaylist, PlaylistTrackViewModel track)
-    {
-        _logger.LogInformation("AddToPlaylist called: moving track {Title} from playlist {Source}", 
-            track?.Title, sourcePlaylist?.SourceTitle);
-        // TODO: Implement playlist track addition logic
-        // This would need to be coordinated with child ViewModels
-    }
-    
+
     // Session 1: Critical command implementations
     
     /// <summary>

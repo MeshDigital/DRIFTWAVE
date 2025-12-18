@@ -310,6 +310,37 @@ public class SettingsViewModel : INotifyPropertyChanged
     public ICommand ConnectSpotifyCommand { get; }
     public ICommand DisconnectSpotifyCommand { get; }
     public ICommand ClearSpotifyCacheCommand { get; }
+    public ICommand CheckFfmpegCommand { get; } // Phase 8: Dependency validation
+
+    // Phase 8: FFmpeg Dependency State
+    private bool _isFfmpegInstalled;
+    public bool IsFfmpegInstalled
+    {
+        get => _isFfmpegInstalled;
+        set
+        {
+            if (SetProperty(ref _isFfmpegInstalled, value))
+            {
+                OnPropertyChanged(nameof(FfmpegBorderColor));
+            }
+        }
+    }
+
+    private string _ffmpegStatus = "Checking...";
+    public string FfmpegStatus
+    {
+        get => _ffmpegStatus;
+        set => SetProperty(ref _ffmpegStatus, value);
+    }
+
+    private string _ffmpegVersion = "";
+    public string FfmpegVersion
+    {
+        get => _ffmpegVersion;
+        set => SetProperty(ref _ffmpegVersion, value);
+    }
+
+    public string FfmpegBorderColor => IsFfmpegInstalled ? "#1DB954" : "#FFA500";
 
     public SettingsViewModel(
         ILogger<SettingsViewModel> logger,
@@ -340,10 +371,150 @@ public class SettingsViewModel : INotifyPropertyChanged
         ConnectSpotifyCommand = new AsyncRelayCommand(ConnectSpotifyAsync, () => !IsAuthenticating);
         DisconnectSpotifyCommand = new AsyncRelayCommand(DisconnectSpotifyAsync);
         ClearSpotifyCacheCommand = new AsyncRelayCommand(ClearSpotifyCacheAsync);
+        CheckFfmpegCommand = new AsyncRelayCommand(CheckFfmpegAsync); // Phase 8
 
         // check initial connection status
         _ = CheckSpotifyConnectionStatusAsync();
+        _ = CheckFfmpegAsync(); // Phase 8: Check FFmpeg on startup
         UpdateLivePreview();
+    }
+
+    /// <summary>
+    /// Phase 8: Enhanced FFmpeg dependency checker with timeout, stderr capture, and fallback paths.
+    /// </summary>
+    private async Task CheckFfmpegAsync()
+    {
+        try
+        {
+            FfmpegStatus = "Checking...";
+            
+            // Try standard PATH lookup first
+            var (success, version) = await TryFfmpegCommandAsync("ffmpeg");
+            
+            if (!success)
+            {
+                // Fallback: Check common install directories (Windows-specific)
+                if (OperatingSystem.IsWindows())
+                {
+                    var commonPaths = new[]
+                    {
+                        @"C:\ffmpeg\bin\ffmpeg.exe",
+                        @"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ffmpeg", "bin", "ffmpeg.exe")
+                    };
+                    
+                    foreach (var path in commonPaths)
+                    {
+                        if (File.Exists(path))
+                        {
+                            (success, version) = await TryFfmpegCommandAsync(path);
+                            if (success)
+                            {
+                                _logger.LogInformation("FFmpeg found via fallback path: {Path}", path);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (success)
+            {
+                IsFfmpegInstalled = true;
+                FfmpegVersion = version;
+                FfmpegStatus = $"✅ Installed (v{version})";
+                
+                // Update global config
+                _config.IsFfmpegAvailable = true;
+                _config.FfmpegVersion = version;
+                _configManager.Save(_config);
+                
+                _logger.LogInformation("FFmpeg validation successful: v{Version}", version);
+            }
+            else
+            {
+                IsFfmpegInstalled = false;
+                FfmpegStatus = "❌ Not Found in PATH";
+                
+                // Update global config
+                _config.IsFfmpegAvailable = false;
+                _config.FfmpegVersion = "";
+                _configManager.Save(_config);
+                
+                _logger.LogWarning("FFmpeg not found. Sonic Integrity features will be disabled.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FFmpeg validation failed unexpectedly");
+            IsFfmpegInstalled = false;
+            FfmpegStatus = "❌ Check Failed";
+        }
+        
+        OnPropertyChanged(nameof(IsFfmpegInstalled));
+        OnPropertyChanged(nameof(FfmpegStatus));
+        OnPropertyChanged(nameof(FfmpegVersion));
+    }
+
+    /// <summary>
+    /// Attempts to run ffmpeg -version with timeout and captures stderr (where FFmpeg prints version info).
+    /// </summary>
+    private async Task<(bool success, string version)> TryFfmpegCommandAsync(string ffmpegPath)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)); // 5-second timeout
+        
+        try
+        {
+            var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = ffmpegPath,
+                    Arguments = "-version",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true, // FFmpeg writes to stderr!
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                }
+            };
+            
+            var outputBuilder = new System.Text.StringBuilder();
+            process.OutputDataReceived += (s, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
+            process.ErrorDataReceived += (s, e) => { if (e.Data != null) outputBuilder.AppendLine(e.Data); };
+            
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            
+            await process.WaitForExitAsync(cts.Token);
+            
+            if (process.ExitCode == 0)
+            {
+                var output = outputBuilder.ToString();
+                
+                // Parse version: "ffmpeg version 6.0.1-full_build-www.gyan.dev" or "ffmpeg version N-109688-g5...github.com/BtbN/FFmpeg-Builds"
+                var match = System.Text.RegularExpressions.Regex.Match(output, @"ffmpeg version (\d+(\.\d+)+)");
+                var version = match.Success ? match.Groups[1].Value : "unknown";
+                
+                return (true, version);
+            }
+            
+            return (false, "");
+        }
+        catch (System.ComponentModel.Win32Exception) // File not found
+        {
+            return (false, "");
+        }
+        catch (OperationCanceledException) // Timeout
+        {
+            _logger.LogWarning("FFmpeg command timed out after 5 seconds at path: {Path}", ffmpegPath);
+            return (false, "");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to execute FFmpeg at path: {Path}", ffmpegPath);
+            return (false, "");
+        }
     }
 
     private async Task CheckSpotifyConnectionStatusAsync()

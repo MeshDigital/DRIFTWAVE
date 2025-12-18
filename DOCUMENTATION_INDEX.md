@@ -14,12 +14,13 @@
 #### Phase 1-3 (Foundation & Enhancement)
 - **[README.md](README.md)** - Project overview and setup
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Developer workflow and contribution guide
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture with ASCII diagrams
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture with ASCII diagrams ✨ Updated: Phase 8
 - **[LEARNING_FROM_SLSK_BATCHDL.md](LEARNING_FROM_SLSK_BATCHDL.md)** - What we learned from slsk-batchdl
 - **[SLSKDONET_LEARNINGS.md](SLSKDONET_LEARNINGS.md)** - Implementation patterns and decisions
 - **[BUILD_REFERENCE.md](BUILD_REFERENCE.md)** - Quick build and project reference
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Complete feature matrix
 - **[DOCS/FILE_PATH_RESOLUTION.md](DOCS/FILE_PATH_RESOLUTION.md)** - File path resolution with fuzzy matching ✨
+- **[DOCS/PHASE8_TECHNICAL.md](DOCS/PHASE8_TECHNICAL.md)** - Phase 8 sonic integrity & automation (Dec 2025) ✨ NEW
 
 #### Phase 4 (Modern UI) ✨
 - **[PHASE4_QUICK_REFERENCE.md](PHASE4_QUICK_REFERENCE.md)** - 5-minute overview

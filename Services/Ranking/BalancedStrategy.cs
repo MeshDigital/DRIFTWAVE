@@ -1,3 +1,6 @@
+using SLSKDONET.Configuration;
+using SLSKDONET.Models;
+
 namespace SLSKDONET.Services.Ranking
 {
     /// <summary>

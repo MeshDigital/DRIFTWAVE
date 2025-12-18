@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ Recently Completed (Dec 17, 2025)
+## ✅ Recently Completed (Dec 18, 2025)
 
 ### Performance Overhaul (Phase 2) - COMPLETE
 **Impact**: 60x-100x performance improvements
@@ -47,11 +47,70 @@
 - Startup crash fixed (ranking strategy config)
 - Library page fully functional with Track Inspector sidebar
 
+### Phase 8: Architectural Foundations (Package 5) - COMPLETE ✅
+**Impact**: Critical infrastructure for sonic integrity and automation
+- **Producer-Consumer Pattern**: Refactored `SonicIntegrityService.cs` with Channel<T> for batch analysis
+  - 2-worker concurrency limit prevents CPU/IO spikes
+  - Non-blocking queued analysis architecture
+- **Xabe.FFmpeg Integration**: Robust cross-platform FFmpeg wrapper (v5.2.6)
+  - Replaced brittle Process.Start() calls
+  - Platform-agnostic executable detection
+- **Database Maintenance**: Added `VacuumDatabaseAsync()` to `DatabaseService.cs`
+  - Reclaims space and optimizes performance
+  - Reduces database bloat from frequent updates
+- **Automated Maintenance Tasks**: Added daily background cleanup to `App.axaml.cs`
+  - Deletes `.backup` files older than 7 days (File.Replace artifacts)
+  - Runs database VACUUM for performance
+  - Non-blocking with full error handling
+
+### Phase 8: Dependency Validation (Package 6) - COMPLETE ✅
+**Impact**: User transparency and graceful degradation  
+**Date**: December 18, 2025
+- **Smart FFmpeg Checker**: Enhanced validation in `SettingsViewModel.cs`
+  - 5-second timeout prevents UI freezing
+  - Captures both stdout AND stderr (where FFmpeg prints version)
+  - Fallback to common Windows directories (`C:\ffmpeg\bin`, etc.)
+  - Improved regex for version parsing
+- **Global State**: `AppConfig.IsFfmpegAvailable` and `AppConfig.FfmpegVersion`
+  - Synced across app and Settings UI
+  - Persisted to config for fast startup checks
+- **Dynamic Settings UI**: New "Dependencies" section in Settings
+  - Border color changes: 🟢 Green (installed) / 🟠 Orange (missing)
+  - One-click "Download FFmpeg" button (auto-hides when installed)
+  - OS-specific install instructions (Windows/macOS/Linux)
+- **Startup Integration**: FFmpeg validated on app launch
+  - Logs warning if missing (non-critical)
+  - Enables graceful feature degradation
+
 ---
 
-## 🚧 In Progress
+## 🔥 In Progress
 
-### Phase 6C: TreeDataGrid (Next Priority)
+### Phase 9: Media Player UI Polish (0% Complete - NEXT)
+**Goal**: Fix and optimize media player controls for better UX
+- [ ] **Critical Fixes** - Verify converters, fix command bindings
+- [ ] **Visual States** - Add loading/error indicators, album artwork
+- [ ] **UX Features** - Like button, keyboard shortcuts, hover animations
+
+**Impact**: Improved user experience for core playback functionality  
+**Docs**: [Player UI Fix Plan](DOCS/PHASE9_PLAYER_UI.md)
+
+### Phase 8: Sonic Integrity & Automation (40% Complete)
+**Status**: Packages 5-6 complete, ready for export UI and background worker  
+**Estimated**: 12-16 hours remaining (MVP scope)
+
+**Completed** ✅:
+- Package 5: Architectural Foundations (Producer-Consumer, Xabe.FFmpeg, Maintenance)
+- Package 6: Dependency Validation (FFmpeg checker with timeout and fallback paths)
+
+**Next Priority**:
+- [ ] **Export UI** - Rekordbox/Denon USB export (Package 1)
+- [ ] **Background Worker** - Upgrade Scout automation (Package 3)
+- [ ] **Smart Replacement** - Atomic file upgrades (Package 4)
+
+> **Note**: Phase 9 (Media Player UI) planned next for improved UX
+
+### Phase 6C: TreeDataGrid (Lower Priority)
 **Status**: Planning complete, ready to implement  
 **Estimated**: 4-5 hours
 

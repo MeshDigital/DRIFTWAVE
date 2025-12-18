@@ -85,6 +85,28 @@ public partial class App : Application
                 
                 Serilog.Log.Information("Loaded ranking strategy: {Strategy} with custom weights", config.RankingPreset ?? "Balanced");
 
+                // Phase 8: Validate FFmpeg availability
+                try
+                {
+                    var sonicService = Services.GetRequiredService<SonicIntegrityService>();
+                    var ffmpegAvailable = await sonicService.ValidateFfmpegAsync();
+                    
+                    if (!ffmpegAvailable)
+                    {
+                        Serilog.Log.Warning(
+                            "FFmpeg not found in PATH. Sonic Integrity features will be disabled. " +
+                            "Install FFmpeg from Settings → Dependencies.");
+                    }
+                    else
+                    {
+                        Serilog.Log.Information("FFmpeg validation successful - Phase 8 features enabled");
+                    }
+                }
+                catch (Exception ffmpegEx)
+                {
+                    Serilog.Log.Warning(ffmpegEx, "FFmpeg validation failed (non-critical)");
+                }
+
                 // Create main window and show it immediately
                 var mainVm = Services.GetRequiredService<MainViewModel>();
                 mainVm.StatusText = "Initializing application...";
@@ -129,6 +151,9 @@ public partial class App : Application
                         });
                     }
                 });
+                
+                // Phase 8: Start maintenance tasks (backup cleanup, database vacuum)
+                _ = RunMaintenanceTasksAsync();
             }
             catch (Exception ex)
             {
@@ -319,5 +344,101 @@ public partial class App : Application
         services.AddSingleton<SearchQueryNormalizer>();
         // Views
         services.AddTransient<Views.Avalonia.ImportPreviewPage>();
+    }
+
+    /// <summary>
+    /// Phase 8: Maintenance Task - Runs daily cleanup operations.
+    /// - Deletes backup files older than 7 days
+    /// - Vacuums database for performance
+    /// </summary>
+    private async Task RunMaintenanceTasksAsync()
+    {
+        try
+        {
+            // Wait 5 minutes after app startup before running first maintenance
+            await Task.Delay(TimeSpan.FromMinutes(5));
+            
+            while (true)
+            {
+                try
+                {
+                    await PerformMaintenanceAsync();
+                }
+                catch (Exception ex)
+                {
+                    // Don't crash app on maintenance errors
+                    Serilog.Log.Warning(ex, "Maintenance task failed (non-critical)");
+                }
+                
+                // Run maintenance daily
+                await Task.Delay(TimeSpan.FromHours(24));
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // App is shutting down
+            Serilog.Log.Debug("Maintenance task canceled (app shutdown)");
+        }
+    }
+
+    private async Task PerformMaintenanceAsync()
+    {
+        var config = Services?.GetService<AppConfig>();
+        if (config == null) return;
+        
+        Serilog.Log.Information("[Maintenance] Starting daily maintenance tasks...");
+        
+        // Task 1: Clean old backup files (7-day retention)
+        if (!string.IsNullOrEmpty(config.DownloadDirectory) && Directory.Exists(config.DownloadDirectory))
+        {
+            try
+            {
+                var backupFiles = Directory.GetFiles(config.DownloadDirectory, "*.backup", SearchOption.AllDirectories)
+                    .Where(f => File.GetCreationTime(f) < DateTime.Now.AddDays(-7))
+                    .ToList();
+                
+                if (backupFiles.Any())
+                {
+                    foreach (var backupFile in backupFiles)
+                    {
+                        try
+                        {
+                            File.Delete(backupFile);
+                            Serilog.Log.Debug("[Maintenance] Deleted old backup: {File}", Path.GetFileName(backupFile));
+                        }
+                        catch (Exception ex)
+                        {
+                            Serilog.Log.Warning(ex, "[Maintenance] Failed to delete backup: {File}", backupFile);
+                        }
+                    }
+                    
+                    Serilog.Log.Information("[Maintenance] Cleaned {Count} old backup files (>7 days)", backupFiles.Count);
+                }
+                else
+                {
+                    Serilog.Log.Debug("[Maintenance] No old backups to clean");
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "[Maintenance] Backup cleanup failed");
+            }
+        }
+        
+        // Task 2: Vacuum database for performance
+        try
+        {
+            var dbService = Services?.GetService<DatabaseService>();
+            if (dbService != null)
+            {
+                await dbService.VacuumDatabaseAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[Maintenance] Database vacuum failed");
+        }
+        
+        Serilog.Log.Information("[Maintenance] Daily maintenance completed");
     }
 }

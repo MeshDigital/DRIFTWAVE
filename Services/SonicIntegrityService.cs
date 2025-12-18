@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Models;
@@ -24,25 +26,147 @@ public class SonicAnalysisResult
 
 /// <summary>
 /// Service for validating audio fidelity using spectral analysis (headless FFmpeg).
+/// Phase 8 Enhancement: Producer-Consumer pattern for batch processing to prevent CPU/IO spikes.
 /// </summary>
-public class SonicIntegrityService
+public class SonicIntegrityService : IDisposable
 {
     private readonly ILogger<SonicIntegrityService> _logger;
-    private readonly string _ffmpegPath = "ffmpeg"; // Assume in path for now, can be configured
+    private readonly string _ffmpegPath = "ffmpeg"; // Validated via dependency checker in Settings
+    
+    // Producer-Consumer pattern for batch analysis
+    private readonly Channel<AnalysisRequest> _analysisQueue;
+    private readonly int _maxConcurrency = 2; // Limit to 2 concurrent FFmpeg processes
+    private readonly CancellationTokenSource _cts = new();
+    private readonly List<Task> _workerTasks = new();
+    private bool _isInitialized = false;
 
     public SonicIntegrityService(ILogger<SonicIntegrityService> logger)
     {
         _logger = logger;
+        
+        // Create unbounded channel for analysis requests
+        _analysisQueue = Channel.CreateUnbounded<AnalysisRequest>(new UnboundedChannelOptions
+        {
+            SingleReader = false,
+            SingleWriter = false
+        });
+        
+        // Start worker tasks
+        for (int i = 0; i < _maxConcurrency; i++)
+        {
+            _workerTasks.Add(ProcessAnalysisQueueAsync(_cts.Token));
+        }
+        
+        _logger.LogInformation("SonicIntegrityService initialized with {Workers} concurrent workers", _maxConcurrency);
     }
 
     /// <summary>
+    /// Validates FFmpeg availability. Should be called during app startup.
+    /// </summary>
+    public async Task<bool> ValidateFfmpegAsync()
+    {
+        try
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = _ffmpegPath,
+                    Arguments = "-version",
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                }
+            };
+            
+            process.Start();
+            await process.WaitForExitAsync();
+            
+            _isInitialized = process.ExitCode == 0;
+            
+            if (_isInitialized)
+            {
+                _logger.LogInformation("FFmpeg validation successful");
+            }
+            else
+            {
+                _logger.LogWarning("FFmpeg validation failed (exit code: {Code})", process.ExitCode);
+            }
+            
+            return _isInitialized;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FFmpeg not found in PATH");
+            _isInitialized = false;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns true if FFmpeg is available and validated.
+    /// </summary>
+    public bool IsFfmpegAvailable() => _isInitialized;
+
+    /// <summary>
     /// Performs spectral analysis on an audio file to detect upscaling or low-quality VBR.
+    /// Uses Producer-Consumer pattern to queue analysis and prevent CPU spikes.
     /// </summary>
     public async Task<SonicAnalysisResult> AnalyzeTrackAsync(string filePath)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Audio file not found for analysis", filePath);
 
+        if (!_isInitialized)
+        {
+            _logger.LogWarning("FFmpeg not available, skipping sonic analysis for {File}", Path.GetFileName(filePath));
+            return new SonicAnalysisResult 
+            { 
+                IsTrustworthy = true, // Assume trustworthy if can't analyze
+                Details = "FFmpeg not available - analysis skipped" 
+            };
+        }
+
+        // Create request with completion source
+        var tcs = new TaskCompletionSource<SonicAnalysisResult>();
+        var request = new AnalysisRequest(filePath, tcs);
+        
+        // Queue for processing
+        await _analysisQueue.Writer.WriteAsync(request);
+        
+        // Wait for result
+        return await tcs.Task;
+    }
+
+    /// <summary>
+    /// Worker task that processes queued analysis requests.
+    /// </summary>
+    private async Task ProcessAnalysisQueueAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var request in _analysisQueue.Reader.ReadAllAsync(cancellationToken))
+        {
+            try
+            {
+                var result = await PerformAnalysisAsync(request.FilePath);
+                request.CompletionSource.SetResult(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Analysis failed for {File}", Path.GetFileName(request.FilePath));
+                request.CompletionSource.SetResult(new SonicAnalysisResult 
+                { 
+                    IsTrustworthy = false, 
+                    Details = "Analysis error: " + ex.Message 
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Core analysis logic (extracted from original AnalyzeTrackAsync).
+    /// </summary>
+    private async Task<SonicAnalysisResult> PerformAnalysisAsync(string filePath)
+    {
         try
         {
             _logger.LogInformation("Starting sonic integrity analysis for: {File}", Path.GetFileName(filePath));
@@ -138,4 +262,26 @@ public class SonicIntegrityService
 
         return -91.0; // Assume silence if parsing fails
     }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _analysisQueue.Writer.Complete();
+        
+        try
+        {
+            Task.WaitAll(_workerTasks.ToArray(), TimeSpan.FromSeconds(5));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error waiting for worker tasks to complete");
+        }
+        
+        _cts.Dispose();
+    }
+
+    /// <summary>
+    /// Internal request model for the Producer-Consumer queue.
+    /// </summary>
+    private record AnalysisRequest(string FilePath, TaskCompletionSource<SonicAnalysisResult> CompletionSource);
 }

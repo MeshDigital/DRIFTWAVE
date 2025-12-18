@@ -207,6 +207,86 @@
                     </Grid>
                 </StackPanel>
             </Border>
+
+            <!-- Phase 8: Dependencies (FFmpeg Validation) -->
+            <Border Background="#252526" CornerRadius="8" Padding="20" BorderBrush="#3E3E3E" BorderThickness="1">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Dependencies" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                    
+                    <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12">
+                        Phase 8 features require external dependencies. Ensure these are installed for full functionality.
+                    </TextBlock>
+
+                    <!-- FFmpeg Status Card -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Padding="16" 
+                            BorderBrush="{Binding FfmpegBorderColor}" 
+                            BorderThickness="2">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="FFmpeg" 
+                                           FontWeight="SemiBold" 
+                                           FontSize="14"
+                                           Foreground="White"/>
+                                <TextBlock Text="{Binding FfmpegStatus}" 
+                                           FontSize="12" 
+                                           Foreground="#AAA"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="2" 
+                                        Orientation="Horizontal" 
+                                        Spacing="8">
+                                <Button Command="{Binding CheckFfmpegCommand}" 
+                                        Content="Check"
+                                        Background="#0078D4"
+                                        Foreground="White"
+                                        Padding="16,6"/>
+                                
+                                <Button Content="Download FFmpeg"
+                                        Name="DownloadFfmpegButton"
+                                        IsVisible="{Binding !IsFfmpegInstalled}"
+                                        Background="#1DB954"
+                                        Foreground="White"
+                                        Padding="16,6"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Warning message if not installed -->
+                    <Border Background="#332200" 
+                            CornerRadius="4" 
+                            Padding="12"
+                            IsVisible="{Binding !IsFfmpegInstalled}"
+                            BorderBrush="#FFA500"
+                            BorderThickness="1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="⚠️ FFmpeg is required for:" 
+                                       FontSize="12" 
+                                       Foreground="#FFA500"
+                                       FontWeight="SemiBold"/>
+                            <StackPanel Margin="16,0,0,0" Spacing="4">
+                                <TextBlock Text="• Sonic Integrity Analysis (fake FLAC detection)" FontSize="11" Foreground="#DDD"/>
+                                <TextBlock Text="• Quality Guard (spectral frequency analysis)" FontSize="11" Foreground="#DDD"/>
+                                <TextBlock Text="• Spectral Hash de-duplication" FontSize="11" Foreground="#DDD"/>
+                            </StackPanel>
+                            
+                            <Separator Background="#FFA500" Height="1" Margin="0,4"/>
+                            
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#CCC">
+                                <Bold>Windows:</Bold> Download from gyan.dev (full builds)
+                            </TextBlock>
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#CCC">
+                                <Bold>macOS:</Bold> Run: <Span Foreground="#0078D4">brew install ffmpeg</Span>
+                            </TextBlock>
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#CCC">
+                                <Bold>Linux:</Bold> Run: <Span Foreground="#0078D4">sudo apt install ffmpeg</Span>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
             <!-- Advanced Ranking & Tuning -->
             <Border Background="#252526" CornerRadius="8" Padding="20" BorderBrush="#3E3E3E" BorderThickness="1">
                 <StackPanel Spacing="16">

@@ -82,9 +82,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         MaxActiveDownloads = _config.MaxConcurrentDownloads > 0 ? _config.MaxConcurrentDownloads : 3;
 
         // Phase 8: Automation Subscriptions
-        _eventBus.Subscribe<Events.AutoDownloadTrackEvent>(OnAutoDownloadTrack);
-        _eventBus.Subscribe<Events.AutoDownloadUpgradeEvent>(OnAutoDownloadUpgrade);
-        _eventBus.Subscribe<Events.UpgradeAvailableEvent>(OnUpgradeAvailable);
+        _eventBus.Subscribe<AutoDownloadTrackEvent>(OnAutoDownloadTrack);
+        _eventBus.Subscribe<AutoDownloadUpgradeEvent>(OnAutoDownloadUpgrade);
+        _eventBus.Subscribe<UpgradeAvailableEvent>(OnUpgradeAvailable);
     }
 
     /// <summary>
@@ -632,7 +632,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    private void OnAutoDownloadTrack(Events.AutoDownloadTrackEvent e)
+    private void OnAutoDownloadTrack(AutoDownloadTrackEvent e)
     {
         _logger.LogInformation("Auto-Download triggered for {TrackId}", e.TrackGlobalId);
         DownloadContext? ctx;
@@ -646,7 +646,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         });
     }
 
-    private void OnAutoDownloadUpgrade(Events.AutoDownloadUpgradeEvent e)
+    private void OnAutoDownloadUpgrade(AutoDownloadUpgradeEvent e)
     {
         _logger.LogInformation("Auto-Upgrade triggered for {TrackId}", e.TrackGlobalId);
         DownloadContext? ctx;
@@ -672,7 +672,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         });
     }
 
-    private void OnUpgradeAvailable(Events.UpgradeAvailableEvent e)
+    private void OnUpgradeAvailable(UpgradeAvailableEvent e)
     {
         // For now just log, could trigger a notification in future
         _logger.LogInformation("Upgrade Available (Manual Approval Needed): {TrackId} - {BestMatch}", 

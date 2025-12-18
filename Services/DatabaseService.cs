@@ -1151,6 +1151,31 @@ public class DatabaseService
         await context.SaveChangesAsync();
         _logger.LogInformation("Cleared saved queue");
     }
+
+    /// <summary>
+    /// Phase 8: Maintenance - Vacuum database to reclaim space and optimize performance.
+    /// Should be called periodically (e.g., during daily maintenance).
+    /// </summary>
+    public async Task VacuumDatabaseAsync()
+    {
+        try
+        {
+            using var context = new AppDbContext();
+            var connection = context.Database.GetDbConnection();
+            await connection.OpenAsync();
+            
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "VACUUM";
+            await cmd.ExecuteNonQueryAsync();
+            
+            _logger.LogInformation("Database VACUUM completed successfully");
+            await connection.CloseAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Database VACUUM failed (this is non-critical)");
+        }
+    }
 }
 
 
