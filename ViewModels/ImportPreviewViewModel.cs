@@ -110,6 +110,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         _libraryService = libraryService;
         _navigationService = navigationService;
         _metadataService = metadataService;
+        _enrichmentCts = new CancellationTokenSource();
 
         AddToLibraryCommand = new AsyncRelayCommand(AddToLibraryAsync, () => CanAddToLibrary);
         SelectAllCommand = new RelayCommand(SelectAll);
@@ -132,6 +133,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
 
             SourceTitle = sourceTitle;
             SourceType = sourceType;
+            _targetJobId = Guid.NewGuid(); // CRITICAL FIX: Ensure unique ID for new imports
 
             int trackNum = 1;
             var tempTracks = new List<Track>();
@@ -139,9 +141,9 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
             {
                 var track = new Track
                 {
-                    Title = query.Title,
-                    Artist = query.Artist,
-                    Album = query.Album,
+                    Title = query.Title ?? "Unknown Title",
+                    Artist = query.Artist ?? "Unknown Artist",
+                    Album = query.Album ?? "Unknown Album",
                     Length = query.Length,
                     // Phase 0: Map Spotify Metadata
                     SpotifyTrackId = query.SpotifyTrackId,

@@ -230,9 +230,9 @@ public class ImportOrchestrator
                     {
                          Id = Guid.NewGuid(),
                          PlaylistId = job.Id,
-                         Artist = t.Artist,
-                         Title = t.Title,
-                         Album = t.Album,
+                         Artist = t.Artist ?? "Unknown Artist",
+                         Title = t.Title ?? "Unknown Track",
+                         Album = t.Album ?? "Unknown Album",
                          TrackUniqueHash = t.SpotifyTrackId ?? Guid.NewGuid().ToString(),
                          Status = TrackStatus.Missing,
                          TrackNumber = ++currentCount,
@@ -243,12 +243,10 @@ public class ImportOrchestrator
                     playlistTracks.Add(pt);
                 }
                 
-                // Save new tracks to DB directly to bypass DownloadManager overhead if needed,
-                // BUT we need DownloadManager to orchestrate downloads.
-                // Use DownloadManager.QueueTracks(List<PlaylistTrack> tracks)
-                // We need to implement QueueTracks if it doesn't exist or expose it.
-                // Checking ProjectListViewModel usage: _downloadManager.QueueTracks exists!
+                // Save new tracks to DB to ensure they appear in the library
+                await _libraryService.SavePlaylistTracksAsync(playlistTracks);
                 
+                // Queue for download
                 _downloadManager.QueueTracks(playlistTracks);
             }
         }

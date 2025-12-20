@@ -167,9 +167,9 @@ public class SpotifyImportViewModel : INotifyPropertyChanged
             {
                 var track = new Track
                 {
-                    Title = query.Title,
-                    Artist = query.Artist,
-                    Album = query.Album,
+                    Title = query.Title ?? "Unknown Title",
+                    Artist = query.Artist ?? "Unknown Artist",
+                    Album = query.Album ?? "Unknown Album",
                     Length = 0, // Will be populated during search
                     // Fix: Map metadata fields
                     SpotifyTrackId = query.SpotifyTrackId,
@@ -355,12 +355,12 @@ public class SpotifyImportViewModel : INotifyPropertyChanged
             {
                 UserPlaylists.Add(new SpotifyPlaylistViewModel
                 {
-                    Id = playlist.Id,
-                    Name = playlist.Name,
+                    Id = playlist.Id ?? "",
+                    Name = playlist.Name ?? "Unnamed Playlist",
                     ImageUrl = playlist.Images?.FirstOrDefault()?.Url ?? "",
                     TrackCount = playlist.Tracks?.Total ?? 0,
                     Owner = playlist.Owner?.DisplayName ?? "Unknown",
-                    Url = playlist.ExternalUrls.ContainsKey("spotify") ? playlist.ExternalUrls["spotify"] : ""
+                    Url = (playlist.ExternalUrls != null && playlist.ExternalUrls.ContainsKey("spotify")) ? playlist.ExternalUrls["spotify"] : ""
                 });
             }
 

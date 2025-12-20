@@ -225,9 +225,9 @@ public class ProjectListViewModel : INotifyPropertyChanged
                 {
                     Id = Guid.NewGuid(),
                     PlaylistId = existingJob.Id,
-                    Artist = nt.Artist,
-                    Title = nt.Title,
-                    Album = nt.Album,
+                    Artist = nt.Artist ?? "Unknown Artist",
+                    Title = nt.Title ?? "Unknown Track",
+                    Album = nt.Album ?? "Unknown Album",
                     TrackUniqueHash = nt.SpotifyTrackId ?? Guid.NewGuid().ToString(), // Use Spotify ID as hash preference
                     Status = TrackStatus.Missing,
                     TrackNumber = ++maxTrackNum,
