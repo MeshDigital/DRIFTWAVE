@@ -368,21 +368,6 @@
             </Grid>
         </Grid>
 
-        <!-- Splitter for Inspector -->
-        <GridSplitter Grid.Column="3" 
-                      Width="1" 
-                      Background="#3E3E3E"
-                      IsVisible="{Binding IsInspectorVisible}"/>
-
-        <!-- RIGHT PANEL: Track Inspector -->
-        <Border Grid.Column="4" 
-                Width="320"
-                Background="#1A1A1A" 
-                BorderBrush="#3E3E3E" 
-                BorderThickness="1,0,0,0"
-                IsVisible="{Binding IsInspectorVisible}">
-            <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
-        </Border>
 
     </Grid>
 </UserControl>

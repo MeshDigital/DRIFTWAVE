@@ -113,7 +113,8 @@ public class LibraryViewModel : INotifyPropertyChanged
         ILibraryService libraryService,
         IEventBus eventBus,
         PlayerViewModel playerViewModel,
-        UpgradeScoutViewModel upgradeScout) // Phase 8: Inject UpgradeScout
+        UpgradeScoutViewModel upgradeScout,
+        TrackInspectorViewModel trackInspector) // Refactor: Inject Singleton Inspector
     {
         _logger = logger;
         _navigationService = navigationService;
@@ -149,7 +150,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         
         _logger.LogInformation("LibraryViewModel initialized with child ViewModels");
 
-        TrackInspector = new TrackInspectorViewModel();
+        TrackInspector = trackInspector;
 
         // Subscribe to selection changes in Tracks.Hierarchical.Source.Selection
         if (Tracks.Hierarchical.Source.Selection is ITreeDataGridSelectionInteraction selectionInteraction)
@@ -209,20 +210,9 @@ public class LibraryViewModel : INotifyPropertyChanged
         if (selectedItem is PlaylistTrackViewModel trackVm)
         {
             TrackInspector.Track = trackVm.Model;
-            IsInspectorVisible = true;
-        }
-        else
-        {
-            IsInspectorVisible = false;
         }
     }
 
-    private bool _isInspectorVisible;
-    public bool IsInspectorVisible
-    {
-        get => _isInspectorVisible;
-        set => SetProperty(ref _isInspectorVisible, value);
-    }
 
     /// <summary>
     /// Loads all projects from the database.

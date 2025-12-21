@@ -8,5 +8,6 @@ public enum PageType
     Downloads,
     Settings,
     Import,
-    UpgradeScout
+    UpgradeScout,
+    Inspector
 }

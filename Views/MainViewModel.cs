@@ -107,6 +107,7 @@ public class MainViewModel : INotifyPropertyChanged
         NavigateDownloadsCommand = new RelayCommand(NavigateToDownloads);
         NavigateSettingsCommand = new RelayCommand(NavigateToSettings);
         NavigateUpgradeScoutCommand = new RelayCommand(NavigateUpgradeScout);
+        NavigateInspectorCommand = new RelayCommand(NavigateInspector);
         NavigateImportCommand = new RelayCommand(NavigateToImport); // Phase 6D
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationCollapsed = !IsNavigationCollapsed);
         TogglePlayerCommand = new RelayCommand(() => IsPlayerSidebarVisible = !IsPlayerSidebarVisible);
@@ -186,6 +187,7 @@ public class MainViewModel : INotifyPropertyChanged
         _navigationService.RegisterPage("Import", typeof(Avalonia.ImportPage));
         _navigationService.RegisterPage("ImportPreview", typeof(Avalonia.ImportPreviewPage));
         _navigationService.RegisterPage("UpgradeScout", typeof(Avalonia.UpgradeScoutView));
+        _navigationService.RegisterPage("Inspector", typeof(Avalonia.InspectorPage));
         
         // Subscribe to navigation events
         _navigationService.Navigated += OnNavigated;
@@ -372,6 +374,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand NavigateDownloadsCommand { get; }
     public ICommand NavigateSettingsCommand { get; }
     public ICommand NavigateUpgradeScoutCommand { get; }
+    public ICommand NavigateInspectorCommand { get; }
     public ICommand NavigateImportCommand { get; } // Phase 6D
     public ICommand ToggleNavigationCommand { get; }
     public ICommand TogglePlayerCommand { get; }
@@ -415,6 +418,7 @@ public class MainViewModel : INotifyPropertyChanged
                 "ImportPage" => PageType.Import,
                 "ImportPreviewPage" => PageType.Import, // Map preview to Import category
                 "UpgradeScoutView" => PageType.UpgradeScout,
+                "InspectorPage" => PageType.Inspector,
                 _ => CurrentPageType
             };
             
@@ -457,6 +461,11 @@ public class MainViewModel : INotifyPropertyChanged
     private void NavigateUpgradeScout()
     {
         _navigationService.NavigateTo("UpgradeScout");
+    }
+
+    private void NavigateInspector()
+    {
+        _navigationService.NavigateTo("Inspector");
     }
 
     private void NavigateToImport()

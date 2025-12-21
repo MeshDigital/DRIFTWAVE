@@ -350,6 +350,10 @@ public partial class App : Application
         services.AddTransient<Views.Avalonia.ImportPage>();
         services.AddTransient<Views.Avalonia.ImportPreviewPage>();
         services.AddTransient<Views.Avalonia.UpgradeScoutView>();
+        services.AddTransient<Views.Avalonia.InspectorPage>();
+        
+        // Singleton ViewModels
+        services.AddSingleton<ViewModels.TrackInspectorViewModel>();
     }
 
     /// <summary>

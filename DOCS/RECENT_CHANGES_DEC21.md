@@ -132,4 +132,34 @@ Search results invisible - Import Preview overlay covering entire search area.
 
 ---
 
+## Structural UI Fixes (Implemented)
+
+### 1. Upgrade Scout: Global Navigation 💎
+- **Change**: Moved Upgrade Scout from an overlay in Library to a top-level page.
+- **Implementation**:
+  - Registered `UpgradeScoutView` as a page in `NavigationService`
+  - Added "Upgrade Scout" button to Main Sidebar (after Downloads)
+  - Removed legacy overlay code from `LibraryPage.axaml`
+  - Removed obsolete commands/properties from `LibraryViewModel`
+- **Result**: Consistent navigation, better discoverability, no overlay conflicts.
+
+### 2. Search Page: Navigation State Reset 🔄
+- **Change**: Search state is now cleared when navigating away.
+- **Implementation**:
+  - Added `SearchViewModel.ResetState()`
+  - Hooked into `MainViewModel.OnNavigated` event
+  - Automatically resets search spinner/results when page context changes
+- **Result**: No more "stuck" search spinners or overlays when returning to search.
+
+### 3. Track Inspector: Moved to Global Page 🔍
+- **Change**: Moved Track Inspector from Library Panel to a dedicated Global Page.
+- **Implementation**:
+  - Registered separate `InspectorPage` and Singleton `TrackInspectorViewModel`.
+  - Added **"🔍 Inspector"** button to Main Sidebar.
+  - Implemented automatic data linking: Creating a singleton instance allows Library (or Search) to update the inspector state, and the dedicated page simply displays it.
+  - Removed cramped side-panel from `LibraryPage`.
+- **Result**: More screen space for Library, and Inspector is now accessible from anywhere (future-proof).
+
+---
+
 **Session Summary**: Fixed 3 critical issues (1 performance, 2 UI), cleaned up technical debt, verified media player stability. All changes committed and ready for production testing.
