@@ -9,6 +9,7 @@ using SLSKDONET.Services;
 using SLSKDONET.Services.Platform;
 using SLSKDONET.Services.Ranking;
 using SLSKDONET.Views; // For AsyncRelayCommand
+using Avalonia.Media;
 
 namespace SLSKDONET.ViewModels;
 
@@ -281,7 +282,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    public string SpotifyStatusColor => IsSpotifyConnected ? "#1DB954" : "#333333";
+    public IBrush SpotifyStatusColor => IsSpotifyConnected ? SolidColorBrush.Parse("#1DB954") : SolidColorBrush.Parse("#333333");
     public string SpotifyStatusIcon => IsSpotifyConnected ? "✓" : "🚫";
 
     private string _spotifyDisplayName = "Not Connected";
@@ -341,7 +342,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         set => SetProperty(ref _ffmpegVersion, value);
     }
 
-    public string FfmpegBorderColor => IsFfmpegInstalled ? "#1DB954" : "#FFA500";
+    public IBrush FfmpegBorderColor => IsFfmpegInstalled ? SolidColorBrush.Parse("#1DB954") : SolidColorBrush.Parse("#FFA500");
 
     public SettingsViewModel(
         ILogger<SettingsViewModel> logger,
