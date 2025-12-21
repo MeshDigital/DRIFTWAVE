@@ -446,6 +446,10 @@
 ## 🐛 Known Issues
 
 ### Critical
+- **N+1 Query Pattern Risk**: UI loading triggers redundant track queries (Needs eager loading).
+- **Soft Deletes Missing**: Deleting projects is non-reversible (Needs `IsDeleted` audit trail).
+- **Status Mismatch**: String-based statuses in DB lack centralized conversion to enums.
+- **Deduplication Lag**: `PlaylistTrack` and `LibraryEntry` sync occurs at save-time, not in real-time.
 - **Duplicate Detection Bug**: Batch imports (Spotify/CSV) fail to detect duplicates *within* the same incoming batch.
 - **UI Thread Safety**: `PlaylistTrackViewModel` risk "Cross-thread Access" exceptions due to background event subscriptions.
 - **Race Condition**: `LibraryViewModel.OnProjectAdded` uses a fragile `Task.Delay(300)` for post-import selection.

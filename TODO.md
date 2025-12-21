@@ -14,6 +14,11 @@
 - ✅ **Search performance**: Streaming results with incremental ranking.
 
 ### 🚨 Technical Debt & Stability (Pending FIX)
+- [ ] **N+1 Query Pattern Risk**: Refactor project loading to use eager loading (.Include) for track counts to prevent performance degradation.
+- [ ] **Soft Deletes & Audit Trail**: Implement `IsDeleted` and `DeletedAt` for imports to allow recovery and history tracking.
+- [ ] **Status Management Standardization**: Create a centralized `StatusConverter` to map DB strings to internal enums consistently.
+- [ ] **Real-time Deduplication Sync**: Ensure `PlaylistTrack` and `LibraryEntry` states stay in sync immediately upon download failure/success.
+- [ ] **Library Resilience**: Implement automated daily backups of `%appdata%/SLSKDONET/library.db`.
 - [ ] **Batch Duplicate Fix**: Update `DownloadManager.QueueProject` to check against `addedInBatch` set during hash check loop.
 - [ ] **UI Thread Safety**: Wrap `PlaylistTrackViewModel` property updates (via event bus) in `Dispatcher.UIThread.Post`.
 - [ ] **Coordinate Precision**: Refactor `LibraryPage.axaml.cs` drag-drop to use `VisualRoot` / `PointToClient` for transformations.
