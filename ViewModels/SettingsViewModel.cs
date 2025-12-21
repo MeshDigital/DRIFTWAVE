@@ -377,42 +377,22 @@ public class SettingsViewModel : INotifyPropertyChanged
         // Explicitly initialize IsAuthenticating to false
         IsAuthenticating = false;
 
-        // Note: Initial Spotify verification is now done in App.axaml.cs during app startup
+        // Note: Initial Spotify verification is already done in App.axaml.cs during startup
         // via SpotifyAuthService.VerifyConnectionAsync() to fix the "zombie token" bug.
-        // We poll here with a 500ms delay for UI responsiveness, but the real validation
-        // happened during background initialization.
-        _ = Task.Delay(500).ContinueWith(_ => RefreshSpotifyConnectionStatusAsync());
-        _ = CheckFfmpegAsync(); // Phase 8: Check FFmpeg on startup
-        UpdateLivePreview();
-    }
-
-    /// <summary>
-    /// Refreshes the Spotify connection status display without blocking.
-    /// Called from the UI layer to keep the status indicator up-to-date.
-    /// </summary>
-    private async Task RefreshSpotifyConnectionStatusAsync()
-    {
-        // Just refresh the display based on current auth state
+        // Just set initial display based on current auth state
         if (_spotifyAuthService.IsAuthenticated)
         {
-            try
-            {
-                var user = await _spotifyAuthService.GetCurrentUserAsync();
-                SpotifyDisplayName = user.DisplayName ?? user.Id;
-                IsSpotifyConnected = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to refresh Spotify user display name");
-                IsSpotifyConnected = false;
-                SpotifyDisplayName = "Not Connected";
-            }
+            IsSpotifyConnected = true;
+            SpotifyDisplayName = "Connected";
         }
         else
         {
             IsSpotifyConnected = false;
             SpotifyDisplayName = "Not Connected";
         }
+
+        _ = CheckFfmpegAsync(); // Phase 8: Check FFmpeg on startup
+        UpdateLivePreview();
     }
 
     /// <summary>
@@ -565,7 +545,9 @@ public class SettingsViewModel : INotifyPropertyChanged
             
             if (success)
             {
-                await RefreshSpotifyConnectionStatusAsync();
+                // Update display based on new auth state
+                IsSpotifyConnected = _spotifyAuthService.IsAuthenticated;
+                SpotifyDisplayName = IsSpotifyConnected ? "Connected" : "Not Connected";
                 UseSpotifyApi = true; // Auto-enable API usage on success
                 _configManager.Save(_config); // Save the enabled state
             }
