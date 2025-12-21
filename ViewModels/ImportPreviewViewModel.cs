@@ -387,6 +387,13 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     {
         try
         {
+            // Skip enrichment if metadata service is not available or not authenticated
+            if (_metadataService == null)
+            {
+                _logger.LogDebug("Skipping enrichment: Metadata service not available");
+                return;
+            }
+
             _logger.LogInformation("Starting background metadata enrichment for {Count} tracks", tracks.Count);
             
             // Initial delay to let UI settle

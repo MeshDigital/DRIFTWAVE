@@ -50,7 +50,6 @@
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Height" Value="Auto"/>
         </Style>
         <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#333"/>

@@ -298,8 +298,9 @@ public class SettingsViewModel : INotifyPropertyChanged
         {
             if (SetProperty(ref _isAuthenticating, value))
             {
-                // notify commands if needed, or rely on command manager
+                // Notify all Spotify commands to re-evaluate their CanExecute state
                 (ConnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (DisconnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -369,7 +370,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         BrowseDownloadPathCommand = new AsyncRelayCommand(BrowseDownloadPathAsync);
         BrowseSharedFolderCommand = new AsyncRelayCommand(BrowseSharedFolderAsync);
         ConnectSpotifyCommand = new AsyncRelayCommand(ConnectSpotifyAsync, () => !IsAuthenticating);
-        DisconnectSpotifyCommand = new AsyncRelayCommand(DisconnectSpotifyAsync);
+        DisconnectSpotifyCommand = new AsyncRelayCommand(DisconnectSpotifyAsync, () => !IsAuthenticating);
         ClearSpotifyCacheCommand = new AsyncRelayCommand(ClearSpotifyCacheAsync);
         CheckFfmpegCommand = new AsyncRelayCommand(CheckFfmpegAsync); // Phase 8
 
@@ -521,7 +522,6 @@ public class SettingsViewModel : INotifyPropertyChanged
     {
         try
         {
-            IsAuthenticating = true;
             if (await _spotifyAuthService.IsAuthenticatedAsync())
             {
                 var user = await _spotifyAuthService.GetCurrentUserAsync();
@@ -538,10 +538,6 @@ public class SettingsViewModel : INotifyPropertyChanged
         {
             _logger.LogWarning(ex, "Failed to check Spotify connection status");
             IsSpotifyConnected = false;
-        }
-        finally
-        {
-            IsAuthenticating = false;
         }
     }
 
