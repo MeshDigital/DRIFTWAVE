@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,26 @@ public class LocalHttpServer : IDisposable
     public LocalHttpServer(ILogger<LocalHttpServer> logger)
     {
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Checks if a port is available for listening.
+    /// </summary>
+    /// <param name="port">Port number to check</param>
+    /// <returns>True if port is available, false if in use</returns>
+    public bool IsPortAvailable(int port)
+    {
+        try
+        {
+            using var socket = new TcpListener(IPAddress.Loopback, port);
+            socket.Start();
+            socket.Stop();
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

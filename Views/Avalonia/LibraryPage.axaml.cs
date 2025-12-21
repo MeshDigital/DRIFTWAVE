@@ -24,9 +24,16 @@ public partial class LibraryPage : UserControl
         AddHandler(DragDrop.DropEvent, OnPlaylistDrop);
     }
 
-    protected override void OnLoaded(RoutedEventArgs e)
+    protected override async void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
+        
+        // BUGFIX: Ensure projects are loaded when user navigates to Library page
+        // Previously only loaded during startup or after imports, not on manual navigation
+        if (DataContext is LibraryViewModel vm)
+        {
+            await vm.LoadProjectsAsync();
+        }
         
         // Find the playlist ListBox and enable drop
         var playlistListBox = this.FindControl<ListBox>("PlaylistListBox");

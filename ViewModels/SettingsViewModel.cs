@@ -313,6 +313,7 @@ public class SettingsViewModel : INotifyPropertyChanged
                 (ConnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (DisconnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (TestSpotifyConnectionCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (ResetAuthStateCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -323,6 +324,7 @@ public class SettingsViewModel : INotifyPropertyChanged
     public ICommand ConnectSpotifyCommand { get; }
     public ICommand DisconnectSpotifyCommand { get; }
     public ICommand TestSpotifyConnectionCommand { get; } // New Diagnostic Command
+    public ICommand ResetAuthStateCommand { get; } // Manual reset for stuck auth state
     public ICommand ClearSpotifyCacheCommand { get; }
     public ICommand CheckFfmpegCommand { get; } // Phase 8: Dependency validation
 
@@ -387,6 +389,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         ConnectSpotifyCommand = new AsyncRelayCommand(ConnectSpotifyAsync, () => !IsAuthenticating);
         DisconnectSpotifyCommand = new AsyncRelayCommand(DisconnectSpotifyAsync);
         TestSpotifyConnectionCommand = new AsyncRelayCommand(TestSpotifyConnectionAsync, () => !IsAuthenticating && IsSpotifyConnected);
+        ResetAuthStateCommand = new RelayCommand(ResetAuthState, () => true);
         ClearSpotifyCacheCommand = new AsyncRelayCommand(ClearSpotifyCacheAsync);
         CheckFfmpegCommand = new AsyncRelayCommand(CheckFfmpegAsync); // Phase 8
 
@@ -596,12 +599,27 @@ public class SettingsViewModel : INotifyPropertyChanged
 
             var success = await _spotifyAuthService.StartAuthorizationAsync();
             
+            // CRITICAL: Reset flag immediately after auth attempt completes
+            // This prevents permanent UI lockup if post-auth checks hang
+            IsAuthenticating = false;
+            
             if (success)
             {
-                await CheckSpotifyConnectionStatusAsync();
-                UseSpotifyApi = true; // Auto-enable API usage on success
-                _configManager.Save(_config); // Save the enabled state
-                await _dialogService.ShowAlertAsync("Success", "Spotify connected successfully!");
+                // Post-auth checks wrapped separately to avoid blocking UI
+                try
+                {
+                    await CheckSpotifyConnectionStatusAsync();
+                    UseSpotifyApi = true; // Auto-enable API usage on success
+                    _configManager.Save(_config); // Save the enabled state
+                    await _dialogService.ShowAlertAsync("Success", "Spotify connected successfully!");
+                }
+                catch (Exception postAuthEx)
+                {
+                    _logger.LogWarning(postAuthEx, "Post-auth check failed, but connection succeeded");
+                    // Don't fail the whole flow if just the status check fails
+                    UseSpotifyApi = true;
+                    _configManager.Save(_config);
+                }
             }
             else
             {
@@ -615,6 +633,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
         finally
         {
+            // Safety net: ensure flag is always reset
             IsAuthenticating = false;
         }
     }
@@ -650,6 +669,16 @@ public class SettingsViewModel : INotifyPropertyChanged
         UseSpotifyApi = false; 
         
         await _dialogService.ShowAlertAsync("Disconnected", "Spotify account disconnected and tokens cleared.");
+    }
+
+    public void ResetAuthState()
+    {
+        _logger.LogInformation("Manually resetting authentication state");
+        IsAuthenticating = false;
+        
+        // Force commands to re-evaluate their CanExecute state
+        (ConnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (TestSpotifyConnectionCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private void SaveSettings()

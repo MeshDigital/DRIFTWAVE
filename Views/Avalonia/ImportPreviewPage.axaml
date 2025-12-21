@@ -29,13 +29,8 @@
                     <TextBlock Text="⚠️" FontSize="20" VerticalAlignment="Center"/>
                     <StackPanel Spacing="4">
                         <TextBlock Text="Existing Playlist Found" FontWeight="Bold" Foreground="#FFD580"/>
-                        <TextBlock Foreground="#FFD580" FontSize="12">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="We found an existing playlist with {0} tracks. Do you want to merge new tracks into it?">
-                                    <Binding Path="ExistingTrackCount"/>
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
+                        <TextBlock Foreground="#FFD580" FontSize="12"
+                                   Text="{Binding ExistingTrackCount, StringFormat='We found an existing playlist with {0} tracks. Do you want to merge new tracks into it?'}"/>
                     </StackPanel>
                 </StackPanel>
                 

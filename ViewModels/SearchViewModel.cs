@@ -111,13 +111,8 @@ public partial class SearchViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _maxBitrate, value);
     }
 
-    // Import Overlay State (Fix for ZIndex bug)
-    private bool _isImportOverlayActive;
-    public bool IsImportOverlayActive 
-    {
-        get => _isImportOverlayActive;
-        set => SetProperty(ref _isImportOverlayActive, value);
-    }
+    // Note: Import overlay is now handled via NavigationService.NavigateTo("ImportPreview") in ImportOrchestrator
+    // Removed IsImportOverlayActive property to fix dual-overlay bug (Dec 21, 2024)
     
     // Dynamic Filters
     public int FilterMinBitrate 
@@ -174,7 +169,6 @@ public partial class SearchViewModel : ReactiveObject
         _fileInteractionService = fileInteractionService;
         _clipboardService = clipboardService;
         _searchOrchestration = searchOrchestration;
-        _isImportOverlayActive = false; // Initialize explicitly
 
         // --- Reactive Pipeline Setup ---
         // Connect SourceList -> Filter -> Sort -> Bind -> Public Collection
@@ -202,9 +196,8 @@ public partial class SearchViewModel : ReactiveObject
         CancelSearchCommand = ReactiveCommand.Create(ExecuteCancelSearch);
         AddToDownloadsCommand = ReactiveCommand.CreateFromTask(ExecuteAddToDownloadsAsync);
         
-        // Listen for Import Preview completion to close overlay
-        importPreviewViewModel.AddedToLibrary += (s, e) => IsImportOverlayActive = false;
-        importPreviewViewModel.Cancelled += (s, e) => IsImportOverlayActive = false;
+        // Note: Import overlay visibility is now handled by ImportOrchestrator via navigation
+        // Event handlers for AddedToLibrary and Cancelled are set up in ImportOrchestrator.SetupPreviewCallbacks()
     }
 
     private Func<SearchResult, bool> BuildFilter((int minKbps, bool mp3, bool flac, bool wav) tuple)
@@ -244,10 +237,12 @@ public partial class SearchViewModel : ReactiveObject
             if (provider != null)
             {
                 StatusText = $"Importing via {provider.Name}...";
-                IsImportOverlayActive = true; // Show overlay
-                await _importOrchestrator.StartImportWithPreviewAsync(provider, SearchQuery);
+                // BUGFIX: Reset IsSearching BEFORE navigation to prevent stuck state
+                // when user returns to SearchPage after import preview
                 IsSearching = false;
-                StatusText = "Import ready";
+                // Note: ImportOrchestrator handles navigation to ImportPreview page
+                await _importOrchestrator.StartImportWithPreviewAsync(provider, SearchQuery);
+                StatusText = "Ready";
                 return;
             }
 
@@ -371,7 +366,7 @@ public partial class SearchViewModel : ReactiveObject
     {
         SearchQuery = "";
         IsSearching = false;
-        IsImportOverlayActive = false;
+        // Note: IsImportOverlayActive was removed - overlay handled by navigation
         _searchResults.Clear();
         AlbumResults.Clear();
         StatusText = "Ready";

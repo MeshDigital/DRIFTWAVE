@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Diagnostics;
+using SLSKDONET.ViewModels;
 
 namespace SLSKDONET.Views.Avalonia
 {
@@ -15,6 +16,13 @@ namespace SLSKDONET.Views.Avalonia
             if (downloadButton != null)
             {
                 downloadButton.Click += OnDownloadFfmpegClick;
+            }
+            
+            // Wire up Reset Auth State button directly
+            var resetAuthButton = this.FindControl<Button>("ResetAuthStateButton");
+            if (resetAuthButton != null)
+            {
+                resetAuthButton.Click += OnResetAuthStateClick;
             }
         }
 
@@ -33,6 +41,29 @@ namespace SLSKDONET.Views.Avalonia
             {
                 // Log error (logger not available in code-behind, but graceful fallback)
                 System.Diagnostics.Debug.WriteLine($"Failed to open FFmpeg download page: {ex.Message}");
+            }
+        }
+        
+        private void OnResetAuthStateClick(object? sender, RoutedEventArgs e)
+        {
+            Console.WriteLine("[RESET BUTTON] Click handler triggered");
+            
+            // DataContext is MainViewModel, SettingsViewModel is a nested property
+            if (DataContext is SLSKDONET.Views.MainViewModel mainViewModel)
+            {
+                var settingsVM = mainViewModel.SettingsViewModel;
+                Console.WriteLine("[RESET BUTTON] Found MainViewModel, accessing SettingsViewModel");
+                
+                // Dispatch on UI thread to ensure property changes update the UI
+                global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    settingsVM.ResetAuthState();
+                    Console.WriteLine("[RESET BUTTON] ResetAuthState() completed");
+                });
+            }
+            else
+            {
+                Console.WriteLine($"[RESET BUTTON] DataContext is: {DataContext?.GetType().Name ?? "null"}");
             }
         }
     }

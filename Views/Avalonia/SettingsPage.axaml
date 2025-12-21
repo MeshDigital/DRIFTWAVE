@@ -368,16 +368,16 @@
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
                              <Border CornerRadius="6" 
                                      Padding="12,6"
-                                     Background="{Binding SpotifyStatusColor}">
+                                     Background="{Binding SettingsViewModel.SpotifyStatusColor}">
                                  <StackPanel Orientation="Horizontal" Spacing="8">
-                                     <PathIcon Data="{StaticResource icons_spotify}" Width="16" Height="16" IsVisible="{Binding IsSpotifyConnected}"/>
-                                     <TextBlock Text="{Binding SpotifyStatusIcon}" FontSize="14" IsVisible="{Binding IsSpotifyConnected, Converter={StaticResource BoolInverseConverter}}"/>
-                                     <TextBlock Text="{Binding SpotifyDisplayName}" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                     <PathIcon Data="{StaticResource icons_spotify}" Width="16" Height="16" IsVisible="{Binding SettingsViewModel.IsSpotifyConnected}"/>
+                                     <TextBlock Text="{Binding SettingsViewModel.SpotifyStatusIcon}" FontSize="14" IsVisible="{Binding SettingsViewModel.IsSpotifyConnected, Converter={StaticResource BoolInverseConverter}}"/>
+                                     <TextBlock Text="{Binding SettingsViewModel.SpotifyDisplayName}" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
                                  </StackPanel>
                              </Border>
                              
                              <TextBlock Text="Authentication Active..." 
-                                        IsVisible="{Binding IsAuthenticating}" 
+                                        IsVisible="{Binding SettingsViewModel.IsAuthenticating}" 
                                         VerticalAlignment="Center" 
                                         FontSize="12" 
                                         Foreground="#1DB954"/>
@@ -389,16 +389,16 @@
                         <Grid ColumnDefinitions="180,*">
                             <TextBlock Grid.Column="0" Text="Spotify Client ID:" VerticalAlignment="Center" Foreground="#DDD"/>
                             <TextBox Grid.Column="1" 
-                                     Text="{Binding SpotifyClientId, Mode=TwoWay}"
+                                     Text="{Binding SettingsViewModel.SpotifyClientId, Mode=TwoWay}"
                                      Background="#1E1E1E"
                                      Watermark="Default (QMUSICSLSK)"/>
                         </Grid>
                     </Expander>
 
                     <!-- Connect/Disconnect Buttons -->
-                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="180,0,0,0" IsVisible="{Binding IsAuthenticating, Converter={StaticResource BoolInverseConverter}}">
-                        <Button Command="{Binding ConnectSpotifyCommand}"
-                                IsVisible="{Binding IsSpotifyConnected, Converter={StaticResource BoolInverseConverter}}"
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="180,0,0,0" IsVisible="{Binding SettingsViewModel.IsAuthenticating, Converter={StaticResource BoolInverseConverter}}">
+                        <Button Command="{Binding SettingsViewModel.ConnectSpotifyCommand}"
+                                IsVisible="{Binding SettingsViewModel.IsSpotifyConnected, Converter={StaticResource BoolInverseConverter}}"
                                 Background="#1DB954"
                                 Padding="20,10"
                                 CornerRadius="4">
@@ -408,8 +408,8 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Command="{Binding DisconnectSpotifyCommand}"
-                                IsVisible="{Binding IsSpotifyConnected}"
+                        <Button Command="{Binding SettingsViewModel.DisconnectSpotifyCommand}"
+                                IsVisible="{Binding SettingsViewModel.IsSpotifyConnected}"
                                 Background="#444"
                                 BorderBrush="#D32F2F"
                                 BorderThickness="1"
@@ -421,8 +421,8 @@
                             </StackPanel>
                         </Button>
                         
-                        <Button Command="{Binding TestSpotifyConnectionCommand}"
-                                IsVisible="{Binding IsSpotifyConnected}"
+                        <Button Command="{Binding SettingsViewModel.TestSpotifyConnectionCommand}"
+                                IsVisible="{Binding SettingsViewModel.IsSpotifyConnected}"
                                 Background="#333"
                                 Padding="16,10"
                                 CornerRadius="4"
@@ -439,8 +439,36 @@
                                  Width="400" Height="4"
                                  Margin="180,0,0,0"
                                  HorizontalAlignment="Left"
-                                 IsVisible="{Binding IsAuthenticating}"
+                                 IsVisible="{Binding SettingsViewModel.IsAuthenticating}"
                                  Foreground="#1DB954"/>
+                    
+                    <!-- Stuck State Warning -->
+                    <Border IsVisible="{Binding SettingsViewModel.IsAuthenticating}" 
+                            Background="#552200" 
+                            CornerRadius="4" 
+                            Padding="12"
+                            Margin="180,8,0,0"
+                            BorderBrush="#FFA500"
+                            BorderThickness="1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="⚠️ Authentication is taking longer than expected..." 
+                                       FontSize="12" 
+                                       Foreground="#FFA500"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="If the browser didn't open or the process is stuck, click Reset below." 
+                                       FontSize="11" 
+                                       Foreground="#DDD"
+                                       TextWrapping="Wrap"/>
+                            <Button Name="ResetAuthStateButton"
+                                    Background="#D32F2F"
+                                    Foreground="White"
+                                    Padding="12,6"
+                                    HorizontalAlignment="Left"
+                                    CornerRadius="4">
+                                <TextBlock Text="🔄 Reset Auth State" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 

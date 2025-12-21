@@ -104,6 +104,17 @@ public class SpotifyAuthService
 
         try
         {
+            // Check if the callback port is available before starting
+            var port = new Uri(_config.SpotifyRedirectUri).Port;
+            if (!_httpServer.IsPortAvailable(port))
+            {
+                _logger.LogWarning("Port {Port} is already in use - possible stale Spotify auth session", port);
+                throw new InvalidOperationException(
+                    $"Port {port} is already in use.\n\n" +
+                    "This usually means a previous Spotify login attempt is still open in a browser tab.\n\n" +
+                    "Please close any browser tabs showing the Spotify login page and try again.");
+            }
+
             // Generate PKCE parameters
             _currentCodeVerifier = PKCEHelper.GenerateCodeVerifier();
             var codeChallenge = PKCEHelper.GenerateCodeChallenge(_currentCodeVerifier);

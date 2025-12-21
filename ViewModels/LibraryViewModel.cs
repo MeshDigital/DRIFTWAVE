@@ -479,5 +479,9 @@ public class LibraryViewModel : INotifyPropertyChanged
     public void SetMainViewModel(Views.MainViewModel mainViewModel)
     {
         MainViewModel = mainViewModel;
+        
+        // BUGFIX: Propagate MainViewModel to child ViewModels that depend on it
+        // TrackListViewModel needs _mainViewModel for AllGlobalTracks sync
+        Tracks.SetMainViewModel(mainViewModel);
     }
 }

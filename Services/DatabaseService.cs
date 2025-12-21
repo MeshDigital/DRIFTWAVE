@@ -725,9 +725,12 @@ public class DatabaseService
     public async Task<PlaylistJobEntity?> LoadPlaylistJobAsync(Guid jobId)
     {
         using var context = new AppDbContext();
+        // BUGFIX: Also exclude soft-deleted jobs, otherwise duplicate detection finds deleted jobs
+        // that won't show in the library list (LoadAllPlaylistJobsAsync filters by !IsDeleted)
         return await context.PlaylistJobs.AsNoTracking()
             .Include(j => j.Tracks)
-            .FirstOrDefaultAsync(j => j.Id == jobId);
+            .FirstOrDefaultAsync(j => j.Id == jobId && !j.IsDeleted);
+
     }
 
     public async Task SavePlaylistJobAsync(PlaylistJobEntity job)

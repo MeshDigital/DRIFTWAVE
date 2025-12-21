@@ -56,7 +56,7 @@
                                         BorderThickness="0"
                                         Padding="8,4"
                                         Margin="0,0,4,0"
-                                        IsVisible="{Binding !!SearchQuery.Length}">
+                                        IsVisible="{Binding CanSearch}">
                                     <TextBlock Text="✕" FontSize="14" Foreground="#808080"/>
                                 </Button>
                             </Grid>
@@ -92,7 +92,7 @@
                                 Padding="24,0"
                                 Margin="12,0,0,0"
                                 VerticalAlignment="Top"
-                                IsEnabled="{Binding !!SearchQuery.Length}">
+                                IsEnabled="{Binding CanSearch}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="Search / Import" FontSize="14" FontWeight="SemiBold"/>
                                 <TextBlock Text="➡️" FontSize="14"/>
@@ -351,10 +351,8 @@
             </Border>
         </Grid>
         
-        <!-- Import Preview Overlay (ZIndex 100) -->
-        <Border IsVisible="{Binding IsImportOverlayActive}" Background="#AA000000" ZIndex="100">
-            <views:ImportPreviewPage DataContext="{Binding ImportPreviewViewModel}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-        </Border>
+        <!-- Note: ImportPreviewPage is now shown via NavigationService.NavigateTo("ImportPreview") in ImportOrchestrator -->
+        <!-- Removed embedded overlay to fix dual-overlay bug (Dec 21, 2024) -->
         
     </Grid>
 </UserControl>
