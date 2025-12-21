@@ -89,25 +89,11 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _isUpgradeScoutVisible = false; // Explicit initialization
-    public bool IsUpgradeScoutVisible
-    {
-        get => _isUpgradeScoutVisible;
-        set
-        {
-            if (_isUpgradeScoutVisible != value)
-            {
-                _isUpgradeScoutVisible = value;
-                OnPropertyChanged();
-            }
-        }
-    }
 
     // Commands that delegate to child ViewModels or handle coordination
     public System.Windows.Input.ICommand ViewHistoryCommand { get; }
     public System.Windows.Input.ICommand ToggleEditModeCommand { get; }
     public System.Windows.Input.ICommand ToggleActiveDownloadsCommand { get; }
-    public System.Windows.Input.ICommand ToggleUpgradeScoutCommand { get; }
     
     // Session 1: Critical bug fixes (3 commands to unblock user)
     public System.Windows.Input.ICommand PlayTrackCommand { get; }
@@ -145,7 +131,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         ViewHistoryCommand = new AsyncRelayCommand(ExecuteViewHistoryAsync);
         ToggleEditModeCommand = new RelayCommand<object>(_ => IsEditMode = !IsEditMode);
         ToggleActiveDownloadsCommand = new RelayCommand<object>(_ => IsActiveDownloadsVisible = !IsActiveDownloadsVisible);
-        ToggleUpgradeScoutCommand = new RelayCommand<object>(_ => IsUpgradeScoutVisible = !IsUpgradeScoutVisible);
+        ToggleActiveDownloadsCommand = new RelayCommand<object>(_ => IsActiveDownloadsVisible = !IsActiveDownloadsVisible);
         
         // Session 1: Critical bug fixes
         PlayTrackCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecutePlayTrackAsync);
@@ -156,9 +142,6 @@ public class LibraryViewModel : INotifyPropertyChanged
         
         PlayerViewModel = playerViewModel;
         UpgradeScout = upgradeScout;
-        
-        // Explicitly ensure Upgrade Scout is hidden by default
-        IsUpgradeScoutVisible = false;
         
         // Wire up events between child ViewModels
         Projects.ProjectSelected += OnProjectSelected;
@@ -175,7 +158,6 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
         
         // Subscribe to UpgradeScout close event
-        UpgradeScout.CloseRequested += (s, e) => IsUpgradeScoutVisible = false;
         
         // Phase 3: Post-Import Navigation - Auto-navigate to Library and select imported album
         _eventBus.GetEvent<ProjectAddedEvent>().Subscribe(OnProjectAdded);

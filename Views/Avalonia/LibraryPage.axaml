@@ -85,15 +85,6 @@
                             </StackPanel>
                         </Button>
                         
-                        <!-- Upgrade Scout -->
-                        <Button Command="{Binding ToggleUpgradeScoutCommand}" Classes="nav-item" Margin="8,0">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Border Width="24" Height="24" CornerRadius="4" Background="#1A1133" VerticalAlignment="Center">
-                                    <TextBlock Text="💎" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <TextBlock Text="Upgrade Scout" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
 
                         <Separator Height="1" Background="#333" Margin="12,8"/>
 
@@ -393,14 +384,5 @@
             <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
         </Border>
 
-        <!-- Phase 8: Upgrade Scout Overlay - Only rendered when visible -->
-        <Panel Grid.Column="0" Grid.ColumnSpan="5" ZIndex="500" 
-               IsVisible="{Binding IsUpgradeScoutVisible, FallbackValue=False}">
-            <Border Background="#99000000">
-                <Panel VerticalAlignment="Center" HorizontalAlignment="Center" Width="900" Height="700">
-                    <views:UpgradeScoutView DataContext="{Binding UpgradeScout}"/>
-                </Panel>
-            </Border>
-        </Panel>
     </Grid>
 </UserControl>

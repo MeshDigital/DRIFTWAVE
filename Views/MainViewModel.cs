@@ -106,6 +106,7 @@ public class MainViewModel : INotifyPropertyChanged
         NavigateLibraryCommand = new RelayCommand(NavigateToLibrary);
         NavigateDownloadsCommand = new RelayCommand(NavigateToDownloads);
         NavigateSettingsCommand = new RelayCommand(NavigateToSettings);
+        NavigateUpgradeScoutCommand = new RelayCommand(NavigateUpgradeScout);
         NavigateImportCommand = new RelayCommand(NavigateToImport); // Phase 6D
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationCollapsed = !IsNavigationCollapsed);
         TogglePlayerCommand = new RelayCommand(() => IsPlayerSidebarVisible = !IsPlayerSidebarVisible);
@@ -184,6 +185,7 @@ public class MainViewModel : INotifyPropertyChanged
         _navigationService.RegisterPage("Settings", typeof(Avalonia.SettingsPage));
         _navigationService.RegisterPage("Import", typeof(Avalonia.ImportPage));
         _navigationService.RegisterPage("ImportPreview", typeof(Avalonia.ImportPreviewPage));
+        _navigationService.RegisterPage("UpgradeScout", typeof(Avalonia.UpgradeScoutView));
         
         // Subscribe to navigation events
         _navigationService.Navigated += OnNavigated;
@@ -369,6 +371,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand NavigateLibraryCommand { get; }
     public ICommand NavigateDownloadsCommand { get; }
     public ICommand NavigateSettingsCommand { get; }
+    public ICommand NavigateUpgradeScoutCommand { get; }
     public ICommand NavigateImportCommand { get; } // Phase 6D
     public ICommand ToggleNavigationCommand { get; }
     public ICommand TogglePlayerCommand { get; }
@@ -411,10 +414,21 @@ public class MainViewModel : INotifyPropertyChanged
                 "SettingsPage" => PageType.Settings,
                 "ImportPage" => PageType.Import,
                 "ImportPreviewPage" => PageType.Import, // Map preview to Import category
+                "UpgradeScoutView" => PageType.UpgradeScout,
                 _ => CurrentPageType
             };
             
             _logger.LogInformation("Navigation sync: CurrentPage updated to {PageType}", CurrentPageType);
+
+            // Structure Fix B.2: Reset Search State on Navigation
+            // If we have navigated away from Search (or just generally navigating), ensure search state is clean
+            // unless we are specifically in a search-related flow (like ImportPreview).
+            // But user requested "whenever a navigation event occurs".
+            // We'll reset if we are NOT on Search page anymore.
+            if (CurrentPageType != PageType.Search)
+            {
+               SearchViewModel.ResetState();
+            }
         }
     }
 
@@ -438,6 +452,11 @@ public class MainViewModel : INotifyPropertyChanged
     private void NavigateToDownloads()
     {
         _navigationService.NavigateTo("Downloads");
+    }
+
+    private void NavigateUpgradeScout()
+    {
+        _navigationService.NavigateTo("UpgradeScout");
     }
 
     private void NavigateToImport()

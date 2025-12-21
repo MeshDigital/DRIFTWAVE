@@ -232,6 +232,18 @@
                     </Button>
                     
                     <Button Classes="nav" 
+                            Command="{Binding NavigateUpgradeScoutCommand}"
+                            Classes.selected="{Binding CurrentPageType, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static models:PageType.UpgradeScout}}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Grid.ColumnSpan="2" CornerRadius="4" IsVisible="False"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="💎" FontSize="16"/>
+                                <TextBlock Text="Upgrade Scout" FontSize="14"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <Button Classes="nav" 
                             Command="{Binding NavigateSettingsCommand}"
                             Classes.selected="{Binding CurrentPageType, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static models:PageType.Settings}}">
                         <Grid ColumnDefinitions="Auto,*">

@@ -204,6 +204,18 @@ public class SearchViewModel : INotifyPropertyChanged
         }
     }
 
+    public void ResetState()
+    {
+        if (IsSearching)
+        {
+            // Cancel any ongoing search here if possible
+             IsSearching = false;
+        }
+        
+        // Optional: specific logic to clear potentially confusing UI states
+        StatusText = "";
+    }
+
     private void OnTracksFound(IEnumerable<Track> tracks)
     {
         // QUICK WIN: Batch UI updates to prevent freeze
