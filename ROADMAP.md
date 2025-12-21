@@ -446,9 +446,13 @@
 ## 🐛 Known Issues
 
 ### Critical
-- None currently
+- **Duplicate Detection Bug**: Batch imports (Spotify/CSV) fail to detect duplicates *within* the same incoming batch.
+- **UI Thread Safety**: `PlaylistTrackViewModel` risk "Cross-thread Access" exceptions due to background event subscriptions.
+- **Race Condition**: `LibraryViewModel.OnProjectAdded` uses a fragile `Task.Delay(300)` for post-import selection.
+- **Incomplete Sync**: `TrackListViewModel` may show merged tracks as `Pending` if not yet indexed in `AllGlobalTracks`.
 
 ### Minor
+- **Coordinate Logic**: Drag-and-drop coordinate transformations use brittle `Parent` visual relative positioning.
 - Drag-and-drop adorner positioning on high-DPI displays
 - Occasional UI thread delays with large playlists (10k+ tracks)
 

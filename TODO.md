@@ -10,6 +10,14 @@
 - ✅ **Performance Optimization**: Event-to-project mapping eliminates O(n) update loop (500+ ops/sec → O(1))
 - ✅ Library-first design: Track state visualization with inline controls
 - ✅ Search performance: Streaming results with incremental ranking
+- ✅ **Library & Import 2.0**: Robust merging, deduplication, and auto-navigation fixes (Dec 21)
+
+### 🚨 Technical Debt & Stability (Pending FIX)
+- [ ] **Batch Duplicate Fix**: Update `DownloadManager.QueueProject` to check against `addedInBatch` set during hash check loop.
+- [ ] **UI Thread Safety**: Wrap `PlaylistTrackViewModel` property updates (via event bus) in `Dispatcher.UIThread.Post`.
+- [ ] **Coordinate Precision**: Refactor `LibraryPage.axaml.cs` drag-drop to use `VisualRoot` / `PointToClient` for transformations.
+- [ ] **Selection Robustness**: Replace `Task.Delay` in `LibraryViewModel` with a reactive "Wait until Project exists in collection" logic.
+- [ ] **Source of Truth Sync**: Update `TrackListViewModel` to cross-reference `DownloadManager` for active tracks not yet in global index.
 
 ### What's Working
 - ✅ Search with ranking (Soulseek P2P)
