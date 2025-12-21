@@ -84,6 +84,16 @@
                                 <TextBlock Text="Liked Songs" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+                        
+                        <!-- Upgrade Scout -->
+                        <Button Command="{Binding ToggleUpgradeScoutCommand}" Classes="nav-item" Margin="8,0">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Width="24" Height="24" CornerRadius="4" Background="#1A1133" VerticalAlignment="Center">
+                                    <TextBlock Text="💎" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Upgrade Scout" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
 
                         <Separator Height="1" Background="#333" Margin="12,8"/>
 

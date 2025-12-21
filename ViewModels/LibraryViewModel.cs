@@ -157,6 +157,9 @@ public class LibraryViewModel : INotifyPropertyChanged
         PlayerViewModel = playerViewModel;
         UpgradeScout = upgradeScout;
         
+        // Explicitly ensure Upgrade Scout is hidden by default
+        IsUpgradeScoutVisible = false;
+        
         // Wire up events between child ViewModels
         Projects.ProjectSelected += OnProjectSelected;
         SmartPlaylists.SmartPlaylistSelected += OnSmartPlaylistSelected;
