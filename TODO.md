@@ -4,7 +4,12 @@
 
 ---
 
-## Current Status: 70% Complete ✅
+## Current Status: 71% Complete ✅
+
+### Recent Updates (December 21, 2025)
+- ✅ **Performance Optimization**: Event-to-project mapping eliminates O(n) update loop (500+ ops/sec → O(1))
+- ✅ Library-first design: Track state visualization with inline controls
+- ✅ Search performance: Streaming results with incremental ranking
 
 ### What's Working
 - ✅ Search with ranking (Soulseek P2P)

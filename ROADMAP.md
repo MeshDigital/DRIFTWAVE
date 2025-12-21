@@ -107,7 +107,7 @@
 - Track states (downloading, missing, completed) should be visual indicators in the library
 - One unified workflow: Browse → Download → Manage
 
-### Phase 11: Library-Integrated Download Controls (60% Complete)
+### Phase 11: Library-Integrated Download Controls (65% Complete)
 **Goal**: Transform library into a unified workspace with embedded download management
 
 **Completed** ✅:
@@ -116,6 +116,7 @@
 - [x] **Progress Display** - Download percentage shown inline in status badges
 - [x] **Post-Import Navigation** - Auto-navigate to library and select imported album
 - [x] **Enhanced Playlist Cards** - Show download stats (total, successful, active, failed) with larger album art
+- [x] **Performance Optimization** - Event-to-project mapping eliminates O(n) loop bottleneck (Dec 21)
 
 **In Progress** 🚧:
 - [ ] **Active Downloads Tracking** - Real-time count of actively downloading tracks per project
@@ -127,6 +128,7 @@
 - [ ] **Batch Operations** - Multi-select tracks and bulk download/retry/cancel
 - [ ] **Context Menu Integration** - Right-click tracks to initiate searches/downloads
 - [ ] **Smart Filtering** - Quick filter chips for "Downloading", "Failed", "Missing"
+- [ ] **Sidebar Search** - Filter playlist list for users with 50+ projects
 
 **Impact**: 60% reduction in page switching, immediate visual feedback, faster workflow
 
