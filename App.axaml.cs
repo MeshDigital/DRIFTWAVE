@@ -104,6 +104,18 @@ public partial class App : Application
                 {
                     try
                     {
+                        // CRITICAL FIX: Proactively verify Spotify connection on startup
+                        // This prevents the "zombie token" bug where tokens are invalid but UI shows "Connected"
+                        try
+                        {
+                            var spotifyAuthService = Services.GetRequiredService<SpotifyAuthService>();
+                            await spotifyAuthService.VerifyConnectionAsync();
+                        }
+                        catch (Exception spotifyEx)
+                        {
+                            Serilog.Log.Warning(spotifyEx, "Spotify connection verification failed (non-critical)");
+                        }
+
                         // Phase 8: Validate FFmpeg availability (Moved from startup)
                         try
                         {

@@ -377,10 +377,42 @@ public class SettingsViewModel : INotifyPropertyChanged
         // Explicitly initialize IsAuthenticating to false
         IsAuthenticating = false;
 
-        // Delay initial check to avoid blocking UI startup
-        _ = Task.Delay(500).ContinueWith(_ => CheckSpotifyConnectionStatusAsync());
+        // Note: Initial Spotify verification is now done in App.axaml.cs during app startup
+        // via SpotifyAuthService.VerifyConnectionAsync() to fix the "zombie token" bug.
+        // We poll here with a 500ms delay for UI responsiveness, but the real validation
+        // happened during background initialization.
+        _ = Task.Delay(500).ContinueWith(_ => RefreshSpotifyConnectionStatusAsync());
         _ = CheckFfmpegAsync(); // Phase 8: Check FFmpeg on startup
         UpdateLivePreview();
+    }
+
+    /// <summary>
+    /// Refreshes the Spotify connection status display without blocking.
+    /// Called from the UI layer to keep the status indicator up-to-date.
+    /// </summary>
+    private async Task RefreshSpotifyConnectionStatusAsync()
+    {
+        // Just refresh the display based on current auth state
+        if (_spotifyAuthService.IsAuthenticated)
+        {
+            try
+            {
+                var user = await _spotifyAuthService.GetCurrentUserAsync();
+                SpotifyDisplayName = user.DisplayName ?? user.Id;
+                IsSpotifyConnected = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to refresh Spotify user display name");
+                IsSpotifyConnected = false;
+                SpotifyDisplayName = "Not Connected";
+            }
+        }
+        else
+        {
+            IsSpotifyConnected = false;
+            SpotifyDisplayName = "Not Connected";
+        }
     }
 
     /// <summary>
@@ -520,44 +552,6 @@ public class SettingsViewModel : INotifyPropertyChanged
             return (false, "");
         }
     }
-
-    private async Task CheckSpotifyConnectionStatusAsync()
-    {
-        try
-        {
-            // Wrap the entire check in a timeout to prevent UI freezing
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
-            var checkTask = Task.Run(async () =>
-            {
-                if (await _spotifyAuthService.IsAuthenticatedAsync())
-                {
-                    var user = await _spotifyAuthService.GetCurrentUserAsync();
-                    SpotifyDisplayName = user.DisplayName ?? user.Id;
-                    IsSpotifyConnected = true;
-                }
-                else
-                {
-                    IsSpotifyConnected = false;
-                    SpotifyDisplayName = "Not Connected";
-                }
-            }, cts.Token);
-
-            await checkTask;
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning("Spotify connection check timed out after 6 seconds");
-            IsSpotifyConnected = false;
-            SpotifyDisplayName = "Check Timed Out";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to check Spotify connection status");
-            IsSpotifyConnected = false;
-            SpotifyDisplayName = "Not Connected";
-        }
-    }
-
     private async Task ConnectSpotifyAsync()
     {
         try
@@ -571,7 +565,7 @@ public class SettingsViewModel : INotifyPropertyChanged
             
             if (success)
             {
-                await CheckSpotifyConnectionStatusAsync();
+                await RefreshSpotifyConnectionStatusAsync();
                 UseSpotifyApi = true; // Auto-enable API usage on success
                 _configManager.Save(_config); // Save the enabled state
             }

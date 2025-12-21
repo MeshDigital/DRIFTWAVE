@@ -59,6 +59,72 @@ public class SpotifyAuthService
     }
 
     /// <summary>
+    /// Proactively verifies Spotify connection on app startup.
+    /// This method VALIDATES the stored token by making an actual API call,
+    /// rather than just checking if a token file exists.
+    /// 
+    /// This is the fix for the "zombie token" bug where the app would show
+    /// "Connected" after restart but the token was actually invalid.
+    /// </summary>
+    public async Task VerifyConnectionAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Starting proactive Spotify connection verification...");
+
+            // Load token from secure storage
+            var refreshToken = await _tokenStorage.LoadRefreshTokenAsync();
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                _logger.LogInformation("No stored refresh token found - user is not authenticated");
+                IsAuthenticated = false;
+                return;
+            }
+
+            _logger.LogInformation("Stored refresh token found, attempting to validate...");
+
+            // Try to refresh the token to verify it's still valid with Spotify
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var verifyTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await RefreshAccessTokenAsync();
+                    // If refresh succeeded, we're authenticated
+                    IsAuthenticated = _authenticatedClient != null;
+                    
+                    if (IsAuthenticated)
+                    {
+                        _logger.LogInformation("✓ Token verification succeeded - user is authenticated");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("✗ Token verification failed - RefreshAccessTokenAsync did not create client");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "✗ Token verification failed during refresh - clearing invalid token");
+                    IsAuthenticated = false;
+                    // Don't re-throw; we want to degrade gracefully
+                }
+            }, cts.Token);
+
+            await verifyTask;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Token verification timed out after 5 seconds - assuming not authenticated");
+            IsAuthenticated = false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during Spotify connection verification");
+            IsAuthenticated = false;
+        }
+    }
+
+    /// <summary>
     /// Checks if the user is currently authenticated with Spotify.
     /// Does not trigger a refresh if the current token is still valid.
     /// </summary>
