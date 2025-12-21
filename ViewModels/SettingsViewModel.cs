@@ -278,6 +278,11 @@ public class SettingsViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(SpotifyStatusColor));
                 OnPropertyChanged(nameof(SpotifyStatusIcon));
+                
+                // Re-evaluate command accessibility
+                (ConnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (DisconnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (TestSpotifyConnectionCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -306,6 +311,7 @@ public class SettingsViewModel : INotifyPropertyChanged
             {
                 // notify commands if needed, or rely on command manager
                 (ConnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (DisconnectSpotifyCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (TestSpotifyConnectionCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }

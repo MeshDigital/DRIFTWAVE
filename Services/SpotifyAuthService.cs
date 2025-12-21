@@ -60,22 +60,30 @@ public class SpotifyAuthService
 
     /// <summary>
     /// Checks if the user is currently authenticated with Spotify.
+    /// Does not trigger a refresh if the current token is still valid.
     /// </summary>
     public async Task<bool> IsAuthenticatedAsync()
     {
-        // Check if we have a stored refresh token
+        // 1. Check if we have a valid client and non-expired token
+        if (_authenticatedClient != null && DateTime.UtcNow < _tokenExpiresAt.AddMinutes(-1))
+        {
+            return true;
+        }
+
+        // 2. Check if we have a stored refresh token
         var refreshToken = await _tokenStorage.LoadRefreshTokenAsync();
         if (string.IsNullOrEmpty(refreshToken))
             return false;
 
-        // Try to refresh the token to verify it's still valid
+        // 3. Try to refresh the token to verify it's still valid
         try
         {
             await RefreshAccessTokenAsync();
-            return true;
+            return _authenticatedClient != null;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "IsAuthenticatedAsync check failed during refresh");
             return false;
         }
     }
@@ -182,7 +190,11 @@ public class SpotifyAuthService
         var tokenRequest = new PKCETokenRequest(_config.SpotifyClientId, authCode, new Uri(_config.SpotifyRedirectUri), _currentCodeVerifier);
 
         var config = SpotifyClientConfig.CreateDefault();
-        var tokenResponse = await new OAuthClient(config).RequestToken(tokenRequest);
+        var oauthClient = new OAuthClient(config);
+
+        // Add 30-second timeout to token exchange
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var tokenResponse = await oauthClient.RequestToken(tokenRequest).WaitAsync(cts.Token);
 
         _currentTokenResponse = tokenResponse;
         _tokenExpiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn);
@@ -207,22 +219,45 @@ public class SpotifyAuthService
     /// </summary>
     public async Task RefreshAccessTokenAsync()
     {
+        Task? taskToWait = null;
+
         await _authLock.WaitAsync();
         try
         {
+            // If a refresh is already in progress, capture the task and wait for it outside the lock
             if (_refreshTask != null)
             {
-                await _refreshTask;
-                return;
+                taskToWait = _refreshTask;
             }
-
-            _refreshTask = RefreshAccessTokenInternalAsync();
-            await _refreshTask;
+            else
+            {
+                // Start a new refresh task
+                _refreshTask = RefreshAccessTokenInternalAsync();
+                taskToWait = _refreshTask;
+            }
         }
         finally
         {
-            _refreshTask = null;
             _authLock.Release();
+        }
+
+        // Wait for the task outside the lock to allow other callers to check status
+        if (taskToWait != null)
+        {
+            try 
+            {
+                await taskToWait;
+            }
+            finally 
+            {
+                // Only the first caller clears the task, but we use another lock or just check
+                await _authLock.WaitAsync();
+                if (_refreshTask == taskToWait)
+                {
+                    _refreshTask = null;
+                }
+                _authLock.Release();
+            }
         }
     }
 
@@ -244,7 +279,11 @@ public class SpotifyAuthService
             var tokenRequest = new PKCETokenRefreshRequest(_config.SpotifyClientId, refreshToken);
 
             var config = SpotifyClientConfig.CreateDefault();
-            var tokenResponse = await new OAuthClient(config).RequestToken(tokenRequest);
+            var oauthClient = new OAuthClient(config);
+
+            // Add 30-second timeout to token refresh
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var tokenResponse = await oauthClient.RequestToken(tokenRequest).WaitAsync(cts.Token);
 
             _currentTokenResponse = tokenResponse;
             _tokenExpiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn);
