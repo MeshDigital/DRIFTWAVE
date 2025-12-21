@@ -394,7 +394,8 @@
         </Border>
 
         <!-- Phase 8: Upgrade Scout Overlay - Only rendered when visible -->
-        <Panel Grid.Column="0" Grid.ColumnSpan="5" ZIndex="500" IsVisible="{Binding IsUpgradeScoutVisible}">
+        <Panel Grid.Column="0" Grid.ColumnSpan="5" ZIndex="500" 
+               IsVisible="{Binding IsUpgradeScoutVisible, FallbackValue=False}">
             <Border Background="#99000000">
                 <Panel VerticalAlignment="Center" HorizontalAlignment="Center" Width="900" Height="700">
                     <views:UpgradeScoutView DataContext="{Binding UpgradeScout}"/>
