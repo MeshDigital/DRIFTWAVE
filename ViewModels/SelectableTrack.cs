@@ -39,6 +39,7 @@ public class SelectableTrack : INotifyPropertyChanged
     public string? Artist => Model.Artist;
     public string? Title => Model.Title;
     public string? Album => Model.Album;
+    public bool IsInLibrary => Model.IsInLibrary;
     
     private int _trackNumber;
     public int TrackNumber

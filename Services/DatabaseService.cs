@@ -892,30 +892,39 @@ public class DatabaseService
         try
         {
             // Convert model to entity
-            var jobEntity = new PlaylistJobEntity
-            {
-                Id = job.Id,
-                SourceTitle = job.SourceTitle,
-                SourceType = job.SourceType,
-                DestinationFolder = job.DestinationFolder,
-                CreatedAt = job.CreatedAt,
-                TotalTracks = job.TotalTracks,
-                SuccessfulCount = job.SuccessfulCount,
-                FailedCount = job.FailedCount,
-                IsDeleted = false
-            };
-            
-            // Check if job exists to decide between Add (Insert) and Update
-            var exists = await context.PlaylistJobs.AnyAsync(j => j.Id == job.Id);
+            // 2. Handle Job Header (Add or Update)
+            var existingJob = await context.PlaylistJobs.FirstOrDefaultAsync(j => j.Id == job.Id);
 
-            if (exists)
+            if (existingJob != null)
             {
-                context.PlaylistJobs.Update(jobEntity);
+                // UPDATE existing job: Only update TotalTracks and potentially header info
+                // Do NOT reset SuccessfulCount/FailedCount to 0 if the 'job' model is fresh
+                existingJob.TotalTracks = Math.Max(existingJob.TotalTracks, job.TotalTracks);
+                existingJob.SourceTitle = job.SourceTitle;
+                existingJob.SourceType = job.SourceType;
+                existingJob.IsDeleted = false;
+                // Add more updates if needed (e.g. DestinationFolder if it changed)
+                context.PlaylistJobs.Update(existingJob);
             }
             else
             {
+                // INSERT new job
+                var jobEntity = new PlaylistJobEntity
+                {
+                    Id = job.Id,
+                    SourceTitle = job.SourceTitle,
+                    SourceType = job.SourceType,
+                    DestinationFolder = job.DestinationFolder,
+                    CreatedAt = job.CreatedAt,
+                    TotalTracks = job.TotalTracks,
+                    SuccessfulCount = job.SuccessfulCount,
+                    FailedCount = job.FailedCount,
+                    IsDeleted = false
+                };
                 context.PlaylistJobs.Add(jobEntity);
             }
+            
+            bool exists = existingJob != null;
             
             // For tracks, we also need to handle Add vs Update. 
             if (!exists)

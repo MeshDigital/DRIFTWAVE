@@ -299,9 +299,11 @@ public class ProjectListViewModel : INotifyPropertyChanged
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            if (AllProjects.Any(j => j.Id == job.Id))
+            var existingProject = AllProjects.FirstOrDefault(j => j.Id == job.Id);
+            if (existingProject != null)
             {
-                _logger.LogWarning("Project {JobId} already exists, skipping add", job.Id);
+                _logger.LogInformation("Project {JobId} already exists, selecting existing one", job.Id);
+                SelectedProject = existingProject;
                 return;
             }
 

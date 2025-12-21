@@ -226,12 +226,42 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             // but no PlaylistTracks. We must convert them before proceeding.
             if (job.PlaylistTracks.Count == 0 && job.OriginalTracks.Count > 0)
             {
-                _logger.LogInformation("Converting {OriginalTrackCount} OriginalTracks to PlaylistTracks", job.OriginalTracks.Count);
-                // Simple conversion logic - existing code was fine here, keeping it compact
+                _logger.LogInformation("Gap analysis: Checking for existing tracks in Job {JobId} to avoid duplicates", job.Id);
+                
+                // Phase 7.1: Robust Deduplication
+                // Load existing track hashes for this job to avoid adding duplicates
+                var existingHashes = new HashSet<string>();
+                try 
+                {
+                    var existingJob = await _libraryService.FindPlaylistJobAsync(job.Id);
+                    if (existingJob != null)
+                    {
+                        foreach (var t in existingJob.PlaylistTracks)
+                        {
+                            if (!string.IsNullOrEmpty(t.TrackUniqueHash))
+                                existingHashes.Add(t.TrackUniqueHash);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to load existing tracks for gap analysis, proceeding cautiously");
+                }
+
+                _logger.LogInformation("Converting {OriginalTrackCount} OriginalTracks to PlaylistTracks (Existing: {ExistingCount})", 
+                    job.OriginalTracks.Count, existingHashes.Count);
+                
                 var playlistTracks = new List<PlaylistTrack>();
-                int idx = 1;
+                int idx = existingHashes.Count + 1;
                 foreach (var track in job.OriginalTracks)
                 {
+                    // SKIP if already in this project
+                    if (existingHashes.Contains(track.UniqueHash))
+                    {
+                        _logger.LogDebug("Skipping track '{Title}' - already exists in this project", track.Title);
+                        continue;
+                    }
+
                     playlistTracks.Add(new PlaylistTrack
                     {
                         Id = Guid.NewGuid(),
@@ -256,6 +286,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     });
                 }
                 job.PlaylistTracks = playlistTracks;
+                job.TotalTracks = existingHashes.Count + playlistTracks.Count;
             }
 
             _logger.LogInformation("Queueing project with {TrackCount} tracks", job.PlaylistTracks.Count);

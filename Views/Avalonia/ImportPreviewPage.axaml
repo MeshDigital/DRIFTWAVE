@@ -34,7 +34,14 @@
                     </StackPanel>
                 </StackPanel>
                 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Command="{Binding SelectMissingCommand}" Background="#1AFFFFFF" Foreground="White" Padding="12,6" CornerRadius="4">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="✨" FontSize="14"/>
+                            <TextBlock Text="Select Missing" FontSize="12"/>
+                        </StackPanel>
+                    </Button>
+                    <Border Width="1" Height="16" Background="#444" Margin="4,0"/>
                     <Button Command="{Binding CreateNewCommand}" Background="#424242" Foreground="White" Padding="12,6" CornerRadius="4">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Text="📄" FontSize="14"/> <!-- Clone Icon -->
@@ -75,6 +82,17 @@
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Text="☐" FontSize="14"/>
                             <TextBlock Text="Deselect All" FontSize="13"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding SelectMissingCommand}"
+                            Background="#2D2D2D"
+                            Foreground="White"
+                            Padding="12,8"
+                            CornerRadius="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="✨" FontSize="14"/>
+                            <TextBlock Text="Select Missing" FontSize="13"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>

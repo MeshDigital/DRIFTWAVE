@@ -90,6 +90,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     public ICommand AddToLibraryCommand { get; }
     public ICommand SelectAllCommand { get; }
     public ICommand DeselectAllCommand { get; }
+    public ICommand SelectMissingCommand { get; }
     public ICommand CancelCommand { get; }
 
     private CancellationTokenSource? _enrichmentCts;
@@ -114,6 +115,7 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         AddToLibraryCommand = new AsyncRelayCommand(AddToLibraryAsync, () => CanAddToLibrary);
         SelectAllCommand = new RelayCommand(SelectAll);
         DeselectAllCommand = new RelayCommand(DeselectAll);
+        SelectMissingCommand = new RelayCommand(SelectMissing);
         CancelCommand = new RelayCommand(Cancel);
         
         MergeCommand = new AsyncRelayCommand(MergeAsync);
@@ -302,9 +304,13 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     
     private async Task MergeAsync()
     {
-        // Keep target as existing ID
-        // Filter out tracks that are already in the existing job?
-        // For now, simple append logic in AddToLibraryAsync will suffice if we pass the ID.
+        // 1. Deselect everything first
+        DeselectAll();
+
+        // 2. Select only missing tracks
+        SelectMissing();
+
+        // 3. Add to library (this will use the existing _targetJobId)
         await AddToLibraryAsync();
     }
 
@@ -344,10 +350,16 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
                     ReleaseDate = query.ReleaseDate
                  };
 
-                 // Check library status (simplistic check vs memory cache or just skip for speed)
-                 // For streaming speed, maybe skip checking every single one against DB?
-                 // Or we rely on ImportOrchestrator to have pre-checked?
-                 // Let's assume unchecked for speed.
+                 // Check library status for deduplication feedback
+                 if (_libraryService != null)
+                 {
+                     try 
+                     {
+                         var entry = await _libraryService.FindLibraryEntryAsync(track.UniqueHash);
+                         track.IsInLibrary = entry != null;
+                     }
+                     catch { /* Ignore DB errors during stream */ }
+                 }
 
                  var selectable = new SelectableTrack(track);
                  selectable.OnSelectionChanged = () => 
@@ -578,6 +590,15 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
         foreach (var track in ImportedTracks)
         {
             track.IsSelected = false;
+        }
+        UpdateSelectedCount();
+    }
+
+    private void SelectMissing()
+    {
+        foreach (var track in ImportedTracks)
+        {
+            track.IsSelected = !track.IsInLibrary;
         }
         UpdateSelectedCount();
     }
