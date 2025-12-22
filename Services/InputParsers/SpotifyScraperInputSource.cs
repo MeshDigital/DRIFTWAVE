@@ -598,8 +598,11 @@ public class SpotifyScraperInputSource
                     if (IsTrackObject(element))
                     {
                         var track = ExtractTrackFromObject(element, sourceTitle);
-                        if (track != null)
-                            tracks.Add(track);
+                        // Validate ID: Must be alphanumeric and reasonable length (Spotify IDs are 22 chars)
+                        if (track != null && !string.IsNullOrEmpty(track.SpotifyTrackId) && track.SpotifyTrackId.Length >= 20)
+                        {
+                             tracks.Add(track);
+                        }
                     }
 
                     foreach (var prop in element.EnumerateObject())

@@ -182,6 +182,8 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              OnPropertyChanged(nameof(SpotifyTrackId));
              OnPropertyChanged(nameof(IsEnriched));
              OnPropertyChanged(nameof(MetadataStatus));
+             OnPropertyChanged(nameof(MetadataStatusColor));
+             OnPropertyChanged(nameof(MetadataStatusSymbol));
         });
     }
 
@@ -219,6 +221,14 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsActive));
                 OnPropertyChanged(nameof(StatusColor));
+                OnPropertyChanged(nameof(StatusText));
+                
+                // Notify command availability
+                OnPropertyChanged(nameof(CanPause));
+                OnPropertyChanged(nameof(CanResume));
+                OnPropertyChanged(nameof(CanCancel));
+                OnPropertyChanged(nameof(CanHardRetry));
+                OnPropertyChanged(nameof(CanDeleteFile));
                 
                 // CommandManager.InvalidateRequerySuggested() happens automatically or via interaction
             }
@@ -234,6 +244,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
             {
                 _progress = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusText));
             }
         }
     }
@@ -417,6 +428,31 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
             };
         }
     }
+
+    public string StatusText => State switch
+    {
+        PlaylistTrackState.Completed => "✓ Ready",
+        PlaylistTrackState.Downloading => $"↓ {Progress:P0}",
+        PlaylistTrackState.Searching => "🔍 Search",
+        PlaylistTrackState.Queued => "⏳ Queued",
+        PlaylistTrackState.Failed => "✗ Failed",
+        PlaylistTrackState.Pending => "⊙ Missing",
+        _ => "?"
+    };
+
+    public string MetadataStatusColor => MetadataStatus switch
+    {
+        "Enriched" => "#FFD700", // Gold
+        "Identified" => "#1E90FF", // DodgerBlue
+        _ => "#505050"
+    };
+
+    public string MetadataStatusSymbol => MetadataStatus switch
+    {
+        "Enriched" => "✨",
+        "Identified" => "🆔",
+        _ => "⏳"
+    };
 
     // Actions
     public void Pause()

@@ -196,52 +196,19 @@
                                        Foreground="White"/>
                         </Grid>
 
-                        <!-- Album Results Grid -->
-                        <DataGrid ItemsSource="{Binding AlbumResults}"
-                                  AutoGenerateColumns="False"
-                                  Background="Transparent"
-                                  BorderThickness="0"
-                                  GridLinesVisibility="Horizontal"
-                                  RowBackground="Transparent"
-                                  Foreground="#DDD"
-                                  HeadersVisibility="Column"
-                                  CanUserReorderColumns="False"
-                                  CanUserResizeColumns="True"
-                                  CanUserSortColumns="False"
-                                  IsReadOnly="True">
-                            
-                            <DataGrid.Styles>
-                                <Style Selector="DataGridRow:pointerover">
-                                    <Setter Property="Background" Value="#1AFFFFFF"/>
-                                </Style>
-                                <Style Selector="DataGridRow:selected">
-                                    <Setter Property="Background" Value="#2A0078D4"/>
-                                </Style>
-                            </DataGrid.Styles>
-
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Album" Binding="{Binding AlbumTitle}" Width="3*"/>
-                                <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="2*"/>
-                                <DataGridTextColumn Header="Tracks" Binding="{Binding TrackCount, StringFormat='{}{0} tracks'}" Width="100"/>
-                                <DataGridTextColumn Header="Quality" Binding="{Binding QualitySummary}" Width="120"/>
-                                <DataGridTextColumn Header="Size" Binding="{Binding TotalSizeMb, StringFormat='{}{0:F1} MB'}" Width="100"/>
-                                <DataGridTextColumn Header="User" Binding="{Binding Username}" Width="120"/>
-                                <DataGridTemplateColumn Header="Action" Width="150">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Button Command="{Binding DownloadAlbumCommand}"
-                                                    Classes="primary"
-                                                    Padding="12,6">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="⬇️" FontSize="12"/>
-                                                    <TextBlock Text="Download" FontSize="12" FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <!-- Album Results Grid (Cards) -->
+                        <ItemsControl ItemsSource="{Binding AlbumResults}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:AlbumCard DataContext="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -311,6 +278,8 @@
                             </DataGrid.Styles>
 
                             <DataGrid.Columns>
+                                <!-- Status Column -->
+                                <DataGridTextColumn Header="Status" Binding="{Binding StatusIcon}" Width="60"/>
                                 <DataGridTextColumn Header="Rank" Binding="{Binding CurrentRank, StringFormat='{}{0:F1}'}" Width="60"/>
                                 <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="2*"/>
                                 <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="3*"/>

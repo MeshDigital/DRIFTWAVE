@@ -323,7 +323,7 @@ public class MetadataEnrichmentOrchestrator : IDisposable
             }
             else
             {
-                 _logger.LogDebug("Metadata enrichment yielded match for {Artist} - {Title}", track.Artist, track.Title);
+                 _logger.LogDebug("Metadata enrichment failed to find match for {Artist} - {Title}", track.Artist, track.Title);
             }
 
             await _databaseService.RemovePendingOrchestrationAsync(track.TrackUniqueHash);

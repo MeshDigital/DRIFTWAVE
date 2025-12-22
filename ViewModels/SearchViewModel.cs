@@ -157,7 +157,8 @@ public partial class SearchViewModel : ReactiveObject
         INavigationService navigationService,
         IFileInteractionService fileInteractionService,
         IClipboardService clipboardService,
-        SearchOrchestrationService searchOrchestration)
+        SearchOrchestrationService searchOrchestration,
+        IEventBus eventBus)
     {
         _logger = logger;
         _soulseek = soulseek;
@@ -169,6 +170,10 @@ public partial class SearchViewModel : ReactiveObject
         _fileInteractionService = fileInteractionService;
         _clipboardService = clipboardService;
         _searchOrchestration = searchOrchestration;
+
+        // Reactive Status Updates
+        eventBus.GetEvent<Events.TrackStateChangedEvent>().Subscribe(OnTrackStateChanged);
+        eventBus.GetEvent<Events.TrackAddedEvent>().Subscribe(OnTrackAdded);
 
         // --- Reactive Pipeline Setup ---
         // Connect SourceList -> Filter -> Sort -> Bind -> Public Collection
@@ -264,7 +269,18 @@ public partial class SearchViewModel : ReactiveObject
                     IsAlbumSearch,
                     cts.Token))
                 {
-                    buffer.Add(new SearchResult(track));
+                    var result = new SearchResult(track);
+                    
+                    // Check initial status
+                    var existing = _downloadManager.ActiveDownloads.FirstOrDefault(d => d.GlobalId == track.UniqueHash);
+                    if (existing != null)
+                    {
+                        result.Status = existing.State == PlaylistTrackState.Completed ? TrackStatus.Downloaded :
+                                        existing.State == PlaylistTrackState.Failed ? TrackStatus.Failed : TrackStatus.Missing;
+                                        // TODO: Add "Queued" or "Downloading" to TrackStatus if we want granular UI
+                    }
+                    
+                    buffer.Add(result);
                     totalFound++;
 
                     // Throttled Buffering (User Trick)
@@ -384,6 +400,50 @@ public partial class SearchViewModel : ReactiveObject
         _searchResults.Clear();
         AlbumResults.Clear();
         StatusText = "Ready";
+    }
+
+    private void OnTrackStateChanged(Events.TrackStateChangedEvent evt)
+    {
+        // Update any matching search results via UI thread
+        if (_searchResults.Count == 0) return;
+
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var status = evt.State == PlaylistTrackState.Completed ? TrackStatus.Downloaded : 
+                         evt.State == PlaylistTrackState.Failed ? TrackStatus.Failed : TrackStatus.Missing;
+
+            // Note: We use global ID (hash) to match.
+            // SourceList access is thread-safe for reading but we need to modify the ViewModel which is bound.
+            // Since SearchResult is an object, we can iterate and update property.
+            
+            // We need to efficiently find the item.
+            // _searchResults is a SourceList. We can just iterate the items we exposed.
+            foreach (var result in _publicSearchResults)
+            {
+                if (result.Model.UniqueHash == evt.TrackGlobalId)
+                {
+                    result.Status = status;
+                }
+            }
+        });
+    }
+
+    private void OnTrackAdded(Events.TrackAddedEvent evt)
+    {
+         Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var result in _publicSearchResults)
+            {
+                if (result.Model.UniqueHash == evt.TrackModel.TrackUniqueHash)
+                {
+                    // It was just added to queue
+                    // We might want a "Queued" status in SearchResult, but TrackStatus only has Missing/Downloaded/Failed
+                    // We can map Missing to "Queued" visually if we add a property, but for now let's leave it.
+                    // Actually, if it's added, it's effectively "Queued".
+                    // Let's assume TrackStateChanged checks will handle the granular states (Downloading etc)
+                }
+            }
+        });
     }
 
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

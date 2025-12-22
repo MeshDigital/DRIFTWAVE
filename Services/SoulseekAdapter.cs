@@ -110,22 +110,24 @@ public class SoulseekAdapter : ISoulseekAdapter, IDisposable
             throw new InvalidOperationException("Soulseek client not initialized yet. ConnectAsync may not have completed.");
         }
 
-        // Wait for Soulseek to establish connection before searching
+        // Wait for Soulseek to be fully logged in before searching
         // Fixes: "The server connection must be connected and logged in" error on startup
         int waitRetries = 0;
-        const int maxWaitRetries = 10;
+        const int maxWaitRetries = 20; // Increased to 10s (20 * 500ms)
         const int retryDelayMs = 500;
-        while (!_client.State.HasFlag(SoulseekClientStates.Connected) && waitRetries < maxWaitRetries)
+        
+        // Wait until we are Connected AND LoggedIn (and not LoggingIn)
+        while ((!_client.State.HasFlag(SoulseekClientStates.LoggedIn)) && waitRetries < maxWaitRetries)
         {
-            _logger.LogInformation("Waiting for Soulseek connection before searching (retry {Attempt}/{Max})...", waitRetries + 1, maxWaitRetries);
+            _logger.LogInformation("Waiting for Soulseek login... (State: {State}, Attempt {Attempt}/{Max})", _client.State, waitRetries + 1, maxWaitRetries);
             await Task.Delay(retryDelayMs, ct);
             waitRetries++;
         }
 
-        if (!_client.State.HasFlag(SoulseekClientStates.Connected))
+        if (!_client.State.HasFlag(SoulseekClientStates.LoggedIn))
         {
-            _logger.LogError("Soulseek failed to connect within {Seconds} seconds", maxWaitRetries * retryDelayMs / 1000.0);
-            throw new InvalidOperationException($"Soulseek failed to connect in time ({maxWaitRetries * retryDelayMs}ms). Cannot perform search.");
+            _logger.LogError("Soulseek failed to login within {Seconds} seconds. State: {State}", maxWaitRetries * retryDelayMs / 1000.0, _client.State);
+            throw new InvalidOperationException($"Soulseek failed to login in time. State: {_client.State}. Cannot perform search.");
         }
 
         try

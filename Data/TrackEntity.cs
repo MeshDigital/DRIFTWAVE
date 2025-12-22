@@ -28,6 +28,7 @@ public class TrackEntity
 
     // Spotify Metadata (Phase 0: Metadata Gravity Well)
     public string? SpotifyTrackId { get; set; }
+    public string? ISRC { get; set; }
     public string? SpotifyAlbumId { get; set; }
     public string? SpotifyArtistId { get; set; }
     public string? AlbumArtUrl { get; set; }
@@ -134,6 +135,12 @@ public class PlaylistTrackEntity
     public string? SpotifyTrackId { get; set; }
     
     /// <summary>
+    /// International Standard Recording Code.
+    /// Critical for cross-platform matching (Soulseek matching).
+    /// </summary>
+    public string? ISRC { get; set; }
+    
+    /// <summary>
     /// Spotify album ID - for artwork and album grouping.
     /// </summary>
     public string? SpotifyAlbumId { get; set; }
@@ -222,6 +229,7 @@ public class LibraryEntryEntity
 
     // Spotify Metadata (Phase 0: Metadata Gravity Well)
     public string? SpotifyTrackId { get; set; }
+    public string? ISRC { get; set; }
     public string? SpotifyAlbumId { get; set; }
     public string? SpotifyArtistId { get; set; }
     public string? AlbumArtUrl { get; set; }

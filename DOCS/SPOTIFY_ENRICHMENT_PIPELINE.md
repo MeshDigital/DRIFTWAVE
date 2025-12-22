@@ -79,3 +79,16 @@ This pipeline transforms the application from a simple downloader into a "Smart"
 2.  **Observe**: Watch the "Metadata" column in the Library.
     *   ⏳ -> 🆔 -> ✨
 3.  **Download**: Right-click -> Download. The log will show "Smart Match Active" if metadata is present.
+
+## Error Handling & Reliability
+
+### Global Circuit Breaker (Spotify 403s)
+*   **Problem**: If the Spotify API returns a `403 Forbidden` (e.g., due to scope restrictions on `GetAudioFeatures`), it can trigger a log spam loop if retried endlessly.
+*   **Solution**: `SpotifyBatchClient` implements a **Global Circuit Breaker**.
+    *   **Trigger**: Single `403 Forbidden` response.
+    *   **Action**: Blocks **ALL** subsequent Spotify requests for **5 minutes**.
+    *   **Impact**: Prevents log flooding. Enrichment gracefully fails (skips audio features), allowing downloads to proceed purely on metadata.
+
+### Soulseek Login Gating
+*   **Problem**: Searching before full login causes `InvalidOperationException`.
+*   **Solution**: `SoulseekAdapter` waits for `SoulseekClientStates.LoggedIn` (not just `Connected`) before executing searches. Max wait: 10 seconds.

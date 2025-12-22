@@ -61,6 +61,7 @@ public class SpotifyEnrichmentService
                 OfficialArtist = track.Artists.FirstOrDefault()?.Name ?? artist,
                 OfficialTitle = track.Name,
                 AlbumArtUrl = track.Album.Images.OrderByDescending(i => i.Width).FirstOrDefault()?.Url ?? "",
+                ISRC = track.ExternalIds != null && track.ExternalIds.ContainsKey("isrc") ? track.ExternalIds["isrc"] : null,
                 // Feature fields remain null here
             };
         }

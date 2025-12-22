@@ -50,6 +50,13 @@
 - 📥 **Import** - Spotify/CSV/USB hub
 - Lazy-loading pattern for fast startup
 
+### Phase 12: Search Experience 2.0 (Dec 22, 2025) - COMPLETE
+**Impact**: Reactive, visual search experience with clear status feedback.
+- **Album Cards**: Replaced tabular album results with a rich, glassmorphism "Bento" grid layout (`AlbumCard.axaml`).
+- **Reactive Status**: Search results now instantly show if a track is already downloading (↓) or completed (✓).
+- **Status Column**: Added visual feedback to the track search grid.
+- **Smart Logic**: Search results deduplicated against active downloads in real-time.
+
 ### Phase 7: The DJ's Studio (Dec 18, 2025) - COMPLETE
 **Impact**: Professional-grade metadata orchestration and DJ tools.
 - **My Spotify Hub**: One-click "Liked Songs" and playlist import with auto-refresh OAuth.

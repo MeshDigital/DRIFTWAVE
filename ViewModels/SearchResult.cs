@@ -43,6 +43,32 @@ public class SearchResult : INotifyPropertyChanged
         }
     }
 
+    private TrackStatus _status = TrackStatus.Missing;
+    public TrackStatus Status
+    {
+        get => _status;
+        set
+        {
+            if (_status != value)
+            {
+                _status = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusIcon));
+                OnPropertyChanged(nameof(IsDownloaded));
+            }
+        }
+    }
+
+    public bool IsDownloaded => Status == TrackStatus.Downloaded;
+
+    public string StatusIcon => Status switch
+    {
+        TrackStatus.Downloaded => "✅",
+        TrackStatus.Failed => "❌",
+        TrackStatus.Skipped => "⏭",
+        _ => "" 
+    };
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)

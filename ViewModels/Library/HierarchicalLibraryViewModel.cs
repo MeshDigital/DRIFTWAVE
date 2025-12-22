@@ -72,76 +72,50 @@ public class HierarchicalLibraryViewModel
                     {
                          if (item is not PlaylistTrackViewModel track) return new Panel();
 
-                        var text = track.MetadataStatus;
-                        var color = text switch
-                        {
-                            "Enriched" => "#FFD700", // Gold
-                            "Identified" => "#1E90FF", // DodgerBlue
-                            _ => "#505050"
-                        };
-                        
-                        var symbol = text switch
-                        {
-                            "Enriched" => "✨",
-                            "Identified" => "🆔",
-                            _ => "⏳"
-                        };
-
-                        return new TextBlock { 
-                            Text = symbol,
-                            Foreground = Brush.Parse(color),
+                        // Use Bindings for Dynamic Updates
+                        var textBlock = new TextBlock { 
                             VerticalAlignment = VerticalAlignment.Center,
                             HorizontalAlignment = HorizontalAlignment.Center,
-                            FontSize = 14,
-                            [ToolTip.TipProperty] = text
+                            FontSize = 14
                         };
+
+                        textBlock.Bind(TextBlock.TextProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatusSymbol)));
+                        textBlock.Bind(TextBlock.ForegroundProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatusColor)) { Converter = new FuncValueConverter<string, IBrush>(c => Brush.Parse(c)) });
+                        textBlock.Bind(ToolTip.TipProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatus)));
+
+                        return textBlock;
                     }, false),
                     width: new GridLength(40)),
 
-                // Phase 1: Enhanced Status Column with Colored Badges
+                // Phase 1: Enhanced Status Column with Colored Badges (LIVE UPDATING)
                 new TemplateColumn<ILibraryNode>(
                     "Status",
                     new FuncDataTemplate<object>((item, _) => 
                     {
                          if (item is not PlaylistTrackViewModel track) return new Panel();
 
-                        var stateColor = track.State switch
-                        {
-                            PlaylistTrackState.Completed => "#1DB954",  // Spotify green
-                            PlaylistTrackState.Downloading => "#00A3FF", // Orbit blue
-                            PlaylistTrackState.Searching => "#B388FF",   // Purple
-                            PlaylistTrackState.Queued => "#FFA726",      // Orange
-                            PlaylistTrackState.Failed => "#F44336",      // Red
-                            PlaylistTrackState.Pending => "#757575",     // Gray
-                            _ => "#666666"
-                        };
-
-                        var stateText = track.State switch
-                        {
-                            PlaylistTrackState.Completed => "✓ Ready",
-                            PlaylistTrackState.Downloading => $"↓ {track.Progress:P0}",
-                            PlaylistTrackState.Searching => "🔍 Search",
-                            PlaylistTrackState.Queued => "⏳ Queued",
-                            PlaylistTrackState.Failed => "✗ Failed",
-                            PlaylistTrackState.Pending => "⊙ Missing",
-                            _ => "?"
-                        };
-
-                        return new Border {
-                            Background = Brush.Parse(stateColor),
+                        var border = new Border {
                             CornerRadius = new CornerRadius(4),
-                            Padding = new Thickness(6, 3),
-                            Child = new TextBlock { 
-                                Text = stateText,
-                                FontSize = 10,
-                                Foreground = Brushes.White
-                            }
+                            Padding = new Thickness(6, 3)
                         };
+
+                        var textBlock = new TextBlock { 
+                            FontSize = 10,
+                            Foreground = Brushes.White
+                        };
+
+                        // Bind Background Color
+                        border.Bind(Border.BackgroundProperty, new Binding(nameof(PlaylistTrackViewModel.StatusColor)) { Converter = new FuncValueConverter<string, IBrush>(c => Brush.Parse(c)) });
+                        
+                        // Bind Status Text (includes progress)
+                        textBlock.Bind(TextBlock.TextProperty, new Binding(nameof(PlaylistTrackViewModel.StatusText)));
+
+                        border.Child = textBlock;
+                        return border;
 
                     }, false),
                     width: new GridLength(100)),
                     
-                // Phase 2: Actions Column with Inline Controls
                 new TemplateColumn<ILibraryNode>(
                     "Actions",
                     new FuncDataTemplate<object>((item, _) => 
@@ -154,61 +128,65 @@ public class HierarchicalLibraryViewModel
                             HorizontalAlignment = HorizontalAlignment.Center
                         };
 
-                        // Search button (Missing/Failed)
-                        if (track.State == PlaylistTrackState.Pending || track.State == PlaylistTrackState.Failed)
+                        // 1. Search button (Missing/Failed) - Bind IsVisible to CanHardRetry (or logic)
+                        var searchBtn = new Button {
+                            Content = "🔍",
+                            Command = track.FindNewVersionCommand,
+                            Padding = new Thickness(6, 2),
+                            FontSize = 11
+                        };
+                        ToolTip.SetTip(searchBtn, "Search for this track");
+                        // Logic: Show if Pending or Failed. CanHardRetry covers Failed/Cancelled. Pending is separate.
+                        // We will bind to a converter or add a specific property. For now, let's just make sure it updates.
+                        // Actually, let's simplify: Bind IsVisible to a new property or existing one?
+                        // Let's use MultiBinding or just basic binding if property exists. 
+                        // To keep it simple, we assume the VM has exact properties. 
+                        // CanHardRetry = Failed/Cancelled. 
+                        // We also want it for Pending? Pending means "Missing" usually.
+                        // Let's check VM: State == PlaylistTrackState.Pending is initial.
+                        
+                        // We'll bind directly to State with a Converter for maximum flexibility without adding 20 booleans.
+                        var searchVisBinding = new Binding(nameof(PlaylistTrackViewModel.State))
                         {
-                            var searchBtn = new Button {
-                                Content = "🔍",
-                                Command = track.FindNewVersionCommand,
-                                Padding = new Thickness(6, 2),
-                                FontSize = 11
-                            };
-                            ToolTip.SetTip(searchBtn, "Search for this track");
-                            panel.Children.Add(searchBtn);
-                        }
+                            Converter = new FuncValueConverter<PlaylistTrackState, bool>(s => 
+                                s == PlaylistTrackState.Pending || s == PlaylistTrackState.Failed)
+                        };
+                        searchBtn.Bind(Button.IsVisibleProperty, searchVisBinding);
+                        panel.Children.Add(searchBtn);
 
-                        // Pause button (Downloading/Queued/Searching)
-                        if (track.State == PlaylistTrackState.Downloading || 
-                            track.State == PlaylistTrackState.Queued ||
-                            track.State == PlaylistTrackState.Searching)
-                        {
-                            var pauseBtn = new Button {
-                                Content = "⏸",
-                                Command = track.PauseCommand,
-                                Padding = new Thickness(6, 2),
-                                FontSize = 11
-                            };
-                            ToolTip.SetTip(pauseBtn, "Pause download");
-                            panel.Children.Add(pauseBtn);
-                        }
+                        // 2. Pause button
+                        var pauseBtn = new Button {
+                            Content = "⏸",
+                            Command = track.PauseCommand,
+                            Padding = new Thickness(6, 2),
+                            FontSize = 11
+                        };
+                        ToolTip.SetTip(pauseBtn, "Pause download");
+                        pauseBtn.Bind(Button.IsVisibleProperty, new Binding(nameof(PlaylistTrackViewModel.CanPause)));
+                        panel.Children.Add(pauseBtn);
 
-                        // Resume button (Paused)
-                        if (track.State == PlaylistTrackState.Paused)
-                        {
-                            var resumeBtn = new Button {
-                                Content = "▶",
-                                Command = track.ResumeCommand,
-                                Padding = new Thickness(6, 2),
-                                FontSize = 11
-                            };
-                            ToolTip.SetTip(resumeBtn, "Resume download");
-                            panel.Children.Add(resumeBtn);
-                        }
+                        // 3. Resume button
+                        var resumeBtn = new Button {
+                            Content = "▶",
+                            Command = track.ResumeCommand,
+                            Padding = new Thickness(6, 2),
+                            FontSize = 11
+                        };
+                        ToolTip.SetTip(resumeBtn, "Resume download");
+                        resumeBtn.Bind(Button.IsVisibleProperty, new Binding(nameof(PlaylistTrackViewModel.CanResume)));
+                        panel.Children.Add(resumeBtn);
 
-                        // Cancel button (Active states)
-                        if (track.State != PlaylistTrackState.Completed && 
-                            track.State != PlaylistTrackState.Cancelled)
-                        {
-                            var cancelBtn = new Button {
-                                Content = "✕",
-                                Command = track.CancelCommand,
-                                Padding = new Thickness(6, 2),
-                                FontSize = 11,
-                                Foreground = Brush.Parse("#F44336")
-                            };
-                            ToolTip.SetTip(cancelBtn, "Cancel");
-                            panel.Children.Add(cancelBtn);
-                        }
+                        // 4. Cancel button
+                        var cancelBtn = new Button {
+                            Content = "✕",
+                            Command = track.CancelCommand,
+                            Padding = new Thickness(6, 2),
+                            FontSize = 11,
+                            Foreground = Brush.Parse("#F44336")
+                        };
+                        ToolTip.SetTip(cancelBtn, "Cancel");
+                        cancelBtn.Bind(Button.IsVisibleProperty, new Binding(nameof(PlaylistTrackViewModel.CanCancel)));
+                        panel.Children.Add(cancelBtn);
 
                         return panel;
 

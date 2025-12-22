@@ -212,7 +212,8 @@ public class SpotifyInputSource : IInputSource
 			if (idx >= 0 && idx + 1 < parts.Length)
 			{
 				var id = parts[idx + 1].Split('?')[0];
-				return string.IsNullOrEmpty(id) ? null : id;
+				// Validation: Spotify IDs are typically 22 chars (base62). "64" is invalid.
+				return (id.Length >= 20) ? id : null;
 			}
 		}
 

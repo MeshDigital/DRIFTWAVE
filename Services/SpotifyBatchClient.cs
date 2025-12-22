@@ -49,8 +49,18 @@ public class SpotifyBatchClient
         }
     }
 
+    private DateTime _forbiddenUntil = DateTime.MinValue;
+
     public async Task<T> GetAsync<T>(string url, CancellationToken ct = default)
     {
+        // Global Circuit Breaker check
+        if (DateTime.UtcNow < _forbiddenUntil)
+        {
+            _log.LogDebug("Circuit Breaker Open: Skipping Spotify request due to recent 403.");
+            // throwing specifically allows callers to handle "skipped" vs "failed"
+            throw new InvalidOperationException("Spotify Circuit Breaker Open (403)");
+        }
+
         // Global lock: Serialize ALL Spotify calls from this client instance.
         await _lock.WaitAsync(ct); 
         try
@@ -62,6 +72,12 @@ public class SpotifyBatchClient
 
             while (true)
             {
+                // Re-check inside lock in case another thread tripped it
+                if (DateTime.UtcNow < _forbiddenUntil)
+                {
+                     throw new InvalidOperationException("Spotify Circuit Breaker Open (403)");
+                }
+
                 var response = await _http.GetAsync(url, ct);
 
                 if (response.StatusCode == (HttpStatusCode)429)
@@ -78,12 +94,13 @@ public class SpotifyBatchClient
                     attempt++;
                      if (attempt > 3 || response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
                     {
-                         // Stop retrying on auth errors or after max attempts for other errors
                          var errorContent = await response.Content.ReadAsStringAsync(ct);
                          
                          if (response.StatusCode == HttpStatusCode.Forbidden)
                          {
-                             _log.LogWarning("Spotify request forbidden (403). Optional enrichment may be unavailable. Url: {Url}. Reason: {Content}", url, errorContent);
+                             _log.LogWarning("Spotify request forbidden (403). Trip Circuit Breaker for 5 minutes. Url: {Url}. Reason: {Content}", url, errorContent);
+                             _forbiddenUntil = DateTime.UtcNow.AddMinutes(5);
+                             throw new InvalidOperationException("Spotify request forbidden (403)");
                          }
                          else
                          {
@@ -142,15 +159,16 @@ public class SpotifyBatchClient
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains("403") || (ex.InnerException?.Message.Contains("403") ?? false))
+                if (ex.Message.Contains("403") || (ex.InnerException?.Message.Contains("403") ?? false) || ex.Message.Contains("Circuit Breaker"))
                 {
-                    _log.LogWarning("Skipping batch chunk due to Spotify restriction (403).");
+                    _log.LogDebug("Skipping batch chunk: Circuit Breaker Open or Forbidden (403).");
+                    break; // Stop trying subsequent chunks
                 }
                 else
                 {
                     _log.LogWarning("Failed to fetch batch chunk. Skipping. Error: {Message}", ex.Message);
                 }
-                // Continue to next chunk
+                // Continue to next chunk for non-403 errors
             }
         }
 

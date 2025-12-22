@@ -15,10 +15,16 @@
 - ✅ **Enrichment Control**: Added "Use Spotify API" toggle to dynamically enable/disable background metadata fetching.
 - ✅ **Decoupling**: Ensured downloads continue gracefully even if Spotify enrichment fails (403/Auth errors).
 - ✅ **Validation**: Sanitized Spotify IDs to reduce API errors.
+- ✅ **API Reliability**: Implemented Global Circuit Breaker for Spotify 403 errors (5min backoff).
+- ✅ **Soulseek Stability**: Fixed startup race condition by waiting for `LoggedIn` state.
+- ✅ **Data Schema**: Added `ISRC` field to all relevant entities for cross-platform matching.
+- ✅ **Ingestion Safety**: Implemented strict length validation (>= 20 chars) for Spotify IDs to prevent malformed imports (e.g. "64").
 
 ### Recent Updates (December 21, 2025)
 - ✅ **Library & Import 2.0 Refinement**: Multi-select support, Floating Action Bar (FAB), side-filtering.
 - ✅ **Performance**: Background DB checks, faster search rendering.
+- ✅ **Search UI**: Implemented Bento Grid for albums and reactive status icons for tracks.
+- ✅ **Library UI**: Fixed real-time status updates and bindings for track view.
 
 ### 🚨 Technical Debt & Stability (Pending FIX)
 - [ ] **N+1 Query Pattern Risk**: Refactor project loading to use eager loading (.Include) for track counts to prevent performance degradation.
@@ -180,10 +186,12 @@
 ## Phase 12: Search Experience 2.0 (Technical Breakdown) 🟡 NEW
 
 ### 12.1 Reactive Search (Streaming) (4 hours)
-- [ ] Refactor `SearchOrchestrationService` to return `IAsyncEnumerable<AlbumResultViewModel>`
-- [ ] Implement incremental results "pop-in" (500ms first paint)
-- [ ] Use `SourceList<T>` (DynamicData) for thread-safe UI updates
-- [ ] Search throttling (100ms buffer) to prevent UI stutter
+- [x] Refactor `SearchOrchestrationService` to return `IAsyncEnumerable<AlbumResultViewModel>` (Done previously)
+- [x] Implement incremental results "pop-in" (500ms first paint) (Done previously)
+- [x] Use `SourceList<T>` (DynamicData) for thread-safe UI updates
+- [x] Search throttling (100ms buffer) to prevent UI stutter (Done via Smart Buffer)
+- [x] **Album Cards**: Implement grid layout for album results (`AlbumCard.axaml`)
+- [x] **Reactive Status**: Bind search results to `DownloadManager` for live status updates
 
 ### 12.2 Advanced Filtering HUD (3 hours)
 - [ ] Create `SearchFilterViewModel`

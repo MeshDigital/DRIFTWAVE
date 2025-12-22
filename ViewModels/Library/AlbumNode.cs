@@ -18,7 +18,19 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
     public int SortOrder => 0;
     public int Popularity => 0;
     public string? Genres => string.Empty;
-    public string? AlbumArtPath { get; set; }
+    private string? _albumArtPath;
+    public string? AlbumArtPath
+    {
+        get => _albumArtPath;
+        set
+        {
+            if (_albumArtPath != value)
+            {
+                _albumArtPath = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     public double Progress
     {
@@ -51,7 +63,18 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
                     item.PropertyChanged -= OnTrackPropertyChanged;
             }
             OnPropertyChanged(nameof(Progress));
+            UpdateAlbumArt();
         };
+    }
+
+    private void UpdateAlbumArt()
+    {
+        // Use the art from the first track that has it
+        var art = Tracks.FirstOrDefault(t => !string.IsNullOrEmpty(t.AlbumArtPath))?.AlbumArtPath;
+        if (art != AlbumArtPath)
+        {
+            AlbumArtPath = art;
+        }
     }
 
     private void OnTrackPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -59,6 +82,10 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         if (e.PropertyName == nameof(PlaylistTrackViewModel.Progress))
         {
             OnPropertyChanged(nameof(Progress));
+        }
+        else if (e.PropertyName == nameof(PlaylistTrackViewModel.AlbumArtPath))
+        {
+            UpdateAlbumArt();
         }
     }
 

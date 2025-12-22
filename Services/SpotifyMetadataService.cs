@@ -109,6 +109,7 @@ public class SpotifyMetadataService : ISpotifyMetadataService
         if (metadata == null) return false;
 
         track.SpotifyTrackId = metadata.Id;
+        track.ISRC = metadata.ExternalIds != null && metadata.ExternalIds.ContainsKey("isrc") ? metadata.ExternalIds["isrc"] : null;
         track.SpotifyAlbumId = metadata.Album.Id;
         track.SpotifyArtistId = metadata.Artists.FirstOrDefault()?.Id;
         track.AlbumArtUrl = metadata.Album.Images.FirstOrDefault()?.Url;

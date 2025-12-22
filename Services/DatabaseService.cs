@@ -72,6 +72,8 @@ public class DatabaseService
             // Phase 0: Spotify Metadata Columns
             if (!existingColumns.Contains("SpotifyTrackId"))
                 columnsToAdd.Add(("SpotifyTrackId", "SpotifyTrackId TEXT NULL"));
+            if (!existingColumns.Contains("ISRC"))
+                columnsToAdd.Add(("ISRC", "ISRC TEXT NULL"));
             if (!existingColumns.Contains("SpotifyAlbumId"))
                 columnsToAdd.Add(("SpotifyAlbumId", "SpotifyAlbumId TEXT NULL"));
             if (!existingColumns.Contains("SpotifyArtistId"))
@@ -306,6 +308,7 @@ public class DatabaseService
                 {
                     var newCols = new List<(string Name, string Def)>();
                     if (!libColumns.Contains("SpotifyTrackId")) newCols.Add(("SpotifyTrackId", "TEXT NULL"));
+                    if (!libColumns.Contains("ISRC")) newCols.Add(("ISRC", "TEXT NULL"));
                     if (!libColumns.Contains("SpotifyAlbumId")) newCols.Add(("SpotifyAlbumId", "TEXT NULL"));
                     if (!libColumns.Contains("SpotifyArtistId")) newCols.Add(("SpotifyArtistId", "TEXT NULL"));
                     if (!libColumns.Contains("AlbumArtUrl")) newCols.Add(("AlbumArtUrl", "TEXT NULL"));
@@ -353,6 +356,7 @@ public class DatabaseService
                 {
                     var newCols = new List<(string Name, string Def)>();
                     if (!tracksColumns.Contains("SpotifyTrackId")) newCols.Add(("SpotifyTrackId", "TEXT NULL"));
+                    if (!tracksColumns.Contains("ISRC")) newCols.Add(("ISRC", "TEXT NULL"));
                     if (!tracksColumns.Contains("SpotifyAlbumId")) newCols.Add(("SpotifyAlbumId", "TEXT NULL"));
                     if (!tracksColumns.Contains("SpotifyArtistId")) newCols.Add(("SpotifyArtistId", "TEXT NULL"));
                     if (!tracksColumns.Contains("AlbumArtUrl")) newCols.Add(("AlbumArtUrl", "TEXT NULL"));
@@ -768,6 +772,7 @@ public class DatabaseService
             if (result.Success)
             {
                 entry.SpotifyTrackId = result.SpotifyId;
+                if (!string.IsNullOrEmpty(result.ISRC)) entry.ISRC = result.ISRC;
                 if (!string.IsNullOrEmpty(result.AlbumArtUrl) && string.IsNullOrEmpty(entry.AlbumArtUrl))
                     entry.AlbumArtUrl = result.AlbumArtUrl;
                 if (!string.IsNullOrEmpty(result.OfficialArtist)) entry.Artist = result.OfficialArtist;
