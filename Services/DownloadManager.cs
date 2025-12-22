@@ -375,12 +375,29 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     public void QueueTracks(List<PlaylistTrack> tracks)
     {
         _logger.LogInformation("Queueing project tracks with {Count} tracks", tracks.Count);
+        
+        int skipped = 0;
+        int queued = 0;
+        
         lock (_collectionLock)
         {
+            // Build a set of existing track IDs for fast lookup
+            var existingTrackIds = new HashSet<Guid>(_downloads.Select(d => d.Model.Id));
+            
             foreach (var track in tracks)
             {
+                // Skip if already queued
+                if (existingTrackIds.Contains(track.Id))
+                {
+                    skipped++;
+                    _logger.LogDebug("Skipping track {Artist} - {Title}: already queued", track.Artist, track.Title);
+                    continue;
+                }
+                
                 var ctx = new DownloadContext(track);
                 _downloads.Add(ctx);
+                existingTrackIds.Add(track.Id); // Add to set for subsequent iterations
+                queued++;
                 
                 // Publish Event
                 _eventBus.Publish(new Events.TrackAddedEvent(track));
@@ -395,6 +412,12 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 }
             }
         }
+        
+        if (skipped > 0)
+        {
+            _logger.LogInformation("Queued {Queued} new tracks, skipped {Skipped} already queued tracks", queued, skipped);
+        }
+        
         // Processing loop picks this up automatically
     }
 
