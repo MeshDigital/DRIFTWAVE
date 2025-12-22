@@ -218,6 +218,18 @@
                                    FontSize="11"
                                    Margin="12,0,0,0"/>
                     </Grid>
+
+                    <Separator Background="#333" Height="1"/>
+
+                    <!-- Spotify Enrichment Toggle -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="Spotify Metadata Enrichment" FontWeight="SemiBold" Foreground="#DDD"/>
+                            <TextBlock Text="Fetch BPM, energy, and other audio features from Spotify. Disable to stop 403 errors if auth scopes are insufficient." 
+                                       Foreground="#666" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding SpotifyUseApi}" OnContent="On" OffContent="Off"/>
+                    </Grid>
                 </StackPanel>
             </Border>
 

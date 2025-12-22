@@ -157,6 +157,12 @@ public class SettingsViewModel : INotifyPropertyChanged
         get => _config.RelaxationTimeoutSeconds;
         set { _config.RelaxationTimeoutSeconds = value; OnPropertyChanged(); }
     }
+
+    public bool SpotifyUseApi
+    {
+        get => _config.SpotifyUseApi;
+        set { _config.SpotifyUseApi = value; OnPropertyChanged(); }
+    }
     
     // Phase 2.4: Ranking Strategy Selection
     // NOTE: RankingPreset property doesn't exist in AppConfig - using CustomWeights directly
