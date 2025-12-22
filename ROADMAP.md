@@ -158,6 +158,75 @@
 
 **Status**: Planning ✅ - Detailed analysis complete.
 
+### Phase 2.5: Download Orchestration & Active Management (10-12h) 🟠 NEW - HIGH PRIORITY
+**Goal**: Transform download system from "Import → Fire-and-Forget" to "Active Orchestration" with professional-grade concurrency control, resumability, and real-time visibility.
+
+**The Vision**:
+- **Only 4 downloads active** at any time (remaining tracks stay in "Pending" state)
+- **Resumable downloads** via `.part` files (survive app crashes/restarts)
+- **Global Download Dashboard** - Live view of active downloads with Pause/Resume controls
+- **Album-level progress** - Visual indicators on album cards ("12/15 Downloaded")
+- **Persistent state** - Paused downloads auto-resume on app restart
+
+**Architectural Components**:
+
+1. **Throttling Layer** (SemaphoreSlim(4)):
+   - Continuous queue processor with fire-and-forget pattern
+   - Ensures only 4 tracks download simultaneously
+   - Remaining tracks wait in "Pending" state
+
+2. **Resumable Downloads** (.part files):
+   - Download to `.part` files to prevent corruption
+   - Check for existing partial files before starting
+   - Resume from last byte position (if protocol supports)
+   - Atomic rename on completion
+
+3. **Global Download Dashboard UI**:
+   - Persistent status indicator in sidebar (↓ 4)
+   - Download Center overlay showing:
+     - Active downloads (4) with real-time progress bars
+     - Pending queue (scrollable "Next Up" list)
+     - Global controls: Pause All / Resume All
+     - Individual track controls: Pause / Cancel
+
+4. **Album Progress Indicators**:
+   - Summary text on cards: "12/15 Tracks Downloaded"
+   - Visual progress bar
+   - Color-coded state badges (Downloading/Paused/Complete/Failed)
+
+5. **Pause/Resume Persistence**:
+   - Update DB state when user clicks "Pause"
+   - Auto-restore paused/pending downloads on app startup
+   - Show notification: "Resuming 12 paused downloads..."
+
+**Technical Implementation**:
+```csharp
+// Semaphore throttling in DownloadManager
+private readonly SemaphoreSlim _downloadSemaphore = new(4, 4);
+
+public async Task ProcessQueueLoop(CancellationToken ct)
+{
+    while (!ct.IsCancellationRequested)
+    {
+        if (_downloadQueue.TryDequeue(out var ctx))
+        {
+            await _downloadSemaphore.WaitAsync(ct);
+            _ = Task.Run(async () => 
+            {
+                try { await ProcessTrackWithFolderLogicAsync(ctx); }
+                finally { _downloadSemaphore.Release(); }
+            }, ct);
+        }
+        else { await Task.Delay(500, ct); }
+    }
+}
+```
+
+**Status**: Architectural plan documented in TODO.md Phase 2.5  
+**Priority**: ⭐⭐⭐ CRITICAL - Foundation for professional download UX  
+**Impact**: 100% reliability, no more "fire-and-forget blackbox", complete user visibility and control
+
+
 
 **Completed** ✅:
 - Package 5: Architectural Foundations (Producer-Consumer, Xabe.FFmpeg, Maintenance)

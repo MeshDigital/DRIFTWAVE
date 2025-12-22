@@ -944,6 +944,246 @@ else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
 
 ---
 
+## Phase 2.5: Download Orchestration & Active Management (10-12 hours) 🟠 HIGH PRIORITY
+
+**Goal**: Transform download system from "Import → Fire-and-Forget" to "Active Orchestration" with concurrency control, resumability, and real-time visibility.
+
+### 2.5.1 Orchestration Engine: Throttling & Queuing (3 hours)
+**Priority**: ⭐⭐⭐ CRITICAL
+
+**What to Build**:
+- [ ] `SemaphoreSlim(4, 4)` throttling in `DownloadManager` to limit concurrent downloads to 4
+- [ ] `ProcessQueueLoop` with fire-and-forget pattern for continuous queue processing
+- [ ] Folder creation logic: `DefaultLibraryPath/ArtistName/AlbumName/` before first track starts
+- [ ] `.part` file handling for resumable downloads (download to `.tmp` → rename on completion)
+- [ ] File size verification for resume support (check existing `.part` file size)
+
+**Concurrency Strategy**:
+```csharp
+private readonly SemaphoreSlim _downloadSemaphore = new(4, 4);
+
+public async Task ProcessQueueLoop(CancellationToken ct)
+{
+    while (!ct.IsCancellationRequested)
+    {
+        // 1. Wait for a track to be available in the ConcurrentQueue
+        if (_downloadQueue.TryDequeue(out var ctx))
+        {
+            // 2. Wait for one of the 4 slots to open up
+            await _downloadSemaphore.WaitAsync(ct);
+
+            // 3. Fire and forget the download task so the loop can pick up the next track
+            _ = Task.Run(async () => 
+            {
+                try 
+                {
+                    await ProcessTrackWithFolderLogicAsync(ctx);
+                }
+                finally 
+                {
+                    _downloadSemaphore.Release(); // Free up the slot for the next track
+                }
+            }, ct);
+        }
+        else
+        {
+            await Task.Delay(500, ct); // Idle wait
+        }
+    }
+}
+```
+
+**Files to Modify**:
+- `Services/DownloadManager.cs` - Add semaphore throttling
+- `Services/DownloadManager.cs` - Implement `ProcessQueueLoop`
+- `Services/DownloadManager.cs` - Add `ProcessTrackWithFolderLogicAsync`
+
+**Implementation Steps**:
+1. Add `SemaphoreSlim _downloadSemaphore` field
+2. Implement continuous `ProcessQueueLoop` method
+3. Add folder structure creation: `Path.Combine(LibraryRoot, Artist, Album)`
+4. Implement `.part` file logic for resumability
+5. Add file size check for partial downloads
+6. Test with 50+ track batch to verify only 4 download simultaneously
+
+---
+
+### 2.5.2 Persistent Transfer State & Resumability (2 hours)
+**Priority**: ⭐⭐⭐ CRITICAL
+
+**What to Build**:
+- [ ] Download to `.part` or `.tmp` files to prevent corruption
+- [ ] Check for existing `.part` files before starting download
+- [ ] Resume logic: if `.part` exists, request remaining bytes (HTTP Range header)
+- [ ] Hash verification for partial files (optional: skip if protocol doesn't support)
+- [ ] Atomic rename on completion: `TrackName.mp3.part` → `TrackName.mp3`
+- [ ] Database state: persist `Paused` state to DB on app close
+- [ ] Auto-resume: on app restart, scan DB for `Paused`/`Pending` tracks and re-enqueue
+
+**Resumability Logic**:
+```csharp
+private async Task DownloadFileAsync(PlaylistTrack track, string targetPath)
+{
+    var partPath = targetPath + ".part";
+    long startPosition = 0;
+    
+    // Check if partial file exists
+    if (File.Exists(partPath))
+    {
+        var fileInfo = new FileInfo(partPath);
+        startPosition = fileInfo.Length;
+        _logger.LogInformation($"Resuming download from byte {startPosition}");
+    }
+    
+    // Download with resume support
+    // (Implementation depends on Soulseek API support for partial transfers)
+    await DownloadFromPositionAsync(track, partPath, startPosition);
+    
+    // Atomic rename on success
+    File.Move(partPath, targetPath, overwrite: false);
+}
+```
+
+**Files to Modify**:
+- `Services/DownloadManager.cs` - Add `.part` file handling
+- `Services/DownloadManager.cs` - Implement resume logic
+- `Data/Entities/PlaylistTrackEntity.cs` - Ensure `Paused` state persists
+- `App.axaml.cs` - Add startup logic to re-enqueue paused/pending tracks
+
+**Implementation Steps**:
+1. Modify download logic to use `.part` extension
+2. Add file existence + size check before download
+3. Implement HTTP Range header support (if protocol allows)
+4. Add atomic rename on successful completion
+5. Update `PlaylistTrackState` to persist `Paused` state
+6. Add `RestorePendingDownloadsAsync()` method called on app startup
+7. Test resume after app crash/restart
+
+---
+
+### 2.5.3 Global Download Dashboard UI (4 hours)
+**Priority**: ⭐⭐⭐ HIGH
+
+**What to Build**:
+- [ ] **Global Status Bar**: Persistent download indicator in sidebar/top nav
+  - Visual: Download icon (↓) with badge showing active count (e.g., "↓ 4")
+  - Click → opens Download Center overlay
+- [ ] **Download Center View**: New overlay/page aggregating all active/pending tracks
+  - **Active List**: 4 tracks currently "In Flight" with real-time progress bars
+  - **Pending Queue**: Scrollable list of "Next Up" tracks
+  - **Global Controls**: "Pause All" / "Resume All" buttons
+  - **Individual Controls**: Pause/Cancel specific tracks
+- [ ] **Continue Logic**: When user hits "Continue" on paused album
+  - Re-add tracks to `_downloadQueue`
+  - `DownloadFileAsync` checks for existing `.part` files
+  - Attempt to append or verify stream to prevent full re-download
+
+**UI Components**:
+```xml
+<!-- Global Status Indicator (TopBar or Sidebar) -->
+<Button Classes="download-indicator">
+    <StackPanel Orientation="Horizontal">
+        <PathIcon Data="{StaticResource DownloadIcon}" />
+        <TextBlock Text="{Binding ActiveDownloadCount}" />
+    </StackPanel>
+</Button>
+
+<!-- Download Center Panel -->
+<Panel IsVisible="{Binding IsDownloadCenterOpen}">
+    <!-- Active Downloads (max 4) -->
+    <ItemsControl Items="{Binding ActiveDownloads}">
+        <ItemTemplate>
+            <Border Classes="download-card">
+                <ProgressBar Value="{Binding PercentComplete}" />
+                <TextBlock Text="{Binding TrackTitle}" />
+            </Border>
+        </ItemTemplate>
+    </ItemsControl>
+    
+    <!-- Pending Queue -->
+    <ItemsControl Items="{Binding PendingDownloads}">
+        <!-- Pending track list -->
+    </ItemsControl>
+    
+    <!-- Global Controls -->
+    <StackPanel Orientation="Horizontal">
+        <Button Command="{Binding PauseAllCommand}">Pause All</Button>
+        <Button Command="{Binding ResumeAllCommand}">Resume All</Button>
+    </StackPanel>
+</Panel>
+```
+
+**Files to Create**:
+- `Views/Avalonia/DownloadCenterPanel.axaml` (new)
+- `ViewModels/DownloadCenterViewModel.cs` (new)
+
+**Files to Modify**:
+- `Views/Avalonia/MainWindow.axaml` - Add global download indicator
+- `ViewModels/MainViewModel.cs` - Add `IsDownloadCenterOpen` property
+- `Services/DownloadManager.cs` - Add `GetActiveDownloads()` and `GetPendingDownloads()` queries
+
+**Implementation Steps**:
+1. Create `DownloadCenterViewModel` that subscribes to `TrackStateChangedEvent`
+2. Filter events to only show tracks with state `Downloading` or `Pending`
+3. Create `DownloadCenterPanel.axaml` with active/pending sections
+4. Add global status indicator to main window sidebar
+5. Implement "Pause All" / "Resume All" commands
+6. Add "Continue" button logic to re-enqueue paused tracks
+7. Test with 50 tracks to verify only 4 active at once
+
+---
+
+### 2.5.4 Album Card Progress Indicators (1 hour)
+**Priority**: ⭐⭐ MEDIUM
+
+**What to Build**:
+- [ ] **Summary Progress**: Add "12/15 Tracks Downloaded" text to album cards
+- [ ] **Visual Progress Bar**: Small progress bar at bottom of album card
+- [ ] **State Badge**: Color-coded badge (Downloading/Paused/Complete/Failed)
+- [ ] **Hover Details**: Tooltip showing detailed download status
+
+**Files to Modify**:
+- `Views/Avalonia/LibraryPage.axaml` - Update album card template
+- `ViewModels/ProjectViewModel.cs` - Add `DownloadProgress` computed property
+- `Services/DownloadManager.cs` - Publish album-level progress events
+
+**Implementation Steps**:
+1. Add `TracksDownloaded` and `TotalTracks` properties to `ProjectViewModel`
+2. Create computed property: `DownloadProgressText` (e.g., "12/15")
+3. Add progress bar to album card XAML
+4. Bind progress bar to `(TracksDownloaded / TotalTracks) * 100`
+5. Test with multiple albums downloading simultaneously
+
+---
+
+### 2.5.5 Pause/Resume Persistence (2 hours)
+**Priority**: ⭐⭐ MEDIUM
+
+**What to Build**:
+- [ ] Update `PlaylistTrackState` in DB when "Paused" is clicked
+- [ ] On app startup, scan DB for `Paused` or `Pending` tracks
+- [ ] Auto re-enqueue paused/pending tracks into `_downloadQueue`
+- [ ] Show "Resuming X downloads..." notification on startup
+
+**Files to Modify**:
+- `Services/DownloadManager.cs` - Add `PauseTrackAsync(trackId)` method
+- `Services/DownloadManager.cs` - Add `RestorePendingDownloadsAsync()` method
+- `Services/DatabaseService.cs` - Add `GetPausedTracksAsync()` query
+- `App.axaml.cs` - Call `RestorePendingDownloadsAsync()` on startup
+
+**Implementation Steps**:
+1. Create `PauseTrackAsync` that updates DB state to `Paused`
+2. Create `GetPausedTracksAsync()` query in `DatabaseService`
+3. Implement `RestorePendingDownloadsAsync()` to re-enqueue tracks
+4. Call restore method in `App.OnStartup`
+5. Add notification message: "Resuming 12 paused downloads..."
+6. Test by pausing downloads, closing app, and restarting
+
+---
+
+**Total Estimated Time**: 10-12 hours  
+**Impact**: Complete overhaul of download system with professional-grade orchestration, reliability, and user visibility
+
 ---
 
 ## Phase 3: Architecture & Refactoring (12 hours) 🟣 TECHNICAL
