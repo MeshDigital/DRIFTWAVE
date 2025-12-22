@@ -306,6 +306,12 @@ public class SpotifyMetadataService : ISpotifyMetadataService
             
             return null;
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Circuit Breaker"))
+        {
+            // Circuit breaker is open - this is expected behavior, log at debug level only
+            _logger.LogDebug("Spotify search skipped for {Artist} - {Title}: Circuit breaker is open", artist, title);
+            return null;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error searching Spotify for {Artist} - {Title}", artist, title);
