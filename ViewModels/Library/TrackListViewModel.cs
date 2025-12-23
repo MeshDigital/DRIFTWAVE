@@ -55,27 +55,32 @@ public class TrackListViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _searchText, value);
     }
 
+    // Guard flag to prevent infinite recursion in filter properties
+    private bool _updatingFilters = false;
+
     private bool _isFilterAll = true;
     public bool IsFilterAll
     {
         get => _isFilterAll;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isFilterAll, value);
-            if (value)
+            if (_updatingFilters) return;
+            _updatingFilters = true;
+            try
             {
-                // If All is on, turn others off
-                IsFilterDownloaded = false;
-                IsFilterPending = false;
+                this.RaiseAndSetIfChanged(ref _isFilterAll, value);
+                if (value)
+                {
+                    IsFilterDownloaded = false;
+                    IsFilterPending = false;
+                }
+                else if (!IsFilterDownloaded && !IsFilterPending)
+                {
+                    _isFilterAll = true;
+                    this.RaisePropertyChanged(nameof(IsFilterAll));
+                }
             }
-            else if (!IsFilterDownloaded && !IsFilterPending)
-            {
-                // Prevent turning off the only active filter -> force back to true
-               // Or we can let it be false if we want "show nothing", but "Always have one active" is better UX
-               // Actually, for a simple toggle set, usually one must be active.
-               if (!_isFilterDownloaded && !_isFilterPending) // Double check fields to avoid recursion loops if properties trigger back
-                    this.RaisePropertyChanged(nameof(IsFilterAll)); // Just notify, don't change
-            }
+            finally { _updatingFilters = false; }
         }
     }
 
@@ -85,17 +90,22 @@ public class TrackListViewModel : ReactiveObject
         get => _isFilterDownloaded;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isFilterDownloaded, value);
-            if (value)
+            if (_updatingFilters) return;
+            _updatingFilters = true;
+            try
             {
-                IsFilterAll = false;
-                IsFilterPending = false;
+                this.RaiseAndSetIfChanged(ref _isFilterDownloaded, value);
+                if (value)
+                {
+                    IsFilterAll = false;
+                    IsFilterPending = false;
+                }
+                else if (!IsFilterPending)
+                {
+                    IsFilterAll = true;
+                }
             }
-            else
-            {
-                // If turning off and no others active, fallback to All
-                if (!IsFilterPending) IsFilterAll = true;
-            }
+            finally { _updatingFilters = false; }
         }
     }
 
@@ -105,17 +115,22 @@ public class TrackListViewModel : ReactiveObject
         get => _isFilterPending;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isFilterPending, value);
-            if (value)
+            if (_updatingFilters) return;
+            _updatingFilters = true;
+            try
             {
-                IsFilterAll = false;
-                IsFilterDownloaded = false;
+                this.RaiseAndSetIfChanged(ref _isFilterPending, value);
+                if (value)
+                {
+                    IsFilterAll = false;
+                    IsFilterDownloaded = false;
+                }
+                else if (!IsFilterDownloaded)
+                {
+                    IsFilterAll = true;
+                }
             }
-            else
-            {
-                // If turning off and no others active, fallback to All
-                if (!IsFilterDownloaded) IsFilterAll = true;
-            }
+            finally { _updatingFilters = false; }
         }
     }
 
