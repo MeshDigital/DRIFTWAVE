@@ -202,7 +202,7 @@ public class SoulseekAdapter : ISoulseekAdapter, IDisposable
                                 _logger.LogTrace("Filtered by bitrate (too low): {File} ({Bitrate} < {Min})", file.Filename, track.Bitrate, bitrateFilter.Min.Value);
                                 continue;
                             }
-                            if (bitrateFilter.Max.HasValue && track.Bitrate > bitrateFilter.Max.Value)
+                            if (bitrateFilter.Max.HasValue && bitrateFilter.Max.Value > 0 && track.Bitrate > bitrateFilter.Max.Value)
                             {
                                 filteredByBitrate++;
                                 _logger.LogTrace("Filtered by bitrate (too high): {File} ({Bitrate} > {Max})", file.Filename, track.Bitrate, bitrateFilter.Max.Value);
