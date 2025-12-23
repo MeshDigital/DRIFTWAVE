@@ -27,6 +27,7 @@ public class TrackListViewModel : ReactiveObject
     private readonly ArtworkCacheService _artworkCache;
     private readonly IEventBus _eventBus;
     private readonly AppConfig _config;
+    private readonly MetadataEnrichmentOrchestrator _enrichmentOrchestrator;
 
     public HierarchicalLibraryViewModel Hierarchical { get; }
 
@@ -161,6 +162,7 @@ public class TrackListViewModel : ReactiveObject
     public System.Windows.Input.ICommand CopyToFolderCommand { get; }
     public System.Windows.Input.ICommand BulkRetryCommand { get; }
     public System.Windows.Input.ICommand BulkCancelCommand { get; }
+    public System.Windows.Input.ICommand BulkReEnrichCommand { get; }
 
     public TrackListViewModel(
         ILogger<TrackListViewModel> logger,
@@ -168,13 +170,15 @@ public class TrackListViewModel : ReactiveObject
         DownloadManager downloadManager,
         ArtworkCacheService artworkCache,
         IEventBus eventBus,
-        AppConfig config)
+        AppConfig config,
+        MetadataEnrichmentOrchestrator enrichmentOrchestrator)
     {
         _logger = logger;
         _libraryService = libraryService;
         _downloadManager = downloadManager;
         _artworkCache = artworkCache;
         _eventBus = eventBus;
+        _enrichmentOrchestrator = enrichmentOrchestrator;
         _config = config;
 
         Hierarchical = new HierarchicalLibraryViewModel(config, downloadManager);
@@ -212,6 +216,7 @@ public class TrackListViewModel : ReactiveObject
         CopyToFolderCommand = ReactiveCommand.CreateFromTask(ExecuteCopyToFolderAsync);
         BulkRetryCommand = ReactiveCommand.CreateFromTask(ExecuteBulkRetryAsync);
         BulkCancelCommand = ReactiveCommand.CreateFromTask(ExecuteBulkCancelAsync);
+        BulkReEnrichCommand = ReactiveCommand.CreateFromTask(ExecuteBulkReEnrichAsync);
 
         // Selection Change Tracking
         Hierarchical.Selection.SelectionChanged += (s, e) => UpdateSelectionState();
@@ -527,6 +532,30 @@ public class TrackListViewModel : ReactiveObject
             track.Cancel();
         }
         Hierarchical.Selection.Clear();
+    }
+
+    private async Task ExecuteBulkReEnrichAsync()
+    {
+        var selectedTracks = Hierarchical.Selection.SelectedItems
+            .OfType<PlaylistTrackViewModel>()
+            .ToList();
+        
+        if (!selectedTracks.Any()) return;
+
+        _logger.LogInformation("Bulk re-enrich for {Count} tracks", selectedTracks.Count);
+        
+        foreach (var track in selectedTracks)
+        {
+            if (track.Model != null)
+            {
+                // Queue for Spotify metadata lookup and tag writing
+                _enrichmentOrchestrator.QueueForEnrichment(track.Model);
+                _logger.LogDebug("Queued {Artist} - {Title} for re-enrichment", track.Artist, track.Title);
+            }
+        }
+        
+        Hierarchical.Selection.Clear();
+        _logger.LogInformation("Re-enrichment queued for {Count} tracks - metadata will be refreshed in background", selectedTracks.Count);
     }
 
     private void OnGlobalTrackUpdated(object? sender, PlaylistTrackViewModel e)

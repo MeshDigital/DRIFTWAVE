@@ -445,6 +445,13 @@
                             </StackPanel>
                         </Button>
                         
+                        <Button Command="{Binding Tracks.BulkReEnrichCommand}" Theme="{StaticResource SimpleButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="🔍"/>
+                                <TextBlock Text="Re-Enrich Metadata"/>
+                            </StackPanel>
+                        </Button>
+                        
                         <Separator Width="1" Height="16" Background="#444" Margin="8,0"/>
                         
                         <Button Command="{Binding Tracks.DeselectAllTracksCommand}" Background="Transparent" BorderThickness="0">
