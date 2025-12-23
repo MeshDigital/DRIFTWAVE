@@ -82,6 +82,25 @@ public class DownloadCenterViewModel : INotifyPropertyChanged, IDisposable
         
         // Start global speed calculator
         StartGlobalSpeedTimer();
+        
+        // CRITICAL: Hydrate from existing downloads (app restart scenario)
+        InitialHydration();
+    }
+    
+    /// <summary>
+    /// Hydrates the ViewModel collections from DownloadManager's existing downloads.
+    /// This handles the case where tracks were loaded from DB before this ViewModel was created.
+    /// </summary>
+    private void InitialHydration()
+    {
+        var existingDownloads = _downloadManager.GetAllDownloads();
+        
+        foreach (var (model, state) in existingDownloads)
+        {
+            // Reuse the OnTrackAdded logic
+            var fakeEvent = new TrackAddedEvent(model, state);
+            OnTrackAdded(fakeEvent);
+        }
     }
     
     /// <summary>

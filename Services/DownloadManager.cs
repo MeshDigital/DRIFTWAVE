@@ -95,6 +95,17 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
+    /// Returns a snapshot of all current downloads for ViewModel hydration.
+    /// </summary>
+    public IReadOnlyList<(PlaylistTrack Model, PlaylistTrackState State)> GetAllDownloads()
+    {
+        lock (_collectionLock)
+        {
+            return _downloads.Select(ctx => (ctx.Model, ctx.State)).ToList();
+        }
+    }
+
+    /// <summary>
     /// Handles requests to download an entire album (Project or AlbumNode).
     /// </summary>
     private void OnDownloadAlbumRequest(DownloadAlbumRequestEvent e)
