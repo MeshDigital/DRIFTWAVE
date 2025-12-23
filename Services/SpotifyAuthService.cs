@@ -45,6 +45,24 @@ public class SpotifyAuthService
         }
     }
 
+    /// <summary>
+    /// Checks if a TCP port is available for listening.
+    /// </summary>
+    private bool IsPortAvailable(int port)
+    {
+        try
+        {
+            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            return false;
+        }
+    }
+
     public SpotifyAuthService(
         ILogger<SpotifyAuthService> logger,
         AppConfig config,
@@ -185,13 +203,39 @@ public class SpotifyAuthService
         var uri = new Uri(_config.SpotifyRedirectUri);
         var port = uri.Port;
         
+        // Check if port is available, try fallbacks if not
+        var availablePort = port;
+        if (!IsPortAvailable(port))
+        {
+            _logger.LogWarning("Port {Port} is in use (likely stale auth session). Trying fallback ports...", port);
+            
+            // Try ports 5001-5005 as fallbacks
+            for (int fallbackPort = port + 1; fallbackPort <= port + 5; fallbackPort++)
+            {
+                if (IsPortAvailable(fallbackPort))
+                {
+                    availablePort = fallbackPort;
+                    _logger.LogInformation("Using fallback port {Port}", availablePort);
+                    break;
+                }
+            }
+            
+            if (availablePort == port)
+            {
+                throw new InvalidOperationException($"Port {port} is in use and no fallback ports (5001-5005) are available. Please close any stale auth browser tabs and try again.");
+            }
+        }
+        
+        // Update URI with available port
+        uri = new UriBuilder(uri) { Port = availablePort }.Uri;
+        
         // Setup robust EmbedIO server
-        var server = new EmbedIOAuthServer(uri, port);
+        var server = new EmbedIOAuthServer(uri, availablePort);
         
         try
         {
             await server.Start();
-            _logger.LogInformation("EmbedIO Auth Server started on port {Port}", port);
+            _logger.LogInformation("EmbedIO Auth Server started on port {Port}", availablePort);
 
             // Generate PKCE
             var (verifier, challenge) = PKCEUtil.GenerateCodes();
