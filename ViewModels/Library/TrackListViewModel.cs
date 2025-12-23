@@ -158,6 +158,7 @@ public class TrackListViewModel : ReactiveObject
     public System.Windows.Input.ICommand SelectAllTracksCommand { get; }
     public System.Windows.Input.ICommand DeselectAllTracksCommand { get; }
     public System.Windows.Input.ICommand BulkDownloadCommand { get; }
+    public System.Windows.Input.ICommand CopyToFolderCommand { get; }
     public System.Windows.Input.ICommand BulkRetryCommand { get; }
     public System.Windows.Input.ICommand BulkCancelCommand { get; }
 
@@ -208,6 +209,7 @@ public class TrackListViewModel : ReactiveObject
         });
 
         BulkDownloadCommand = ReactiveCommand.CreateFromTask(ExecuteBulkDownloadAsync);
+        CopyToFolderCommand = ReactiveCommand.CreateFromTask(ExecuteCopyToFolderAsync);
         BulkRetryCommand = ReactiveCommand.CreateFromTask(ExecuteBulkRetryAsync);
         BulkCancelCommand = ReactiveCommand.CreateFromTask(ExecuteBulkCancelAsync);
 
@@ -396,6 +398,98 @@ public class TrackListViewModel : ReactiveObject
         _logger.LogInformation("Bulk download for {Count} tracks", selectedTracks.Count);
         _downloadManager.QueueTracks(selectedTracks.Select(t => t.Model).ToList());
         Hierarchical.Selection.Clear(); // Clear selection after action
+    }
+
+    private async Task ExecuteCopyToFolderAsync()
+    {
+        try
+        {
+            // Get selected completed tracks only
+            var selectedTracks = Hierarchical.Selection.SelectedItems
+                .OfType<PlaylistTrackViewModel>()
+                .Where(t => t.State == PlaylistTrackState.Completed && !string.IsNullOrEmpty(t.Model?.ResolvedFilePath))
+                .ToList();
+            
+            if (!selectedTracks.Any())
+            {
+                _logger.LogWarning("No completed tracks selected for copy");
+                return;
+            }
+
+            _logger.LogInformation("Copy to folder: {Count} tracks selected", selectedTracks.Count);
+
+            // Show folder picker dialog
+            var folderTask = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var dialog = new Avalonia.Platform.Storage.FolderPickerOpenOptions
+                {
+                    Title = "Select destination folder for tracks",
+                    AllowMultiple = false
+                };
+
+                var mainWindow = (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+                if (mainWindow == null) return null;
+
+                var result = await mainWindow.StorageProvider.OpenFolderPickerAsync(dialog);
+                return result?.FirstOrDefault()?.Path.LocalPath;
+            });
+
+            var targetFolder = await folderTask;
+            if (string.IsNullOrEmpty(targetFolder))
+            {
+                _logger.LogInformation("Copy cancelled - no folder selected");
+                return;
+            }
+
+            _logger.LogInformation("Copying {Count} files to: {Folder}", selectedTracks.Count, targetFolder);
+
+            // Copy files
+            int successCount = 0;
+            int failCount = 0;
+
+            foreach (var track in selectedTracks)
+            {
+                try
+                {
+                    var sourceFile = track.Model?.ResolvedFilePath;
+                    if (string.IsNullOrEmpty(sourceFile) || !System.IO.File.Exists(sourceFile))
+                    {
+                        _logger.LogWarning("Source file not found: {File}", sourceFile);
+                        failCount++;
+                        continue;
+                    }
+
+                    var fileName = System.IO.Path.GetFileName(sourceFile);
+                    var targetFile = System.IO.Path.Combine(targetFolder, fileName);
+
+                    // Handle duplicate filenames
+                    int suffix = 1;
+                    while (System.IO.File.Exists(targetFile))
+                    {
+                        var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                        var ext = System.IO.Path.GetExtension(fileName);
+                        targetFile = System.IO.Path.Combine(targetFolder, $"{nameWithoutExt} ({suffix}){ext}");
+                        suffix++;
+                    }
+
+                    System.IO.File.Copy(sourceFile, targetFile, false);
+                    _logger.LogDebug("Copied: {File}", fileName);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to copy track: {Title}", track.Title);
+                    failCount++;
+                }
+            }
+
+            _logger.LogInformation("Copy complete: {Success} succeeded, {Fail} failed", successCount, failCount);
+            Hierarchical.Selection.Clear();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Copy to folder operation failed");
+        }
     }
 
     private async Task ExecuteBulkRetryAsync()

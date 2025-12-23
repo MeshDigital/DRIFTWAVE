@@ -424,6 +424,13 @@
                             </StackPanel>
                         </Button>
                         
+                        <Button Command="{Binding Tracks.CopyToFolderCommand}" Classes="accent" Theme="{StaticResource SimpleButton}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="📂"/>
+                                <TextBlock Text="Copy to Folder"/>
+                            </StackPanel>
+                        </Button>
+                        
                         <Button Command="{Binding Tracks.BulkRetryCommand}" Theme="{StaticResource SimpleButton}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="🔄"/>
