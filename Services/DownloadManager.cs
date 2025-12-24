@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json; // Phase 2A: Checkpoint serialization
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -42,6 +43,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     private readonly MetadataEnrichmentOrchestrator _enrichmentOrchestrator;
     private readonly PathProviderService _pathProvider;
     private readonly SLSKDONET.Services.IO.IFileWriteService _fileWriteService; // Phase 1A
+    private readonly CrashRecoveryJournal _crashJournal; // Phase 2A
 
     // Phase 2.5: Concurrency control with SemaphoreSlim throttling
     private readonly CancellationTokenSource _globalCts = new();
@@ -72,7 +74,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         DownloadDiscoveryService discoveryService,
         MetadataEnrichmentOrchestrator enrichmentOrchestrator,
         PathProviderService pathProvider,
-        SLSKDONET.Services.IO.IFileWriteService fileWriteService) // Phase 1A
+        SLSKDONET.Services.IO.IFileWriteService fileWriteService, // Phase 1A
+        CrashRecoveryJournal crashJournal) // Phase 2A
     {
         _logger = logger;
         _config = config;
@@ -85,6 +88,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         _enrichmentOrchestrator = enrichmentOrchestrator;
         _pathProvider = pathProvider;
         _fileWriteService = fileWriteService; // Phase 1A
+        _crashJournal = crashJournal; // Phase 2A
 
         // Initialize from config, but allow runtime changes
         MaxActiveDownloads = _config.MaxConcurrentDownloads > 0 ? _config.MaxConcurrentDownloads : 3;

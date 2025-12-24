@@ -21,7 +21,15 @@ public class DownloadContext
 
     // Phase 2.5: Resumable Download Tracking
     public long TotalBytes { get; set; }        // Remote file size
-    public long BytesReceived { get; set; }     // Local progress (includes .part file size)
+    
+    // Phase 2A: Thread-safe progress tracking (Interlocked for atomic updates)
+    private long _bytesReceived;
+    public long BytesReceived 
+    { 
+        get => Interlocked.Read(ref _bytesReceived);
+        set => Interlocked.Exchange(ref _bytesReceived, value);
+    }
+    
     public bool IsResuming { get; set; }        // UI/Log feedback for "Resuming" vs "Downloading"
 
     // Reliability (Phase 7: DJ's Studio)
