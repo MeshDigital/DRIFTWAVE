@@ -1016,7 +1016,99 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         // STEP 3: Set total bytes for progress tracking
         ctx.TotalBytes = bestMatch.Size ?? 0;  // Handle nullable size
 
-        // STEP 4: Progress tracking with 100ms throttling
+        // Phase 2A: CHECKPOINT LOGGING - Log before download starts
+        var checkpointState = new DownloadCheckpointState
+        {
+            TrackGlobalId = ctx.GlobalId,
+            Artist = ctx.Model.Artist,
+            Title = ctx.Model.Title,
+            SoulseekUsername = bestMatch.Username!,
+            SoulseekFilename = bestMatch.Filename!,
+            ExpectedSize = bestMatch.Size ?? 0,
+            PartFilePath = partPath,
+            FinalPath = finalPath,
+            BytesDownloaded = startPosition // Start with existing progress if resuming
+        };
+
+        var checkpoint = new RecoveryCheckpoint
+        {
+            Id = ctx.GlobalId, // CRITICAL: Use TrackGlobalId to prevent duplicates on retry
+            OperationType = OperationType.Download,
+            TargetPath = finalPath,
+            StateJson = JsonSerializer.Serialize(checkpointState),
+            Priority = 10 // High priority - active user download
+        };
+
+        string? checkpointId = await _crashJournal.LogCheckpointAsync(checkpoint);
+        _logger.LogDebug("✅ Download checkpoint logged: {Id} - {Artist} - {Title}", 
+            checkpointId, ctx.Model.Artist, ctx.Model.Title);
+
+        // Phase 2A: PERIODIC HEARTBEAT with stall detection
+        using var heartbeatTimer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        
+        int stallCount = 0;
+        long lastHeartbeatBytes = startPosition;
+        
+        var heartbeatTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (await heartbeatTimer.WaitForNextTickAsync(heartbeatCts.Token))
+                {
+                    var currentBytes = ctx.BytesReceived; // Thread-safe Interlocked read
+                    
+                    // STALL DETECTION: 4 heartbeats (1 minute) of no progress
+                    if (currentBytes == lastHeartbeatBytes)
+                    {
+                        stallCount++;
+                        if (stallCount >= 4)
+                        {
+                            _logger.LogWarning("⚠️ Download stalled for 1 minute: {Artist} - {Title} ({Current}/{Total} bytes)",
+                                ctx.Model.Artist, ctx.Model.Title, currentBytes, checkpointState.ExpectedSize);
+                            // Skip heartbeat update to save SSD writes
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        stallCount = 0; // Reset on progress
+                    }
+
+                    // PERFORMANCE: Only update if progress > 1KB to reduce SQLite overhead
+                    if (currentBytes > 0 && currentBytes > lastHeartbeatBytes + 1024)
+                    {
+                        checkpointState.BytesDownloaded = currentBytes;
+                        
+                        // SSD OPTIMIZATION: Skip if no meaningful progress (built into UpdateHeartbeatAsync)
+                        await _crashJournal.UpdateHeartbeatAsync(
+                            checkpointId!,
+                            JsonSerializer.Serialize(checkpointState), // Serialize in heartbeat thread
+                            lastHeartbeatBytes,
+                            currentBytes);
+                        
+                        lastHeartbeatBytes = currentBytes;
+                        
+                        _logger.LogTrace("Heartbeat: {Current}/{Total} bytes ({Percent}%)",
+                            currentBytes, checkpointState.ExpectedSize, 
+                            (currentBytes * 100.0 / checkpointState.ExpectedSize));
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on download completion or cancellation
+                _logger.LogDebug("Heartbeat cancelled for {GlobalId}", ctx.GlobalId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Heartbeat error for {GlobalId}", ctx.GlobalId);
+            }
+        }, heartbeatCts.Token);
+
+        try
+        {
+            // STEP 4: Progress tracking with 100ms throttling
         var lastNotificationTime = DateTime.MinValue;
         var totalFileSize = bestMatch.Size ?? 1;  // Avoid division by zero
         var progress = new Progress<double>(p =>
@@ -1138,6 +1230,13 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 ctx.BytesReceived = bestMatch.Size ?? 0;  // Handle nullable size
                 await UpdateStateAsync(ctx, PlaylistTrackState.Completed);
 
+                // Phase 2A: Complete checkpoint on success
+                if (checkpointId != null)
+                {
+                    await _crashJournal.CompleteCheckpointAsync(checkpointId);
+                    _logger.LogDebug("✅ Download checkpoint completed: {Id}", checkpointId);
+                }
+
                 // CRITICAL: Create LibraryEntry for global index (enables All Tracks view + cross-project deduplication)
                 var libraryEntry = new LibraryEntry
                 {
@@ -1168,6 +1267,26 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 "Download transfer failed or was cancelled. .part file retained for resume.");
         }
     }
+    finally
+    {
+        // Phase 2A: CRITICAL CLEANUP - Stop heartbeat timer
+        heartbeatCts.Cancel(); // Signal heartbeat to stop
+        heartbeatTimer.Dispose();
+        
+        try
+        {
+            await heartbeatTask; // Wait for heartbeat task to complete
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when heartbeat is cancelled
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error waiting for heartbeat task cleanup");
+        }
+    }
+}
 
     public event PropertyChangedEventHandler? PropertyChanged;
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
