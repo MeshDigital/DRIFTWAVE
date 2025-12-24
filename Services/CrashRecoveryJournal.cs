@@ -50,6 +50,7 @@ public class TagWriteCheckpointState
     public string FilePath { get; set; } = string.Empty;
     public string TempPath { get; set; } = string.Empty;
     public DateTime OriginalTimestamp { get; set; }
+    public DateTime? OriginalCreationTime { get; set; } // Phase 2A: For full timestamp recovery
 }
 
 public class HydrationCheckpointState

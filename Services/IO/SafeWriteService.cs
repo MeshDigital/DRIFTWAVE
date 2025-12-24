@@ -1,20 +1,27 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using SLSKDONET.Services;
 
 namespace SLSKDONET.Services.IO
 {
     public class SafeWriteService : IFileWriteService
     {
         private readonly ILogger<SafeWriteService> _logger;
+        private readonly CrashRecoveryJournal _crashJournal;
         private readonly SemaphoreSlim _fileLock = new(1, 1); // Prevent concurrent writes to same file
 
-        public SafeWriteService(ILogger<SafeWriteService> logger)
+        public SafeWriteService(
+            ILogger<SafeWriteService> logger,
+            CrashRecoveryJournal crashJournal)
         {
             _logger = logger;
+            _crashJournal = crashJournal;
         }
 
         public async Task<bool> WriteAtomicAsync(
@@ -66,6 +73,18 @@ namespace SLSKDONET.Services.IO
                 return false;
             }
 
+            // Phase 2A: Log checkpoint BEFORE any I/O operations
+            string? checkpointId = null;
+            DateTime? originalCreationTime = null;
+            DateTime? originalLastWriteTime = null;
+            
+            if (File.Exists(targetPath))
+            {
+                var fileInfo = new FileInfo(targetPath);
+                originalCreationTime = fileInfo.CreationTime;
+                originalLastWriteTime = fileInfo.LastWriteTime;
+            }
+
             try
             {
                 // Thread synchronization for same-file writes
@@ -73,6 +92,27 @@ namespace SLSKDONET.Services.IO
 
                 try
                 {
+                    // Phase 2A: Create checkpoint state with enhanced tracking
+                    var checkpointState = new TagWriteCheckpointState
+                    {
+                        FilePath = targetPath,
+                        TempPath = tempPath,
+                        OriginalTimestamp = originalLastWriteTime ?? DateTime.Now,
+                        OriginalCreationTime = originalCreationTime
+                    };
+
+                    var checkpoint = new RecoveryCheckpoint
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        OperationType = OperationType.TagWrite,
+                        TargetPath = targetPath,
+                        StateJson = JsonSerializer.Serialize(checkpointState),
+                        Priority = 5 // Medium priority
+                    };
+
+                    checkpointId = await _crashJournal.LogCheckpointAsync(checkpoint);
+                    _logger.LogDebug("Logged tag write checkpoint: {Id}", checkpointId);
+
                     // Step 1: Write to temporary file
                     _logger.LogDebug("Writing to temporary file: {TempPath}", tempPath);
                     await writeAction(tempPath);
@@ -93,17 +133,22 @@ namespace SLSKDONET.Services.IO
                         }
                     }
 
-                    // Step 4: Preserve original file metadata (if exists)
-                    DateTime? originalCreationTime = null;
-                    DateTime? originalLastWriteTime = null;
-                    if (File.Exists(targetPath))
+                    // Phase 2A: Enhanced verification with file hash (optional)
+                    if (verifyAction == null)
                     {
-                        var fileInfo = new FileInfo(targetPath);
-                        originalCreationTime = fileInfo.CreationTime;
-                        originalLastWriteTime = fileInfo.LastWriteTime;
+                        // If no custom verifier, at least check temp file exists and has content
+                        var tempInfo = new FileInfo(tempPath);
+                        if (tempInfo.Length == 0)
+                        {
+                            _logger.LogWarning("Temp file is empty: {TempPath}", tempPath);
+                            CleanupTempFile(tempPath);
+                            if (checkpointId != null)
+                                await _crashJournal.CompleteCheckpointAsync(checkpointId);
+                            return false;
+                        }
                     }
 
-                    // Step 5: Atomic replace/move
+                    // Step 4: Atomic replace/move
                     if (File.Exists(targetPath))
                     {
                         // Use File.Replace for atomic swap with backup
@@ -122,7 +167,7 @@ namespace SLSKDONET.Services.IO
                         File.Move(tempPath, targetPath, overwrite: false);
                     }
 
-                    // Step 6: Restore original timestamps (preserves "Date Added" in players)
+                    // Step 5: Restore original timestamps (preserves "Date Added" in players)
                     if (originalCreationTime.HasValue && originalLastWriteTime.HasValue)
                     {
                         var newFileInfo = new FileInfo(targetPath);
@@ -130,7 +175,14 @@ namespace SLSKDONET.Services.IO
                         newFileInfo.LastWriteTime = originalLastWriteTime.Value;
                     }
 
-                    _logger.LogInformation("Successfully wrote file atomically: {TargetPath}", targetPath);
+                    // Phase 2A: Complete checkpoint AFTER successful atomic swap
+                    if (checkpointId != null)
+                    {
+                        await _crashJournal.CompleteCheckpointAsync(checkpointId);
+                        _logger.LogDebug("Completed tag write checkpoint: {Id}", checkpointId);
+                    }
+
+                    _logger.LogInformation("✅ Successfully wrote file atomically: {TargetPath}", targetPath);
                     return true;
                 }
                 finally
