@@ -275,9 +275,10 @@ public partial class SearchViewModel : ReactiveObject
                     var existing = _downloadManager.ActiveDownloads.FirstOrDefault(d => d.GlobalId == track.UniqueHash);
                     if (existing != null)
                     {
-                        result.Status = existing.State == PlaylistTrackState.Completed ? TrackStatus.Downloaded :
-                                        existing.State == PlaylistTrackState.Failed ? TrackStatus.Failed : TrackStatus.Missing;
-                                        // TODO: Add "Queued" or "Downloading" to TrackStatus if we want granular UI
+                        result.Status = (existing.State == PlaylistTrackState.Completed) ? TrackStatus.Downloaded :
+                                        (existing.State == PlaylistTrackState.Failed) ? TrackStatus.Failed : 
+                                        TrackStatus.Missing;
+                        // Deferred/Pending/Searching/Downloading all map to Missing in this simple 3-state enum
                     }
                     
                     buffer.Add(result);
@@ -409,8 +410,9 @@ public partial class SearchViewModel : ReactiveObject
 
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var status = evt.NewState == PlaylistTrackState.Completed ? TrackStatus.Downloaded : 
-                         evt.NewState == PlaylistTrackState.Failed ? TrackStatus.Failed : TrackStatus.Missing;
+            var status = (evt.NewState == PlaylistTrackState.Completed) ? TrackStatus.Downloaded : 
+                         (evt.NewState == PlaylistTrackState.Failed) ? TrackStatus.Failed : 
+                         TrackStatus.Missing;
 
             // Note: We use global ID (hash) to match.
             // SourceList access is thread-safe for reading but we need to modify the ViewModel which is bound.

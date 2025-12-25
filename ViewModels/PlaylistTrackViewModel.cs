@@ -423,6 +423,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                 PlaylistTrackState.Queued => "#00FFFF",         // Cyan
                 PlaylistTrackState.Paused => "#FFA500",         // Orange
                 PlaylistTrackState.Failed => "#FF0000",         // Red
+                PlaylistTrackState.Deferred => "#FFD700",       // Goldenrod (Preemption)
                 PlaylistTrackState.Cancelled => "#808080",      // Gray
                 _ => "#D3D3D3"                                  // LightGray
             };
@@ -436,6 +437,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         PlaylistTrackState.Searching => "🔍 Search",
         PlaylistTrackState.Queued => "⏳ Queued",
         PlaylistTrackState.Failed => "✗ Failed",
+        PlaylistTrackState.Deferred => "⏳ Deferred",
         PlaylistTrackState.Pending => "⊙ Missing",
         _ => "?"
     };

@@ -286,6 +286,7 @@ public class DownloadItemViewModel : INotifyPropertyChanged
                 PlaylistTrackState.Downloading => "Downloading",
                 PlaylistTrackState.Queued => "Queued",
                 PlaylistTrackState.Paused => "Paused",
+                PlaylistTrackState.Deferred => "Waiting (Deferred)",
                 PlaylistTrackState.Failed => "Failed",
                 PlaylistTrackState.Completed => "Completed",
                 _ => State.ToString()

@@ -980,6 +980,17 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             }
             catch (OperationCanceledException)
             {
+                // Fix #3: Preemption-aware cancellation handling
+                // If this was a background (Priority 10+) download that was preempted,
+                // defer it back to Pending rather than marking as Cancelled
+                if (ctx.Model.Priority >= 10 && ctx.State == PlaylistTrackState.Downloading)
+                {
+                    _logger.LogInformation("⏸ Download preempted for high-priority work: {Title} - deferring to queue", ctx.Model.Title);
+                    await UpdateStateAsync(ctx, PlaylistTrackState.Deferred, "Deferred for high-priority downloads");
+                    return;
+                }
+                
+                // User-initiated pause or cancellation
                 if (ctx.State != PlaylistTrackState.Paused && ctx.State != PlaylistTrackState.Cancelled)
                 {
                     await UpdateStateAsync(ctx, PlaylistTrackState.Cancelled);
@@ -1509,16 +1520,16 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     /// <summary>
     /// Prioritizes all tracks from a specific project by bumping to Priority 0 (High).
     /// Phase 3C: The "VIP Pass" - allows user to jump queue with specific playlist.
+    /// Hardening Fix #1: Now persists to database for crash resilience.
     /// </summary>
     public async Task PrioritizeProjectAsync(Guid playlistId)
     {
         _logger.LogInformation("🚀 Prioritizing project: {PlaylistId}", playlistId);
 
-        // Update database: Bump all missing tracks in this playlist to Priority 0
-        // Note: Using raw SQL since we don't have direct EF context access in DownloadManager
-        // Alternative: Could add PrioritizeProjectAsync to DatabaseService
+        // Fix #1: Persist to database FIRST for crash resilience
+        await _databaseService.UpdatePlaylistTracksPriorityAsync(playlistId, 0);
         
-        // Update in-memory contexts first
+        // Update in-memory contexts
         int updatedCount = 0;
         lock (_collectionLock)
         {
@@ -1529,11 +1540,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             }
         }
 
-        _logger.LogInformation("✅ Prioritized {Count} tracks from project {PlaylistId} (in-memory)",
+        _logger.LogInformation("✅ Prioritized {Count} tracks from project {PlaylistId} (database + in-memory)",
             updatedCount, playlistId);
-
-        // TODO: Add database update via DatabaseService.ExecuteRawSqlAsync or add dedicated method
-        // For now, in-memory update is sufficient for immediate queue behavior
     }
 
     /// <summary>

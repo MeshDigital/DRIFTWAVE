@@ -1168,6 +1168,9 @@ public class DatabaseService
                     TrackNumber = track.TrackNumber,
                     AddedAt = track.AddedAt,
                     SortOrder = track.SortOrder,
+                    Priority = track.Priority,
+                    SourcePlaylistId = track.SourcePlaylistId,
+                    SourcePlaylistName = track.SourcePlaylistName,
                     // Phase 0: Spotify Metadata
                     SpotifyTrackId = track.SpotifyTrackId,
                     SpotifyAlbumId = track.SpotifyAlbumId,
@@ -1224,6 +1227,9 @@ public class DatabaseService
                         TrackNumber = track.TrackNumber,
                         AddedAt = track.AddedAt,
                         SortOrder = track.SortOrder,
+                        Priority = track.Priority,
+                        SourcePlaylistId = track.SourcePlaylistId,
+                        SourcePlaylistName = track.SourcePlaylistName,
                         // Phase 0: Spotify Metadata
                         SpotifyTrackId = track.SpotifyTrackId,
                         SpotifyAlbumId = track.SpotifyAlbumId,
@@ -1429,6 +1435,9 @@ public class DatabaseService
                     Status = trackEntity.Status,
                     ResolvedFilePath = trackEntity.ResolvedFilePath,
                     TrackNumber = trackEntity.TrackNumber,
+                    Priority = trackEntity.Priority,
+                    SourcePlaylistId = trackEntity.SourcePlaylistId,
+                    SourcePlaylistName = trackEntity.SourcePlaylistName,
                     AddedAt = trackEntity.AddedAt,
                     SortOrder = trackEntity.SortOrder,
                     SpotifyTrackId = trackEntity.SpotifyTrackId,
@@ -1521,6 +1530,30 @@ public class DatabaseService
             throw; // Re-throw to allow ViewModel to handle rollback
         }
     }
+
+    /// <summary>
+    /// Phase 3C: Bulk updates Priority for all tracks in a specific playlist.
+    /// Used by DownloadManager.PrioritizeProjectAsync for queue orchestration.
+    /// </summary>
+    public async Task UpdatePlaylistTracksPriorityAsync(Guid playlistId, int newPriority)
+    {
+        using var conn = GetConnection();
+        await conn.OpenAsync();
+
+        using var command = conn.CreateCommand();
+        command.CommandText = @"
+            UPDATE PlaylistTrackEntity 
+            SET Priority = @priority 
+            WHERE PlaylistId = @playlistId AND Status = 0"; // 0 = Missing (pending download)
+
+        command.Parameters.AddWithValue("@priority", newPriority);
+        command.Parameters.AddWithValue("@playlistId", playlistId.ToString());
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        _logger.LogInformation("Updated priority to {Priority} for {Count} tracks in playlist {PlaylistId}",
+            newPriority, rowsAffected, playlistId);
+    }
+
 
     private SqliteConnection GetConnection()
     {

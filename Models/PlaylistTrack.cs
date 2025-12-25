@@ -127,6 +127,16 @@ public class PlaylistTrack
     /// </summary>
     public int Priority { get; set; } = 1;
     
+    /// <summary>
+    /// Source playlist ID for origin tracking and project grouping.
+    /// </summary>
+    public Guid? SourcePlaylistId { get; set; }
+    
+    /// <summary>
+    /// Cached source playlist name for UI origin tags.
+    /// </summary>
+    public string? SourcePlaylistName { get; set; }
+    
     public bool IsEnriched { get; set; } = false;
 
     // Phase 13: Per-Track Filter Overrides
@@ -152,6 +162,7 @@ public enum PlaylistTrackState
     Queued,
     Downloading,
     Paused,
+    Deferred,
     Completed,
     Failed,
     Cancelled
