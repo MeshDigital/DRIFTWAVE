@@ -35,7 +35,7 @@
                                  <MenuItem Header="Import History" Command="{Binding ViewHistoryCommand}">
                                      <MenuItem.Icon>📜</MenuItem.Icon>
                                  </MenuItem>
-                                 <MenuItem Header="Upgrade Scout" Command="{Binding ToggleUpgradeScoutCommand}">
+                                 <MenuItem Header="Upgrade Scout (Soon)" Command="{Binding ToggleUpgradeScoutCommand}" IsEnabled="False" ToolTip.Tip="Feature coming in Phase 8">
                                      <MenuItem.Icon>💎</MenuItem.Icon>
                                  </MenuItem>
                                  <MenuItem Header="New Smart Playlist" Command="{Binding Projects.AddPlaylistCommand}">

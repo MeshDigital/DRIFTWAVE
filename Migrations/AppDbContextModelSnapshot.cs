@@ -71,8 +71,14 @@ namespace SLSKDONET.Migrations
                     b.Property<int?>("CanonicalDuration")
                         .HasColumnType("INTEGER");
 
+                    b.Property<double?>("Danceability")
+                        .HasColumnType("REAL");
+
                     b.Property<int?>("DurationSeconds")
                         .HasColumnType("INTEGER");
+
+                    b.Property<double?>("Energy")
+                        .HasColumnType("REAL");
 
                     b.Property<string>("FilePath")
                         .IsRequired()
@@ -88,7 +94,19 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("Genres")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ISRC")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnriched")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("LastUsedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("ManualBPM")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("ManualKey")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("MusicalKey")
@@ -109,6 +127,12 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("SpotifyArtistId")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("SpotifyBPM")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("SpotifyKey")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SpotifyTrackId")
                         .HasColumnType("TEXT");
 
@@ -116,9 +140,47 @@ namespace SLSKDONET.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("Valence")
+                        .HasColumnType("REAL");
+
                     b.HasKey("UniqueHash");
 
                     b.ToTable("LibraryEntries");
+                });
+
+            modelBuilder.Entity("SLSKDONET.Data.LibraryHealthEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("FreeStorageBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HqTracks")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastScanDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PendingUpdates")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TopGenresJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("TotalStorageBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalTracks")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UpgradableCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LibraryHealth");
                 });
 
             modelBuilder.Entity("SLSKDONET.Data.PlaylistActivityLogEntity", b =>
@@ -245,6 +307,9 @@ namespace SLSKDONET.Migrations
                     b.Property<double?>("BPM")
                         .HasColumnType("REAL");
 
+                    b.Property<int>("Bitrate")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("BitrateScore")
                         .HasColumnType("INTEGER");
 
@@ -254,10 +319,16 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("CuePointsJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Format")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("FrequencyCutoff")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Genres")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ISRC")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsEnriched")
@@ -272,6 +343,15 @@ namespace SLSKDONET.Migrations
                     b.Property<DateTime?>("LastPlayedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("ManualBPM")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("ManualKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("MinBitrateOverride")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("MusicalKey")
                         .HasColumnType("TEXT");
 
@@ -283,6 +363,9 @@ namespace SLSKDONET.Migrations
 
                     b.Property<int?>("Popularity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("PreferredFormats")
+                        .HasColumnType("TEXT");
 
                     b.Property<double?>("QualityConfidence")
                         .HasColumnType("REAL");
@@ -310,6 +393,12 @@ namespace SLSKDONET.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SpotifyArtistId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("SpotifyBPM")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("SpotifyKey")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SpotifyTrackId")
@@ -408,6 +497,12 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("CuePointsJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("Danceability")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Energy")
+                        .HasColumnType("REAL");
+
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("TEXT");
 
@@ -421,11 +516,20 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("Genres")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ISRC")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsEnriched")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool?>("IsTrustworthy")
                         .HasColumnType("INTEGER");
+
+                    b.Property<double?>("ManualBPM")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("ManualKey")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MusicalKey")
                         .HasColumnType("TEXT");
@@ -458,6 +562,12 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("SpotifyArtistId")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("SpotifyBPM")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("SpotifyKey")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SpotifyTrackId")
                         .HasColumnType("TEXT");
 
@@ -468,6 +578,9 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<double?>("Valence")
+                        .HasColumnType("REAL");
 
                     b.HasKey("GlobalId");
 

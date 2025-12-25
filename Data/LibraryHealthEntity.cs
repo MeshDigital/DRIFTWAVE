@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SLSKDONET.Data;
 
@@ -18,4 +19,14 @@ public class LibraryHealthEntity
     
     public DateTime LastScanDate { get; set; }
     public string? TopGenresJson { get; set; } // Serialized top genres
+    
+    // Phase 3A: Transparency Properties (Not persisted)
+    [NotMapped]
+    public int HealthScore { get; set; } = 100;
+    
+    [NotMapped]
+    public string HealthStatus { get; set; } = "Healthy";
+    
+    [NotMapped]
+    public int IssuesCount { get; set; } = 0;
 }

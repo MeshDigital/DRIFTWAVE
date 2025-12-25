@@ -107,9 +107,9 @@
                 </StackPanel>
 
                 <!-- Sonic Integrity Section (Phase 8) -->
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Sonic Integrity" FontSize="14" FontWeight="SemiBold" Foreground="#AAA"/>
-                    <Border Background="#252526" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="12" IsEnabled="False" ToolTip.Tip="Feature coming in Phase 8 (Sonic Integrity)">
+                    <TextBlock Text="Sonic Integrity (Coming Soon)" FontSize="14" FontWeight="SemiBold" Foreground="#666"/>
+                    <Border Background="#252526" CornerRadius="8" Padding="16" Opacity="0.5">
                         <StackPanel Spacing="12">
                             <Grid ColumnDefinitions="*,*">
                                 <StackPanel Grid.Column="0" Spacing="4">

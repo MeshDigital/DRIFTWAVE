@@ -61,6 +61,13 @@ public class TagWriteCheckpointState
     public DateTime? OriginalCreationTime { get; set; } // Phase 2A: For full timestamp recovery
 }
 
+public struct SystemHealthStats
+{
+    public int ActiveCount { get; set; }
+    public int DeadLetterCount { get; set; }
+    public int CompletedCount { get; set; }
+}
+
 public class HydrationCheckpointState
 {
     public string TrackGlobalId { get; set; } = string.Empty;
@@ -86,6 +93,7 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
     private SqliteCommand? _deleteCheckpointCmd;
     private SqliteCommand? _resetFailureCountCmd;
     private SqliteCommand? _markDeadLetterCmd;
+    private SqliteCommand? _getSystemHealthCmd;
     
     private bool _disposed = false;
 
@@ -175,6 +183,13 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
             _markDeadLetterCmd = _journalConnection.CreateCommand();
             _markDeadLetterCmd.CommandText = "UPDATE RecoveryCheckpoints SET Status = 2 WHERE Id = @id";
             _markDeadLetterCmd.Prepare();
+            
+            _getSystemHealthCmd = _journalConnection.CreateCommand();
+            _getSystemHealthCmd.CommandText = @"
+                SELECT Status, COUNT(*) 
+                FROM RecoveryCheckpoints 
+                GROUP BY Status";
+            _getSystemHealthCmd.Prepare();
 
             _logger.LogInformation("✅ Ironclad Recovery Journal initialized with optimized connection pool");
         }
@@ -421,6 +436,52 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
+    /// Phase 3A (Transparency): Gets aggregated health stats for the UI Dashboard.
+    /// Helps users see if there are pending dead letters or active recoveries.
+    /// </summary>
+    public async Task<SystemHealthStats> GetSystemHealthAsync()
+    {
+        if (_disposed || _journalConnection == null || _getSystemHealthCmd == null)
+            return new SystemHealthStats();
+
+        var stats = new SystemHealthStats();
+
+        await _journalLock.WaitAsync();
+        try
+        {
+            using var reader = await _getSystemHealthCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var status = (CheckpointStatus)reader.GetInt32(0);
+                var count = reader.GetInt32(1);
+
+                switch (status)
+                {
+                    case CheckpointStatus.Active:
+                        stats.ActiveCount = count;
+                        break;
+                    case CheckpointStatus.Completed:
+                        stats.CompletedCount = count;
+                        break;
+                    case CheckpointStatus.DeadLetter:
+                        stats.DeadLetterCount = count;
+                        break;
+                }
+            }
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve system health stats");
+            return new SystemHealthStats();
+        }
+        finally
+        {
+            _journalLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Clears all stale checkpoints (heartbeat >24 hours old).
     /// Used during startup to clean up truly abandoned operations.
     /// </summary>
@@ -468,6 +529,8 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
             _updateHeartbeatCmd?.Dispose();
             _deleteCheckpointCmd?.Dispose();
             _resetFailureCountCmd?.Dispose();
+            _markDeadLetterCmd?.Dispose();
+            _getSystemHealthCmd?.Dispose();
             _journalConnection?.Dispose();
             _journalLock.Dispose();
         }
@@ -486,6 +549,8 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
         _updateHeartbeatCmd?.Dispose();
         _deleteCheckpointCmd?.Dispose();
         _resetFailureCountCmd?.Dispose();
+        _markDeadLetterCmd?.Dispose();
+        _getSystemHealthCmd?.Dispose();
         
         if (_journalConnection != null)
         {

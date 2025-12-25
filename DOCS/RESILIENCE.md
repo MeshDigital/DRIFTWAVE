@@ -134,3 +134,23 @@ This ensures that a single corrupted file or edge case cannot prevent the applic
 
 ### Manual Retry Mechanism
 If a file is dead-lettered but the user fixes the issue (e.g., clears disk space), they can trigger a manual retry. The system calls `ResetFailureCountAsync`, setting failures to 0 and returning the checkpoint to the active queue.
+
+---
+
+## 🚦 System Health Dashboard (Phase 3A)
+
+Resilience is invisible until it fails, or until you show it working. We bridge this "Value Gap" by exposing the Journal's state directly on the Home Page.
+
+### 1. The "Dual-Truth" Health Model
+The `HomeViewModel` queries the `CrashRecoveryJournal` via `GetSystemHealthAsync()` to populate the Library Health card.
+
+| Journal State | UI Status | Health Score | Action Required |
+| :--- | :--- | :--- | :--- |
+| **Active > 0** | "Recovering (N)" | 100% | None (System is healing) |
+| **DeadLetters > 0** | "Requires Attention" | 85% | User intervention needed |
+| **Clean** | "Healthy" | 100% | None |
+
+### 2. Implementation Details
+*   **Non-Blocking**: Health checks run asynchronously during `RefreshDashboardAsync`.
+*   **Transient Data**: Health status properties (`HealthScore`, `HealthStatus`) are `[NotMapped]` in `LibraryHealthEntity`, ensuring they reflect real-time RAM state without polluting the persistence layer.
+

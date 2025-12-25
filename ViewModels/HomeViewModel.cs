@@ -26,6 +26,7 @@ public class HomeViewModel : INotifyPropertyChanged
     private readonly SpotifyAuthService _spotifyAuth;
     private readonly SpotifyEnrichmentService _spotifyEnrichment;
     private readonly DownloadManager _downloadManager;
+    private readonly CrashRecoveryJournal _crashJournal; // Phase 3A: Transparency
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -78,7 +79,8 @@ public class HomeViewModel : INotifyPropertyChanged
         DatabaseService databaseService,
         SpotifyAuthService spotifyAuth,
         SpotifyEnrichmentService spotifyEnrichment,
-        DownloadManager downloadManager)
+        DownloadManager downloadManager,
+        CrashRecoveryJournal crashJournal)
     {
         _logger = logger;
         _dashboardService = dashboardService;
@@ -88,6 +90,7 @@ public class HomeViewModel : INotifyPropertyChanged
         _spotifyAuth = spotifyAuth;
         _spotifyEnrichment = spotifyEnrichment;
         _downloadManager = downloadManager;
+        _crashJournal = crashJournal;
 
         RefreshDashboardCommand = new AsyncRelayCommand(RefreshDashboardAsync);
         NavigateToSearchCommand = new RelayCommand(() => _navigationService.NavigateTo("Search"));
@@ -134,6 +137,26 @@ public class HomeViewModel : INotifyPropertyChanged
                 // Trigger an initial calculation if cache is empty
                 await _dashboardService.RecalculateLibraryHealthAsync();
                 LibraryHealth = await _dashboardService.GetLibraryHealthAsync();
+            }
+
+            // Phase 3A (Transparency): Inject real Journal Health data (Recovery Status)
+            if (LibraryHealth != null)
+            {
+                var journalStats = await _crashJournal.GetSystemHealthAsync();
+                
+                if (journalStats.DeadLetterCount > 0)
+                {
+                    LibraryHealth.HealthScore = 85; // Penalty for dead letters
+                    LibraryHealth.HealthStatus = "Requires Attention";
+                    LibraryHealth.IssuesCount = journalStats.DeadLetterCount;
+                    // We could add a more specific message property if the view supported it,
+                    // but for now, 'Issues Count' drives the orange UI state.
+                }
+                else if (journalStats.ActiveCount > 0)
+                {
+                    LibraryHealth.HealthStatus = $"Recovering ({journalStats.ActiveCount})";
+                    // Active recovery is good, so keep score high
+                }
             }
         }
         finally

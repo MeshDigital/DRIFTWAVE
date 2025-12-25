@@ -48,6 +48,12 @@ public class TrackEntity
     public string? AudioFingerprint { get; set; } // Chromaprint/SoundFingerprinting hash
     public int? BitrateScore { get; set; } // Quality score for replacement
     public double? AnalysisOffset { get; set; } // Silence offset for time alignment
+    
+    // Phase 3A: Dual-Truth Metadata
+    public double? SpotifyBPM { get; set; }
+    public string? SpotifyKey { get; set; }
+    public double? ManualBPM { get; set; }
+    public string? ManualKey { get; set; }
 
     // Phase 8: Sonic Integrity & Spectral Analysis
     public string? SpectralHash { get; set; } // Headless frequency histogram hash
@@ -190,6 +196,12 @@ public class PlaylistTrackEntity
     public string? AudioFingerprint { get; set; } // Chromaprint/SoundFingerprinting hash
     public int? BitrateScore { get; set; } // Quality score for replacement
     public double? AnalysisOffset { get; set; } // Silence offset for time alignment
+    
+    // Phase 3A: Dual-Truth Metadata
+    public double? SpotifyBPM { get; set; }
+    public string? SpotifyKey { get; set; }
+    public double? ManualBPM { get; set; }
+    public string? ManualKey { get; set; }
 
     // Phase 8: Sonic Integrity & Spectral Analysis
     public string? SpectralHash { get; set; }
@@ -248,6 +260,13 @@ public class LibraryEntryEntity
     // Phase 0.1: Musical Intelligence & Antigravity
     public string? MusicalKey { get; set; }
     public double? BPM { get; set; }
+    
+    // Phase 3A: Dual-Truth Metadata
+    public double? SpotifyBPM { get; set; }
+    public string? SpotifyKey { get; set; }
+    public double? ManualBPM { get; set; }
+    public string? ManualKey { get; set; }
+
     public double? Energy { get; set; }
     public double? Valence { get; set; }
     public double? Danceability { get; set; }

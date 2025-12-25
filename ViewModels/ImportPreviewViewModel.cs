@@ -93,7 +93,6 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
     public ICommand SelectMissingCommand { get; }
     public ICommand CancelCommand { get; }
 
-    private CancellationTokenSource? _enrichmentCts;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<PlaylistJob>? AddedToLibrary;
@@ -613,7 +612,6 @@ public class ImportPreviewViewModel : INotifyPropertyChanged
 
     private void Cancel()
     {
-        _enrichmentCts?.Cancel();
         _logger.LogInformation("Import preview cancelled");
         StatusMessage = "Preview cancelled";
         Cancelled?.Invoke(this, EventArgs.Empty);

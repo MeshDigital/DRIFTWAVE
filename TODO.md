@@ -260,13 +260,13 @@
 - [ ] Bind `AudioAnalysis` properties correctly.
 
 #### 2. Home Page Bento Grid
-- [ ] Hook "Library Health" card to `CrashRecoveryJournal` queries.
-- [ ] Show "Active Recoveries" count if startup recovery ran.
+- [x] Hook "Library Health" card to `CrashRecoveryJournal` queries.
+- [x] Show "Active Recoveries" count if startup recovery ran.
 
 #### 3. USB Export & Player Control
-- [ ] Set `IsEnabled="False"` on "Export to Rekordbox".
-- [ ] Add Tooltip "Coming in v1.1".
+- [x] Set `IsEnabled="False"` on "Upgrade Scout" and "Sonic Integrity" (Placeholder UI Hardening).
 - [ ] Disable Pitch Slider until `AudioPlayerService` supports stretching.
+- [ ] Implement "Export to Rekordbox" UI (currently missing) before disabling it.
 
 ### 🏗️ Architectural Improvements & Advanced Features
 
