@@ -1192,10 +1192,12 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 }
 
                 var finalPartSize = new FileInfo(partPath).Length;
-                if (finalPartSize != bestMatch.Size)
+                // Fix: Allow file to be slightly larger (metadata padding)
+                // We rely on VerifyAudioFormatAsync later for actual integrity
+                if (finalPartSize < bestMatch.Size)
                 {
                     throw new InvalidDataException(
-                        $"Downloaded file size mismatch. Expected {bestMatch.Size}, got {finalPartSize}");
+                        $"Downloaded file truncated. Expected {bestMatch.Size}, got {finalPartSize}");
                 }
 
                 // Clean up old final file if it exists (race condition edge case)

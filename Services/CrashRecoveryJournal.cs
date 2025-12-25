@@ -20,6 +20,13 @@ public enum OperationType
     MetadataHydration
 }
 
+public enum CheckpointStatus
+{
+    Active = 0,
+    Completed = 1,
+    DeadLetter = 2
+}
+
 public class RecoveryCheckpoint
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -28,6 +35,7 @@ public class RecoveryCheckpoint
     public string StateJson { get; set; } = string.Empty;
     public int Priority { get; set; } = 0;
     public int FailureCount { get; set; } = 0;
+    public CheckpointStatus Status { get; set; } = CheckpointStatus.Active;
     public long LastHeartbeat { get; set; } = Stopwatch.GetTimestamp();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
@@ -77,6 +85,7 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
     private SqliteCommand? _updateHeartbeatCmd;
     private SqliteCommand? _deleteCheckpointCmd;
     private SqliteCommand? _resetFailureCountCmd;
+    private SqliteCommand? _markDeadLetterCmd;
     
     private bool _disposed = false;
 
@@ -110,6 +119,7 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
                     StateJson TEXT NOT NULL,
                     Priority INTEGER DEFAULT 0,
                     FailureCount INTEGER DEFAULT 0,
+                    Status INTEGER DEFAULT 0, -- 0: Active, 1: Completed, 2: DeadLetter
                     LastHeartbeat INTEGER NOT NULL,
                     CreatedAt TEXT NOT NULL
                 );
@@ -135,6 +145,7 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
                 PRAGMA journal_mode = WAL;
                 PRAGMA synchronous = NORMAL;
                 PRAGMA temp_store = MEMORY;
+                PRAGMA mmap_size = 268435456; -- 256MB Limit (Good Neighbor Policy)
             ";
             await pragmaCmd.ExecuteNonQueryAsync();
 
@@ -142,8 +153,8 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
             _insertCheckpointCmd = _journalConnection.CreateCommand();
             _insertCheckpointCmd.CommandText = @"
                 INSERT OR REPLACE INTO RecoveryCheckpoints 
-                (Id, OperationType, TargetPath, StateJson, Priority, FailureCount, LastHeartbeat, CreatedAt)
-                VALUES (@id, @type, @path, @state, @priority, @failures, @heartbeat, @created)";
+                (Id, OperationType, TargetPath, StateJson, Priority, FailureCount, Status, LastHeartbeat, CreatedAt)
+                VALUES (@id, @type, @path, @state, @priority, @failures, @status, @heartbeat, @created)";
             _insertCheckpointCmd.Prepare();
 
             _updateHeartbeatCmd = _journalConnection.CreateCommand();
@@ -158,8 +169,12 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
             _deleteCheckpointCmd.Prepare();
 
             _resetFailureCountCmd = _journalConnection.CreateCommand();
-            _resetFailureCountCmd.CommandText = "UPDATE RecoveryCheckpoints SET FailureCount = 0 WHERE TargetPath = @path";
+            _resetFailureCountCmd.CommandText = "UPDATE RecoveryCheckpoints SET FailureCount = 0, Status = 0 WHERE TargetPath = @path";
             _resetFailureCountCmd.Prepare();
+            
+            _markDeadLetterCmd = _journalConnection.CreateCommand();
+            _markDeadLetterCmd.CommandText = "UPDATE RecoveryCheckpoints SET Status = 2 WHERE Id = @id";
+            _markDeadLetterCmd.Prepare();
 
             _logger.LogInformation("✅ Ironclad Recovery Journal initialized with optimized connection pool");
         }
@@ -188,6 +203,7 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
             _insertCheckpointCmd.Parameters.AddWithValue("@state", checkpoint.StateJson);
             _insertCheckpointCmd.Parameters.AddWithValue("@priority", checkpoint.Priority);
             _insertCheckpointCmd.Parameters.AddWithValue("@failures", checkpoint.FailureCount);
+            _insertCheckpointCmd.Parameters.AddWithValue("@status", (int)checkpoint.Status);
             _insertCheckpointCmd.Parameters.AddWithValue("@heartbeat", Stopwatch.GetTimestamp());
             _insertCheckpointCmd.Parameters.AddWithValue("@created", checkpoint.CreatedAt.ToString("o"));
 
@@ -292,6 +308,33 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
+    /// Phase 2A/3A: Marks a checkpoint as "DeadLetter" (Status=2) to preserve it in DB
+    /// instead of deleting it. Prevents startup loops while keeping audit trail.
+    /// </summary>
+    public async Task MarkAsDeadLetterAsync(string checkpointId)
+    {
+        if (_disposed || _markDeadLetterCmd == null)
+            return;
+
+        await _journalLock.WaitAsync();
+        try
+        {
+            _markDeadLetterCmd.Parameters.Clear();
+            _markDeadLetterCmd.Parameters.AddWithValue("@id", checkpointId);
+            
+            var rows = await _markDeadLetterCmd.ExecuteNonQueryAsync();
+            if (rows > 0)
+            {
+                _logger.LogWarning("🏴 Marked checkpoint as Dead-Letter: {Id}", checkpointId);
+            }
+        }
+        finally
+        {
+            _journalLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Phase 3A: Atomic Resume - Gets confirmed bytes from journal.
     /// Acts as the "Source of Truth" to validate partial files on disk.
     /// Uses JsonDocument to avoid dependency on specific state types.
@@ -351,9 +394,9 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
         using var cmd = _journalConnection.CreateCommand();
         cmd.CommandText = @"
             SELECT Id, OperationType, TargetPath, StateJson, Priority, FailureCount, 
-                   LastHeartbeat, CreatedAt
+                   LastHeartbeat, CreatedAt, Status
             FROM RecoveryCheckpoints
-            WHERE LastHeartbeat > @staleThreshold
+            WHERE LastHeartbeat > @staleThreshold AND Status = 0
             ORDER BY Priority DESC, CreatedAt ASC";
         cmd.Parameters.AddWithValue("@staleThreshold", staleThresholdTicks);
 
@@ -369,7 +412,8 @@ public class CrashRecoveryJournal : IDisposable, IAsyncDisposable
                 Priority = reader.GetInt32(4),
                 FailureCount = reader.GetInt32(5),
                 LastHeartbeat = reader.GetInt64(6),
-                CreatedAt = DateTime.Parse(reader.GetString(7))
+                CreatedAt = DateTime.Parse(reader.GetString(7)),
+                Status = (CheckpointStatus)reader.GetInt32(8)
             });
         }
 

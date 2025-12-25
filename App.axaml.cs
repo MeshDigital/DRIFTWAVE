@@ -215,7 +215,7 @@ public partial class App : Application
                             // Phase 2A: Run crash recovery with delay for UI breathing room
                             _ = Task.Run(async () =>
                             {
-                                await Task.Delay(1000); // Let UI fully render first
+                                await Task.Delay(3000); // Wait 3s ensures UI & EventBus are fully engaged
                                 try
                                 {
                                     var crashRecovery = Services.GetRequiredService<CrashRecoveryService>();

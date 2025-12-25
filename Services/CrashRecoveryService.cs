@@ -84,8 +84,10 @@ public class CrashRecoveryService
                                 "⚠️ Checkpoint {Id} failed {Count} times - moving to dead-letter",
                                 checkpoint.Id, checkpoint.FailureCount);
                             
-                            await LogDeadLetterAsync(checkpoint);
-                            await _journal.CompleteCheckpointAsync(checkpoint.Id);
+                            // Phase 3A: Mark as Dead-Letter in DB (persistent status)
+                            await _journal.MarkAsDeadLetterAsync(checkpoint.Id);
+                            // We do NOT call CompleteCheckpointAsync removal, as MarkAsDeadLetterAsync keeps it
+                            // but sets Status=2 so it's ignored by future GetPending calls.
                             stats.DeadLetters++;
                             continue;
                         }
