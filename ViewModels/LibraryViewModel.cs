@@ -29,6 +29,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     private readonly SpotifyEnrichmentService _spotifyEnrichmentService; // Phase 5: Cache-First
     private readonly HarmonicMatchService _harmonicMatchService; // Phase 8: DJ Features
     private System.Threading.Timer? _selectionDebounceTimer; // Debounce for harmonic matching
+    private System.Threading.CancellationTokenSource? _matchLoadCancellation; // Phase 9B: Cancel overlapping operations
     private Views.MainViewModel? _mainViewModel; // Reference to parent
     public Views.MainViewModel? MainViewModel
     {
@@ -138,6 +139,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand DownloadAlbumCommand { get; }
     public System.Windows.Input.ICommand ExportMonthlyDropCommand { get; }
     public System.Windows.Input.ICommand FindHarmonicMatchesCommand { get; }
+    public System.Windows.Input.ICommand ToggleMixHelperCommand { get; } // Phase 9: Toggle sidebar
 
     public LibraryViewModel(
         ILogger<LibraryViewModel> logger,
@@ -189,6 +191,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         DownloadAlbumCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteDownloadAlbumAsync);
         ExportMonthlyDropCommand = new AsyncRelayCommand(ExecuteExportMonthlyDropAsync);
         FindHarmonicMatchesCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteFindHarmonicMatchesAsync);
+        ToggleMixHelperCommand = new RelayCommand<object>(_ => IsMixHelperVisible = !IsMixHelperVisible);
         
         PlayerViewModel = playerViewModel;
         UpgradeScout = upgradeScout;
@@ -296,10 +299,14 @@ public class LibraryViewModel : INotifyPropertyChanged
             }
 
             // Phase 9: Debounced Harmonic Matching
-            // Cancel previous timer and start new one (250ms delay)
+            // Phase 9B: Cancel previous operation and timer to prevent overlapping queries
+            _matchLoadCancellation?.Cancel();
+            _matchLoadCancellation?.Dispose();
+            _matchLoadCancellation = new System.Threading.CancellationTokenSource();
+            
             _selectionDebounceTimer?.Dispose();
             _selectionDebounceTimer = new System.Threading.Timer(
-                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadHarmonicMatchesAsync(trackVm)),
+                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadHarmonicMatchesAsync(trackVm, _matchLoadCancellation.Token)),
                 null,
                 250, // Wait 250ms after last selection change
                 System.Threading.Timeout.Infinite);
@@ -714,8 +721,9 @@ public class LibraryViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// Phase 9: Loads harmonic matches for the Mix Helper sidebar (debounced).
+    /// Phase 9B: Now accepts CancellationToken to prevent overlapping operations.
     /// </summary>
-    private async Task LoadHarmonicMatchesAsync(PlaylistTrackViewModel seedTrack)
+    private async Task LoadHarmonicMatchesAsync(PlaylistTrackViewModel seedTrack, System.Threading.CancellationToken cancellationToken = default)
     {
         try
         {
@@ -725,12 +733,26 @@ public class LibraryViewModel : INotifyPropertyChanged
 
             _logger.LogDebug("Loading harmonic matches for: {Title}", seedTrack.Title);
 
+            // Check for cancellation before expensive operation
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogDebug("Harmonic match loading cancelled for: {Title}", seedTrack.Title);
+                return;
+            }
+
             // Find matches
             var matches = await _harmonicMatchService.GetHarmonicMatchesAsync(
                 seedTrack.GlobalId,
                 limit: 10, // Sidebar shows top 10
                 includeBpmRange: true,
                 includeEnergyMatch: true);
+
+            // Check cancellation again after async operation
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogDebug("Harmonic match loading cancelled after query for: {Title}", seedTrack.Title);
+                return;
+            }
 
             // Convert to ViewModel
             foreach (var match in matches)

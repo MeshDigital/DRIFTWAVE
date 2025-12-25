@@ -360,12 +360,30 @@
                                      <TextBlock Text="💿"/>
                                  </MenuItem.Icon>
                             </MenuItem>
+                            
+                            <Separator/>
+                            
+                            <!-- Phase 9: Harmonic Matching -->
+                            <MenuItem Header="Find Harmonic Matches" 
+                                      Command="{Binding $parent[UserControl].((vm:LibraryViewModel)DataContext).FindHarmonicMatchesCommand}"
+                                      CommandParameter="{Binding Source.Selection.SelectedItem}">
+                                 <MenuItem.Icon>
+                                     <TextBlock Text="🎹"/>
+                                 </MenuItem.Icon>
+                            </MenuItem>
+                            
+                            <MenuItem Header="Show Mix Helper" 
+                                      Command="{Binding $parent[UserControl].((vm:LibraryViewModel)DataContext).ToggleMixHelperCommand}">
+                                 <MenuItem.Icon>
+                                     <TextBlock Text="🎛️"/>
+                                 </MenuItem.Icon>
+                            </MenuItem>
                         </ContextMenu>
                     </TreeDataGrid.ContextMenu>
                     <TreeDataGrid.Styles>
                         <Style Selector="TreeDataGridRow">
                             <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="MinHeight" Value="32"/>
+                            <Setter Property="MinHeight" Value="40"/><!-- Phase 9: Increased from 32 for modern touch-friendly feel -->
                             <Setter Property="Transitions">
                                 <Transitions>
                                     <BrushTransition Property="Background" Duration="0:0:0.15"/>

@@ -379,6 +379,11 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
 
     public string ReleaseYear => Model.ReleaseDate.HasValue ? Model.ReleaseDate.Value.Year.ToString() : string.Empty;
 
+    // Phase 9: Metadata display defaults (no empty cells)
+    public string BpmDisplay => Model.BPM.HasValue && Model.BPM.Value > 0 ? $"{Model.BPM:F1}" : "—";
+    
+    public string KeyDisplay => !string.IsNullOrWhiteSpace(Model.Tonality) ? Model.Tonality : "Unknown";
+
     /// <summary>
     /// Loads the album artwork from cache or downloads it.
     /// Should be called by the ViewModel after construction.
