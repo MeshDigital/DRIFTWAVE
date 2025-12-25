@@ -193,9 +193,10 @@
   - [x] **BPM Matching**: ±6% beatmatching range.
   - [x] **Scoring Algorithm**: 0-100 compatibility score (Key: 50pts, BPM: 30pts, Energy: 20pts).
   - [x] **Command Implementation**: FindHarmonicMatchesCommand in LibraryViewModel.
+  - [x] **Phase 9: Mix Helper Sidebar**: Real-time harmonic suggestions with debounced selection (250ms).
   - [ ] **UI Integration**:
     - [ ] Library TreeDataGrid context menu: "Find Harmonic Matches".
-    - [ ] "Mix Helper" panel for seed track visualization.
+    - [x] "Mix Helper" panel for seed track visualization.
     - [ ] Smart Playlist Generator.
   - [ ] **Advanced Features**:
     - [ ] Spotify Energy/Valence integration.

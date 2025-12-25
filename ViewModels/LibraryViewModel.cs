@@ -28,6 +28,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     private readonly INotificationService _notificationService;
     private readonly SpotifyEnrichmentService _spotifyEnrichmentService; // Phase 5: Cache-First
     private readonly HarmonicMatchService _harmonicMatchService; // Phase 8: DJ Features
+    private System.Threading.Timer? _selectionDebounceTimer; // Debounce for harmonic matching
     private Views.MainViewModel? _mainViewModel; // Reference to parent
     public Views.MainViewModel? MainViewModel
     {
@@ -40,6 +41,35 @@ public class LibraryViewModel : INotifyPropertyChanged
     {
         get => _isLoading;
         set { _isLoading = value; OnPropertyChanged(); }
+    }
+
+    // Phase 9: Mix Helper Sidebar
+    private bool _isMixHelperVisible = true;
+    public bool IsMixHelperVisible
+    {
+        get => _isMixHelperVisible;
+        set { _isMixHelperVisible = value; OnPropertyChanged(); }
+    }
+
+    private PlaylistTrackViewModel? _mixHelperSeedTrack;
+    public PlaylistTrackViewModel? MixHelperSeedTrack
+    {
+        get => _mixHelperSeedTrack;
+        set { _mixHelperSeedTrack = value; OnPropertyChanged(); }
+    }
+
+    private System.Collections.ObjectModel.ObservableCollection<HarmonicMatchViewModel> _harmonicMatches = new();
+    public System.Collections.ObjectModel.ObservableCollection<HarmonicMatchViewModel> HarmonicMatches
+    {
+        get => _harmonicMatches;
+        set { _harmonicMatches = value; OnPropertyChanged(); }
+    }
+
+    private bool _isLoadingMatches;
+    public bool IsLoadingMatches
+    {
+        get => _isLoadingMatches;
+        set { _isLoadingMatches = value; OnPropertyChanged(); }
     }
 
     // Child ViewModels (Phase 0: ViewModel Refactoring)
@@ -264,6 +294,15 @@ public class LibraryViewModel : INotifyPropertyChanged
                     _logger.LogDebug("Cache-Miss: Queued for background worker: {Title}", trackVm.Title);
                 }
             }
+
+            // Phase 9: Debounced Harmonic Matching
+            // Cancel previous timer and start new one (250ms delay)
+            _selectionDebounceTimer?.Dispose();
+            _selectionDebounceTimer = new System.Threading.Timer(
+                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadHarmonicMatchesAsync(trackVm)),
+                null,
+                250, // Wait 250ms after last selection change
+                System.Threading.Timeout.Infinite);
         }
     }
 
@@ -670,6 +709,50 @@ public class LibraryViewModel : INotifyPropertyChanged
                 "Harmonic Matches",
                 $"Error: {ex.Message}",
                 NotificationType.Error);
+        }
+    }
+
+    /// <summary>
+    /// Phase 9: Loads harmonic matches for the Mix Helper sidebar (debounced).
+    /// </summary>
+    private async Task LoadHarmonicMatchesAsync(PlaylistTrackViewModel seedTrack)
+    {
+        try
+        {
+            IsLoadingMatches = true;
+            MixHelperSeedTrack = seedTrack;
+            HarmonicMatches.Clear();
+
+            _logger.LogDebug("Loading harmonic matches for: {Title}", seedTrack.Title);
+
+            // Find matches
+            var matches = await _harmonicMatchService.GetHarmonicMatchesAsync(
+                seedTrack.GlobalId,
+                limit: 10, // Sidebar shows top 10
+                includeBpmRange: true,
+                includeEnergyMatch: true);
+
+            // Convert to ViewModel
+            foreach (var match in matches)
+            {
+                HarmonicMatches.Add(new HarmonicMatchViewModel
+                {
+                    Track = match.Track,
+                    CompatibilityScore = match.CompatibilityScore,
+                    Relationship = match.KeyRelationship,
+                    BpmDifference = match.BpmDifference
+                });
+            }
+
+            _logger.LogDebug("Loaded {Count} matches for Mix Helper", matches.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load harmonic matches for sidebar");
+        }
+        finally
+        {
+            IsLoadingMatches = false;
         }
     }
 }
