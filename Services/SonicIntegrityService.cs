@@ -147,8 +147,11 @@ public class SonicIntegrityService : IDisposable
         {
             try
             {
-                var result = await PerformAnalysisAsync(request.FilePath);
+            try
+            {
+                var result = await PerformAnalysisAsync(request.FilePath, cancellationToken);
                 request.CompletionSource.SetResult(result);
+            }
             }
             catch (Exception ex)
             {
@@ -165,20 +168,20 @@ public class SonicIntegrityService : IDisposable
     /// <summary>
     /// Core analysis logic (extracted from original AnalyzeTrackAsync).
     /// </summary>
-    private async Task<SonicAnalysisResult> PerformAnalysisAsync(string filePath)
+    private async Task<SonicAnalysisResult> PerformAnalysisAsync(string filePath, CancellationToken ct)
     {
         try
         {
             _logger.LogInformation("Starting sonic integrity analysis for: {File}", Path.GetFileName(filePath));
 
             // Stage 1: Check energy above 16kHz (Cutoff for 128kbps)
-            double energy16k = await GetEnergyAboveFrequencyAsync(filePath, 16000);
+            double energy16k = await GetEnergyAboveFrequencyAsync(filePath, 16000, ct);
             
             // Stage 2: Check energy above 19kHz (Cutoff for 256k/320k)
-            double energy19k = await GetEnergyAboveFrequencyAsync(filePath, 19000);
+            double energy19k = await GetEnergyAboveFrequencyAsync(filePath, 19000, ct);
 
             // Stage 3: Check energy above 21kHz (True Lossless/High-Res)
-            double energy21k = await GetEnergyAboveFrequencyAsync(filePath, 21000);
+            double energy21k = await GetEnergyAboveFrequencyAsync(filePath, 21000, ct);
 
             _logger.LogDebug("Energy Profile for {File}: 16k={E16}dB, 19k={E19}dB, 21k={E21}dB", 
                 Path.GetFileName(filePath), energy16k, energy19k, energy21k);
@@ -233,7 +236,7 @@ public class SonicIntegrityService : IDisposable
         }
     }
 
-    private async Task<double> GetEnergyAboveFrequencyAsync(string filePath, int freq)
+    private async Task<double> GetEnergyAboveFrequencyAsync(string filePath, int freq, CancellationToken ct)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -250,7 +253,22 @@ public class SonicIntegrityService : IDisposable
 
         process.Start();
         process.BeginErrorReadLine();
-        await process.WaitForExitAsync();
+        
+        try
+        {
+            await process.WaitForExitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Killing zombie FFmpeg process due to cancellation");
+            try 
+            { 
+                 process.Kill(); 
+                 await process.WaitForExitAsync(); // Ensure it's dead
+            } 
+            catch {}
+            throw; // Re-throw to abort analysis
+        }
 
         string result = output.ToString();
         // Parse "max_volume: -24.5 dB"

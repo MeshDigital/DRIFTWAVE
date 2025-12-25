@@ -2040,19 +2040,21 @@ public class DatabaseService
     /// Prevents orphaned connections and ensures clean process termination.
     /// Note: DatabaseService uses 'using var context' pattern, so no persistent context to dispose.
     /// </summary>
-    public Task CloseConnectionsAsync()
+    public async Task CloseConnectionsAsync()
     {
         try
         {
-            _logger.LogInformation("Database service shutdown - all contexts are self-disposing");
-            // No-op: Each method creates and disposes its own AppDbContext via 'using'
-            // This ensures connections are always cleaned up properly
-            return Task.CompletedTask;
+            _logger.LogInformation("Database service shutdown - Running WAL Checkpoint...");
+            
+            // Phase 5C Hardening: Checkpoint WAL on shutdown to merge -wal file
+            using var context = new AppDbContext();
+            await context.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(FULL);");
+            
+            _logger.LogInformation("WAL Checkpoint complete.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during database service shutdown");
-            return Task.CompletedTask;
         }
     }
     /// <summary>

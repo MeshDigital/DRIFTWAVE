@@ -383,7 +383,11 @@ public class SpotifyAuthService
     {
         Task? taskToWait = null;
 
-        await _authLock.WaitAsync();
+        if (!await _authLock.WaitAsync(TimeSpan.FromSeconds(10)))
+        {
+            _logger.LogError("Deadlock detected: Timed out waiting for AuthLock.");
+            throw new TimeoutException("Timed out waiting for Spotify Authentication lock.");
+        }
         try
         {
             // If a refresh is already in progress, capture the task and wait for it outside the lock

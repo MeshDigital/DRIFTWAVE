@@ -10,26 +10,41 @@ namespace SLSKDONET.Services;
 /// </summary>
 public class ProtectedDataService
 {
-    // Fallback: base64 encode/decode (non-secure). Replace with DPAPI if desired.
+    // Secure implementation using Windows DPAPI
     public string? Protect(string? data)
     {
         if (string.IsNullOrEmpty(data))
             return null;
-        var bytes = Encoding.UTF8.GetBytes(data);
-        return Convert.ToBase64String(bytes);
+            
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(data);
+            // Protect bytes for Current User
+            var encrypted = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
+            return Convert.ToBase64String(encrypted);
+        }
+        catch (Exception)
+        {
+            // If encryption fails, fallback or return null
+            return null;
+        }
     }
 
     public string? Unprotect(string? encryptedData)
     {
         if (string.IsNullOrEmpty(encryptedData))
             return null;
+            
         try
         {
             var bytes = Convert.FromBase64String(encryptedData);
-            return Encoding.UTF8.GetString(bytes);
+            // Unprotect bytes
+            var decrypted = ProtectedData.Unprotect(bytes, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(decrypted);
         }
         catch
         {
+            // Failed to decrypt (e.g. wrong user context or corrupted data)
             return null;
         }
     }

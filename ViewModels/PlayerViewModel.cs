@@ -231,6 +231,9 @@ namespace SLSKDONET.ViewModels
         public ICommand ToggleQueueCommand { get; }
         public ICommand ToggleLikeCommand { get; } // Phase 9.3
 
+        // Phase 5C: UI Throttling
+        private DateTime _lastTimeUpdate = DateTime.MinValue;
+
         public PlayerViewModel(IAudioPlayerService playerService, DatabaseService databaseService, IEventBus eventBus, Services.Rekordbox.AnlzFileParser anlzParser)
         {
             _playerService = playerService;
@@ -288,7 +291,17 @@ namespace SLSKDONET.ViewModels
             
             _playerService.PositionChanged += (s, pos) => Position = pos;
             
-            _playerService.TimeChanged += (s, timeMs) => CurrentTimeStr = TimeSpan.FromMilliseconds(timeMs).ToString(@"m\:ss");
+            _playerService.PositionChanged += (s, pos) => Position = pos;
+            
+            _playerService.TimeChanged += (s, timeMs) => 
+            {
+                var now = DateTime.UtcNow;
+                if ((now - _lastTimeUpdate).TotalMilliseconds > 250) // Throttle to 4fps
+                {
+                    CurrentTimeStr = TimeSpan.FromMilliseconds(timeMs).ToString(@"m\:ss");
+                    _lastTimeUpdate = now;
+                }
+            };
             
             _playerService.LengthChanged += (s, lenMs) => TotalTimeStr = TimeSpan.FromMilliseconds(lenMs).ToString(@"m\:ss");
             
