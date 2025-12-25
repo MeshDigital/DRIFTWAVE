@@ -2050,9 +2050,10 @@ public QualityFlags Flags { get; set; }
 **Priority**: ⭐⭐⭐
 
 **What to Build**:
-- [ ] Post-download quality analysis
-- [ ] Compare against existing library
-- [ ] Flag duplicates for review
+- [x] **Phase 5: Industrial Reliability (Hardening)**
+  - [x] **Ghost File Prevention**: FileLockMonitor with Pre-Flight Retry & Deferral Persistence.
+  - [x] **Spotify Quota**: Circuit Breaker & Cache-First Proxy for Inspector.
+  - [x] **Atomic Swaps**: Same-drive MFT vs Cross-drive Verify-Copy checks.view
 - [ ] Suggest higher quality replacements
 - [ ] Auto-replace option (with confirmation)
 
