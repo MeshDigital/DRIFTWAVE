@@ -33,6 +33,9 @@ public class Track
     // Phase 1: Musical Intelligence (from Spotify Audio Features)
     public double? BPM { get; set; }           // Tempo from Spotify (e.g., 128.005)
     public string? MusicalKey { get; set; }    // Camelot notation (e.g., "8A")
+    public double? Energy { get; set; }        // 0.0 - 1.0 (Spotify Audio Feature)
+    public double? Valence { get; set; }       // 0.0 - 1.0 (Spotify Audio Feature - happiness/positivity)
+    public double? Danceability { get; set; }  // 0.0 - 1.0 (Spotify Audio Feature)
     
     // Intelligence Metrics
     public bool HasFreeUploadSlot { get; set; }
@@ -150,6 +153,9 @@ public class Track
         // Musical Intelligence - all null
         BPM = null,
         MusicalKey = null,
+        Energy = null,
+        Valence = null,
+        Danceability = null,
         
         // Intelligence Metrics - worst case values
         HasFreeUploadSlot = false,
