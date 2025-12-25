@@ -999,13 +999,36 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         // STEP 2: Check for existing .part file to resume
         if (File.Exists(partPath))
         {
-            var partFileInfo = new FileInfo(partPath);
-            startPosition = partFileInfo.Length;
+            var diskBytes = new FileInfo(partPath).Length;
+            
+            // Phase 3A: Atomic Handshake - Trust Journal, Truncate Disk
+            var confirmedBytes = await _crashJournal.GetConfirmedBytesAsync(ctx.GlobalId);
+
+            if (confirmedBytes > 0 && diskBytes > confirmedBytes)
+            {
+                // Case 1: Disk has more data than journal (unconfirmed tail)
+                // Truncate to confirmed bytes to ensure no corrupt/torn data is kept
+                _logger.LogWarning("⚠️ Atomic Resume: Truncating {Diff} bytes of unconfirmed data for {Track}", 
+                    diskBytes - confirmedBytes, ctx.Model.Title);
+                    
+                using (var fs = File.OpenWrite(partPath))
+                {
+                    fs.SetLength(confirmedBytes);
+                }
+                startPosition = confirmedBytes;
+            }
+            else
+            {
+                // Case 2: Disk <= Journal, or no Journal entry (clean shutdown/new)
+                // Resume from what we physically have
+                startPosition = diskBytes;
+            }
+
             ctx.IsResuming = true;
             ctx.BytesReceived = startPosition;
             
-            _logger.LogInformation("Resuming download from byte {Position} for {Track}", 
-                startPosition, ctx.Model.Title);
+            _logger.LogInformation("Resuming download from byte {Position} for {Track} (Journal Confirmed: {Confirmed})", 
+                startPosition, ctx.Model.Title, confirmedBytes);
         }
         else
         {

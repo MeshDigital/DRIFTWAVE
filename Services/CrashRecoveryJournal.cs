@@ -261,6 +261,48 @@ public class CrashRecoveryJournal : IDisposable
     }
 
     /// <summary>
+    /// Phase 3A: Atomic Resume - Gets confirmed bytes from journal.
+    /// Acts as the "Source of Truth" to validate partial files on disk.
+    /// Uses JsonDocument to avoid dependency on specific state types.
+    /// </summary>
+    public async Task<long> GetConfirmedBytesAsync(string checkpointId)
+    {
+        if (_disposed || _journalConnection == null)
+            return 0;
+
+        await _journalLock.WaitAsync();
+        try
+        {
+            using var cmd = _journalConnection.CreateCommand();
+            cmd.CommandText = "SELECT StateJson FROM RecoveryCheckpoints WHERE Id = @id";
+            cmd.Parameters.AddWithValue("@id", checkpointId);
+
+            var json = await cmd.ExecuteScalarAsync() as string;
+            if (string.IsNullOrEmpty(json))
+                return 0;
+
+            try 
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("BytesDownloaded", out var bytesElement))
+                {
+                    return bytesElement.GetInt64();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse confirmed bytes for checkpoint {Id}", checkpointId);
+            }
+
+            return 0;
+        }
+        finally
+        {
+            _journalLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Gets all pending checkpoints for recovery, sorted by priority.
     /// Filters out stale checkpoints based on monotonic timestamp.
     /// </summary>

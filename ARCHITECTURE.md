@@ -176,3 +176,17 @@ DownloadManager.QueueProject
     *   Failed recovery operations are retried 3 times.
     *   After 3 strikes, they are moved to `%AppData%/SLSKDONET/dead_letters.log`.
 *   **Logging**: Serilog writes to both Console (Debug) and Rolling File (Release).
+
+---
+
+## 📚 Documentation Map
+
+The following technical guides provide deep-dives into specific subsystems:
+
+| Subsystem | Documentation | Description |
+| :--- | :--- | :--- |
+| **Resilience** | [RESILIENCE.md](DOCS/RESILIENCE.md) | Overview of the crash recovery system and standard patterns. |
+| **Atomic Downloads** | [ATOMIC_DOWNLOADS.md](DOCS/ATOMIC_DOWNLOADS.md) | Details the "Trust Journal, Truncate Disk" resume pattern. |
+| **SafeWrite** | [SAFE_WRITE.md](DOCS/SAFE_WRITE.md) | Explains the ACID transaction wrapper for file operations. |
+| **The Brain** | [THE_BRAIN_SCORING.md](DOCS/THE_BRAIN_SCORING.md) | Breakdown of the scoring algorithms, tiers, and point values. |
+| **Spotify Auth** | [SPOTIFY_AUTH.md](DOCS/SPOTIFY_AUTH.md) | PKCE authentication flow and token security. |
