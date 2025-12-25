@@ -864,13 +864,22 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 DownloadContext? nextContext = null;
                 lock (_collectionLock)
                 {
-                    // Phase 2: Enrichment Gate
-                    // Only pick up tracks that are Enriched (have Audio Features + ID)
-                    // OR if they have been pending for > 5 minutes (fail-safe for enrichment timeouts)
-                    nextContext = _downloads.FirstOrDefault(t => 
+                    // Phase 3C: Multi-Lane Priority Engine
+                    // Weighted selection algorithm with slot allocation
+                    var eligibleTracks = _downloads.Where(t => 
                         t.State == PlaylistTrackState.Pending && 
                         (!t.NextRetryTime.HasValue || t.NextRetryTime.Value <= DateTime.Now) &&
-                        (t.Model.IsEnriched || (DateTime.Now - t.Model.AddedAt).TotalMinutes > 5));
+                        (t.Model.IsEnriched || (DateTime.Now - t.Model.AddedAt).TotalMinutes > 5))
+                        .ToList();
+
+                    if (eligibleTracks.Any())
+                    {
+                        // Get current slot allocation by priority
+                        var activeByPriority = GetActiveDownloadsByPriority();
+                        
+                        // Try to find next track respecting lane limits
+                        nextContext = SelectNextTrackWithLaneAllocation(eligibleTracks, activeByPriority);
+                    }
                 }
 
                 if (nextContext == null)
@@ -1419,6 +1428,138 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         _logger.LogInformation("Upgrade Available (Manual Approval Needed): {TrackId} - {BestMatch}", 
             e.TrackGlobalId, e.BestMatch.Filename);
     }
+
+    // ========================================
+    // Phase 3C: Multi-Lane Priority Engine
+    // ========================================
+
+    private const int HIGH_PRIORITY_SLOTS = 2;
+    private const int STANDARD_PRIORITY_SLOTS = 2;
+
+    /// <summary>
+    /// Gets count of active downloads grouped by priority level.
+    /// Returns dictionary: Priority -> Count
+    /// </summary>
+    private Dictionary<int, int> GetActiveDownloadsByPriority()
+    {
+        var activeDownloads = _downloads
+            .Where(d => d.State == PlaylistTrackState.Searching || d.State == PlaylistTrackState.Downloading)
+            .GroupBy(d => d.Model.Priority)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return activeDownloads;
+    }
+
+    /// <summary>
+    /// Selects next track respecting lane allocation limits.
+    /// Lane A (Priority 0): 2 slots max
+    /// Lane B (Priority 1): 2 slots max  
+    /// Lane C (Priority 10+): Remaining slots
+    /// </summary>
+    private DownloadContext? SelectNextTrackWithLaneAllocation(
+        List<DownloadContext> eligibleTracks,
+        Dictionary<int, int> activeByPriority)
+    {
+        // Sort by Priority (ascending), then AddedAt (FIFO within priority)
+        var sortedTracks = eligibleTracks
+            .OrderBy(t => t.Model.Priority)
+            .ThenBy(t => t.Model.AddedAt)
+            .ToList();
+
+        foreach (var track in sortedTracks)
+        {
+            var priority = track.Model.Priority;
+            var currentCount = activeByPriority.GetValueOrDefault(priority, 0);
+
+            // Check lane limits
+            if (priority == 0) // High Priority
+            {
+                if (currentCount < HIGH_PRIORITY_SLOTS)
+                {
+                    _logger.LogDebug("Selected High Priority track: {Title} (Lane A: {Count}/2)",
+                        track.Model.Title, currentCount + 1);
+                    return track;
+                }
+            }
+            else if (priority == 1) // Standard
+            {
+                if (currentCount < STANDARD_PRIORITY_SLOTS)
+                {
+                    _logger.LogDebug("Selected Standard Priority track: {Title} (Lane B: {Count}/2)",
+                        track.Model.Title, currentCount + 1);
+                    return track;
+                }
+            }
+            else // Background (Priority 10+)
+            {
+                // Background can use any remaining slots
+                var totalActive = activeByPriority.Values.Sum();
+                if (totalActive < 4) // MAX_CONCURRENT_DOWNLOADS
+                {
+                    _logger.LogDebug("Selected Background Priority track: {Title} (Lane C)",
+                        track.Model.Title);
+                    return track;
+                }
+            }
+        }
+
+        return null; // All lanes at capacity
+    }
+
+    /// <summary>
+    /// Prioritizes all tracks from a specific project by bumping to Priority 0 (High).
+    /// Phase 3C: The "VIP Pass" - allows user to jump queue with specific playlist.
+    /// </summary>
+    public async Task PrioritizeProjectAsync(Guid playlistId)
+    {
+        _logger.LogInformation("🚀 Prioritizing project: {PlaylistId}", playlistId);
+
+        // Update database: Bump all missing tracks in this playlist to Priority 0
+        // Note: Using raw SQL since we don't have direct EF context access in DownloadManager
+        // Alternative: Could add PrioritizeProjectAsync to DatabaseService
+        
+        // Update in-memory contexts first
+        int updatedCount = 0;
+        lock (_collectionLock)
+        {
+            foreach (var download in _downloads.Where(d => d.Model.PlaylistId == playlistId && d.State == PlaylistTrackState.Pending))
+            {
+                download.Model.Priority = 0;
+                updatedCount++;
+            }
+        }
+
+        _logger.LogInformation("✅ Prioritized {Count} tracks from project {PlaylistId} (in-memory)",
+            updatedCount, playlistId);
+
+        // TODO: Add database update via DatabaseService.ExecuteRawSqlAsync or add dedicated method
+        // For now, in-memory update is sufficient for immediate queue behavior
+    }
+
+    /// <summary>
+    /// Pauses the lowest priority active download to free a slot for high-priority track.
+    /// Phase 3C: Preemption support.
+    /// </summary>
+    private async Task PauseLowestPriorityDownloadAsync()
+    {
+        DownloadContext? lowestPriority = null;
+
+        lock (_collectionLock)
+        {
+            lowestPriority = _downloads
+                .Where(d => d.State == PlaylistTrackState.Downloading || d.State == PlaylistTrackState.Searching)
+                .OrderByDescending(d => d.Model.Priority) // Highest priority value = lowest priority
+                .ThenBy(d => d.Model.AddedAt)
+                .FirstOrDefault();
+        }
+
+        if (lowestPriority != null && lowestPriority.Model.Priority >= 10) // Only preempt background
+        {
+            _logger.LogInformation("⏸ Preempting background download: {Title}", lowestPriority.Model.Title);
+            await PauseTrackAsync(lowestPriority.Model.TrackUniqueHash);
+        }
+    }
+
 
     public void Dispose()
     {

@@ -121,6 +121,12 @@ public class PlaylistTrack
     public bool? IsTrustworthy { get; set; }
     public string? QualityDetails { get; set; }
     
+    // Phase 3C: Advanced Queue Orchestration
+    /// <summary>
+    /// Download priority: 0=High (manual/bump-to-top), 1=Standard (playlist), 10=Background (large imports).
+    /// </summary>
+    public int Priority { get; set; } = 1;
+    
     public bool IsEnriched { get; set; } = false;
 
     // Phase 13: Per-Track Filter Overrides
