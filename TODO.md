@@ -144,13 +144,20 @@
   - [x] **Threshold Trigger**: Start download if score > 92%.
   - [x] **Speculative Start**: Start silver match (>70%) after 5s timeout.
   - [x] **Project Prioritization**: "VIP Pass" logic (P1-P10).
-  - [ ] **Phase 3C.3: UI Integration (Air Traffic Control)**
-    - [ ] **Swimlanes**: Three-tier `ItemsRepeater` (Express, Standard, Background).
-    - [ ] **Badges**: Gold (92%+), Silver (70%+, Pulsing), Bronze (<70%).
-    - [ ] **VIP Pass**: Right-click context menu "Push to Express" (Max 10).
-    - [ ] **Radar**: "Searching..." pulsation animation.
-    - [ ] **Optimization**: Virtualization + 100ms Throttling.
-  - [x] **Hardening**: Lazy Hydration (Waiting Room Pattern for 2k+ queues)`Services/DownloadHealthMonitor.cs`
+  - [x] **Phase 3C.3: UI Integration ("Air Traffic Control")**
+    - [x] **Refactor `DownloadsViewModel`**
+        - [x] Use `DynamicData` for reactive sorting/filtering (SourceCache).
+        - [x] Create three `ObservableCollection`s (Express, Standard, Background) derived from source.
+    - [x] **Implement "Swimlane" View (`DownloadsPage.axaml`)**
+        - [x] Use `Expander` controls for each lane.
+        - [x] Implement `ItemsRepeater` for each lane for virtualization/performance.
+        - [x] Add "Radar" animation for Searching state.
+    - [x] **"VIP Pass" Command**
+        - [x] Add ContextMenu option to promote track to Express Lane (force Priority 0).
+    - [ ] **Hardening**
+        - [ ] Performance test with 100+ items.
+        - [ ] Verify "Speculative Start" visual feedback.
+- [x] **Hardening**: Lazy Hydration (Waiting Room Pattern for 2k+ queues)`Services/DownloadHealthMonitor.cs`
 - [ ] Track health metrics per download:
   - Stall count
   - Failure count

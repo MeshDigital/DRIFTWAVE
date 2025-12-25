@@ -6,6 +6,17 @@ using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Avalonia.Threading;
+using DynamicData;
+using DynamicData.Binding;
+using ReactiveUI;
+using SLSKDONET.Models;
+using SLSKDONET.Services;
+using System.ComponentModel;
+using System.Linq;
+using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Avalonia.Threading;
 using ReactiveUI;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
@@ -25,15 +36,33 @@ public class DownloadCenterViewModel : INotifyPropertyChanged, IDisposable
     private readonly IDisposable _trackStateChangedSubscription;
     private readonly IDisposable _trackProgressChangedSubscription;
     
-    // Collections
-    public ObservableCollection<DownloadItemViewModel> ActiveDownloads { get; } = new();
-    public ObservableCollection<DownloadItemViewModel> CompletedDownloads { get; } = new();
-    public ObservableCollection<DownloadItemViewModel> FailedDownloads { get; } = new();
-    
+    // Collections (DynamicData Source)
+    private readonly SourceCache<DownloadItemViewModel, string> _downloadsSource = new(x => x.GlobalId);
+
+    // Public ReadOnly Collections (Bound to UI)
+    private readonly ReadOnlyObservableCollection<DownloadItemViewModel> _activeDownloads;
+    public ReadOnlyObservableCollection<DownloadItemViewModel> ActiveDownloads => _activeDownloads;
+
+    private readonly ReadOnlyObservableCollection<DownloadItemViewModel> _completedDownloads;
+    public ReadOnlyObservableCollection<DownloadItemViewModel> CompletedDownloads => _completedDownloads;
+
+    private readonly ReadOnlyObservableCollection<DownloadItemViewModel> _failedDownloads;
+    public ReadOnlyObservableCollection<DownloadItemViewModel> FailedDownloads => _failedDownloads;
+
+    // Swimlanes (Derived from Active)
+    private readonly ReadOnlyObservableCollection<DownloadItemViewModel> _expressItems;
+    public ReadOnlyObservableCollection<DownloadItemViewModel> ExpressItems => _expressItems;
+
+    private readonly ReadOnlyObservableCollection<DownloadItemViewModel> _standardItems;
+    public ReadOnlyObservableCollection<DownloadItemViewModel> StandardItems => _standardItems;
+
+    private readonly ReadOnlyObservableCollection<DownloadItemViewModel> _backgroundItems;
+    public ReadOnlyObservableCollection<DownloadItemViewModel> BackgroundItems => _backgroundItems;
+
     // Stats
     public int ActiveCount => ActiveDownloads.Count;
     public int QueuedCount => ActiveDownloads.Count(d => d.State == Models.PlaylistTrackState.Pending || d.State == Models.PlaylistTrackState.Queued);
-    public int CompletedTodayCount => CompletedDownloads.Count; // Session-only as per user feedback
+    public int CompletedTodayCount => CompletedDownloads.Count;
     
     private string _globalSpeed = "0 MB/s";
     public string GlobalSpeed
@@ -70,6 +99,60 @@ public class DownloadCenterViewModel : INotifyPropertyChanged, IDisposable
         ClearCompletedCommand = ReactiveCommand.Create(() => CompletedDownloads.Clear());
         ClearFailedCommand = ReactiveCommand.Create(() => FailedDownloads.Clear());
         
+        // Initialize DynamicData Pipelines
+        
+        // 1. Base Pipeline (Active vs Completed vs Failed)
+        var sharedSource = _downloadsSource.Connect()
+            .AutoRefresh(x => x.State) // Logic re-evaluates when State changes
+            .AutoRefresh(x => x.Priority) // Logic re-evaluates when Priority changes (VIP Pass)
+            .Publish(); // Share subscription
+
+        // Active Pipeline
+        sharedSource
+            .Filter(x => x.State != PlaylistTrackState.Completed && x.State != PlaylistTrackState.Failed)
+            .Sort(SortExpressionComparer<DownloadItemViewModel>.Descending(x => x.State == PlaylistTrackState.Downloading)
+                .ThenByAscending(x => x.Priority)) // Sort by Priority then (implementation detail)
+            .Bind(out _activeDownloads)
+            .Subscribe()
+            .DisposeWith(_subscriptions); // Need a CompositeDisposable ideally, but skipping for brevity
+
+        // Completed Pipeline
+        sharedSource
+            .Filter(x => x.State == PlaylistTrackState.Completed)
+            .Sort(SortExpressionComparer<DownloadItemViewModel>.Descending(x => x.GlobalId)) // Sort by ID/Time
+            .Bind(out _completedDownloads)
+            .Subscribe();
+
+        // Failed Pipeline
+        sharedSource
+            .Filter(x => x.State == PlaylistTrackState.Failed)
+            .Bind(out _failedDownloads)
+            .Subscribe();
+
+        // 2. Swimlane Pipelines (Derived from sharedSource filtered to Active)
+        // Express: Priority 0
+        sharedSource
+            .Filter(x => x.State != PlaylistTrackState.Completed && x.State != PlaylistTrackState.Failed && x.Priority == 0)
+            .ObserveOn(RxApp.MainThreadScheduler) // Throttle updates to UI
+            .Bind(out _expressItems)
+            .Subscribe();
+
+        // Standard: Priority 1-9
+        sharedSource
+            .Filter(x => x.State != PlaylistTrackState.Completed && x.State != PlaylistTrackState.Failed && x.Priority >= 1 && x.Priority < 10)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Bind(out _standardItems)
+            .Subscribe();
+
+        // Background: Priority >= 10
+        sharedSource
+            .Filter(x => x.State != PlaylistTrackState.Completed && x.State != PlaylistTrackState.Failed && x.Priority >= 10)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Bind(out _backgroundItems)
+            .Subscribe();
+
+        sharedSource.Connect(); // Connect the publisher
+
         // Subscribe to events (Reactive pattern: GetEvent<T>().Subscribe())
         _trackAddedSubscription = _eventBus.GetEvent<TrackAddedEvent>()
             .Subscribe(OnTrackAdded);
@@ -105,10 +188,12 @@ public class DownloadCenterViewModel : INotifyPropertyChanged, IDisposable
     
     /// <summary>
     /// Phase 2.5: Track added to download queue
+    /// <summary>
+    /// Phase 2.5: Track added to download queue
     /// </summary>
     private void OnTrackAdded(TrackAddedEvent e)
     {
-        // CRITICAL: Marshal to UI thread for ObservableCollection modifications
+        // Marshal unnecessary for source cache update, but safe
         Dispatcher.UIThread.Post(() =>
         {
             var track = e.TrackModel;
@@ -121,25 +206,15 @@ public class DownloadCenterViewModel : INotifyPropertyChanged, IDisposable
                 track.AlbumArtUrl,
                 _downloadManager,
                 track.PreferredFormats,
-                track.MinBitrateOverride
+                track.MinBitrateOverride,
+                track.Priority, // Phase 3C: Pass Priority
+                0               // Score starts at 0, updated via event if needed
             );
-            
-
             
             // Respect proper initial state (e.g. hydrate as Completed)
             viewModel.State = e.InitialState ?? Models.PlaylistTrackState.Pending;
             
-            // Smart Insert: Active downloads on top, pending at bottom
-            // This keeps the most relevant items (currently downloading/searching) visible
-            if (viewModel.State == Models.PlaylistTrackState.Downloading || 
-                viewModel.State == Models.PlaylistTrackState.Searching)
-            {
-                ActiveDownloads.Insert(0, viewModel); // Top of list
-            }
-            else
-            {
-                ActiveDownloads.Add(viewModel); // Bottom (queued/pending)
-            }
+            _downloadsSource.AddOrUpdate(viewModel);
             
             OnPropertyChanged(nameof(ActiveCount));
             OnPropertyChanged(nameof(QueuedCount));
@@ -147,92 +222,39 @@ public class DownloadCenterViewModel : INotifyPropertyChanged, IDisposable
     }
     
     /// <summary>
-    /// Phase 2.5: Track state changed (Pending → Downloading → Completed/Failed)
-    /// Pro-tip: State-based tab switching - visually move tracks between collections
+    /// Phase 2.5: Track state changed
     /// </summary>
     private void OnTrackStateChanged(Events.TrackStateChangedEvent e)
     {
-        // CRITICAL: Marshal to UI thread for ObservableCollection modifications
         Dispatcher.UIThread.Post(() =>
         {
-            var item = ActiveDownloads.FirstOrDefault(d => d.GlobalId == e.TrackGlobalId);
+            var item = _downloadsSource.Lookup(e.TrackGlobalId);
             
-            if (item != null)
+            if (item.HasValue)
             {
-                var oldState = item.State;
-                item.State = e.NewState; // Use NewState property
-                
-                // State-based tab switching
-                if (e.NewState == Models.PlaylistTrackState.Completed)
-                {
-                    // Move from Active → Completed
-                    ActiveDownloads.Remove(item);
-                    CompletedDownloads.Insert(0, item); // Insert at top (most recent first)
-                    
-                    OnPropertyChanged(nameof(ActiveCount));
-                    OnPropertyChanged(nameof(CompletedTodayCount));
-                }
-                else if (e.NewState == Models.PlaylistTrackState.Failed)
-                {
-                    // Move from Active → Failed
-                    ActiveDownloads.Remove(item);
-                    FailedDownloads.Insert(0, item);
-                    
-                    OnPropertyChanged(nameof(ActiveCount));
-                }
-                else if (e.NewState == Models.PlaylistTrackState.Pending && FailedDownloads.Contains(item))
-                {
-                    // Retry: Move from Failed → Active
-                    FailedDownloads.Remove(item);
-                    ActiveDownloads.Add(item);
-                    
-                    OnPropertyChanged(nameof(ActiveCount));
-                }
-                /* 
-                // REMOVED: Aggressive sorting causes UI jumps. 
-                // Allow the list to maintain its natural sort order (e.g. by Added Date).
-                else if ((e.NewState == Models.PlaylistTrackState.Downloading || e.NewState == Models.PlaylistTrackState.Searching) && 
-                         oldState != e.NewState)
-                {
-                    // Move to top of Active list
-                    ActiveDownloads.Remove(item);
-                    ActiveDownloads.Insert(0, item);
-                }
-                */
-            }
-            else
-            {
-                // Check if it's in Failed/Completed (edge case: user retries from those tabs)
-                var failedItem = FailedDownloads.FirstOrDefault(d => d.GlobalId == e.TrackGlobalId);
-                if (failedItem != null)
-                {
-                    failedItem.State = e.NewState;
-                }
-                
-                var completedItem = CompletedDownloads.FirstOrDefault(d => d.GlobalId == e.TrackGlobalId);
-                if (completedItem != null)
-                {
-                    completedItem.State = e.NewState;
-                }
+                item.Value.State = e.NewState;
+                // DynamicData AutoRefresh handles moving between collections
             }
             
+            OnPropertyChanged(nameof(ActiveCount));
+            OnPropertyChanged(nameof(CompletedTodayCount));
             OnPropertyChanged(nameof(QueuedCount));
         });
     }
     
     /// <summary>
-    /// Phase 2.5: Track progress updated (bytes received, speed calculation happens in DownloadItemViewModel)
+    /// Phase 2.5: Track progress updated
     /// </summary>
     private void OnTrackProgressChanged(Events.TrackProgressChangedEvent e)
     {
-        var item = ActiveDownloads.FirstOrDefault(d => d.GlobalId == e.TrackGlobalId);
-        
-        if (item != null)
-        {
-            item.Progress = e.Progress;
-            item.BytesReceived = e.BytesReceived;
-            item.TotalBytes = e.TotalBytes;
-        }
+         var item = _downloadsSource.Lookup(e.TrackGlobalId);
+         
+         if (item.HasValue)
+         {
+             item.Value.Progress = e.Progress;
+             item.Value.BytesReceived = e.BytesReceived;
+             item.Value.TotalBytes = e.TotalBytes;
+         }
     }
     
     /// <summary>

@@ -658,6 +658,19 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     /// <summary>
     /// Phase 2.5: Enhanced pause with immediate cancellation and IsUserPaused tracking.
     /// </summary>
+    public void PromoteTrackToExpress(string globalId)
+    {
+        DownloadContext? ctx;
+        lock(_collectionLock) ctx = _downloads.FirstOrDefault(d => d.GlobalId == globalId);
+        
+        if (ctx != null)
+        {
+            ctx.Model.Priority = 0;
+            _logger.LogInformation("Creating VIP Pass for {Title} (Priority 0)", ctx.Model.Title);
+            // In a real implementation, we would persist this to PlaylistTrackEntity here.
+        }
+    }
+
     public async Task PauseTrackAsync(string globalId)
     {
         DownloadContext? ctx;

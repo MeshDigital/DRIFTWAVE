@@ -24,6 +24,34 @@ public class DownloadItemViewModel : INotifyPropertyChanged
     public string ArtistName { get; }
     public string AlbumName { get; }
     public string? AlbumArtUrl { get; }
+
+    // Phase 3C: Priority & Scoring
+    private int _priority;
+    public int Priority
+    {
+        get => _priority;
+        set { if (_priority != value) { _priority = value; OnPropertyChanged(); OnPropertyChanged(nameof(BadgeIcon)); } }
+    }
+
+    private double _score;
+    public double Score
+    {
+        get => _score;
+        set { if (Math.Abs(_score - value) > 0.001) { _score = value; OnPropertyChanged(); OnPropertyChanged(nameof(BadgeIcon)); } }
+    }
+
+    public string BadgeIcon
+    {
+        get
+        {
+            if (Score > 0.92) return "🥇";
+            if (Score > 0.70) return "🥈"; // Silver (Speculative)
+            return "🥉";
+        }
+    }
+    
+    // Commands
+    public ICommand PromoteToExpressCommand { get; set; }
     
     // Progress Tracking
     private double _progress;
@@ -302,6 +330,7 @@ public class DownloadItemViewModel : INotifyPropertyChanged
     public ICommand ToggleFilterCommand { get; }
     public ICommand RetryWithFiltersCommand { get; }
     public ICommand ApplyPresetCommand { get; }
+    public ICommand PromoteToExpressCommand { get; }
     
     // Command CanExecute
     public bool CanPause => State == PlaylistTrackState.Downloading || State == PlaylistTrackState.Searching;
@@ -317,7 +346,9 @@ public class DownloadItemViewModel : INotifyPropertyChanged
         string? albumArtUrl,
         DownloadManager downloadManager,
         string? preferredFormats = null,
-        int? minBitrate = null)
+        int? minBitrate = null,
+        int priority = 1,
+        double score = 0)
     {
         GlobalId = globalId;
         TrackTitle = trackTitle;
@@ -325,6 +356,8 @@ public class DownloadItemViewModel : INotifyPropertyChanged
         AlbumName = albumName;
         AlbumArtUrl = albumArtUrl;
         _downloadManager = downloadManager;
+        Priority = priority;
+        Score = score;
 
         if (!string.IsNullOrWhiteSpace(preferredFormats))
         {
@@ -346,6 +379,12 @@ public class DownloadItemViewModel : INotifyPropertyChanged
         ResumeCommand = ReactiveCommand.CreateFromTask(
             async () => await _downloadManager.ResumeTrackAsync(GlobalId),
             this.WhenAnyValue(x => x.CanResume));
+
+        PromoteToExpressCommand = ReactiveCommand.Create(() => 
+        {
+            _downloadManager.PromoteTrackToExpress(GlobalId);
+            Priority = 0;
+        }, this.WhenAnyValue(x => x.Priority, x => x.State, (p, s) => p > 0 && s != PlaylistTrackState.Completed));
         
         CancelCommand = ReactiveCommand.Create(
             () => _downloadManager.CancelTrack(GlobalId),
