@@ -65,6 +65,12 @@ public class TrackEntity
     
     // New Flag
     public bool IsEnriched { get; set; } = false;
+    
+    // Phase 5: Self-Healing Library - Upgrade Tracking
+    public DateTime? LastUpgradeScanAt { get; set; }
+    public DateTime? LastUpgradeAt { get; set; }
+    public string? UpgradeSource { get; set; } // "Auto" or "Manual"
+    public string? PreviousBitrate { get; set; } // e.g., "128kbps MP3" before upgrade
 }
 
 /// <summary>
