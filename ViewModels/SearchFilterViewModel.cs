@@ -19,12 +19,12 @@ public class SearchFilterViewModel : ReactiveObject
         get => _minBitrate; 
         set
         {
-            var oldVal = _minBitrate;
-            if (this.RaiseAndSetIfChanged(ref _minBitrate, value) != oldVal && !_isSyncingFromQuery)
-            {
-                // Phase 12.6: Sync bitrate as "320+" style token
+            if (_minBitrate == value) return;
+            this.RaiseAndSetIfChanged(ref _minBitrate, value);
+            
+            // Phase 12.6: Sync bitrate as "320+" style token
+            if (!_isSyncingFromQuery)
                 OnTokenSyncRequested?.Invoke($"{value}+", true);
-            }
         }
     }
 
