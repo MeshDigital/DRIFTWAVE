@@ -25,6 +25,7 @@
 - **[SLSKDONET_LEARNINGS.md](SLSKDONET_LEARNINGS.md)** - Implementation patterns and decisions
 - **[BUILD_REFERENCE.md](BUILD_REFERENCE.md)** - Quick build and project reference
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Complete feature matrix
+- **[DOCS/DATABASE_LIBRARY_FLOW.md](DOCS/DATABASE_LIBRARY_FLOW.md)** - How DB state flows into Library/Playlists/Queue UI (Dec 2025)
 - **[DOCS/FILE_PATH_RESOLUTION.md](DOCS/FILE_PATH_RESOLUTION.md)** - File path resolution with fuzzy matching ✨
 - **[DOCS/PHASE8_TECHNICAL.md](DOCS/PHASE8_TECHNICAL.md)** - Phase 8 sonic integrity & automation (Dec 2025) ✨
 - **[DOCS/HIGH_FIDELITY_AUDIO.md](DOCS/HIGH_FIDELITY_AUDIO.md)** - NAudio engine, VU meters, & waveforms (Dec 2025) ✨ NEW

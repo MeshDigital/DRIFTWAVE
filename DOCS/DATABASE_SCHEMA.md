@@ -1,5 +1,7 @@
 # Database Schema - The Memory Layer
 
+**See also:** [DATABASE_LIBRARY_FLOW.md](DATABASE_LIBRARY_FLOW.md) for end-to-end data flow from ingest → queue → download → library/playlist/queue UI.
+
 ## Overview
 
 ORBIT's database schema is designed around the **Dual-Truth** principle: Trust user input, but verify with multiple sources. This allows DJs to override auto-detected metadata while preserving the original source data for verification.
