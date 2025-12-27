@@ -9,6 +9,7 @@ namespace SLSKDONET.ViewModels
     {
         private readonly Services.IAudioAnalysisService _audioAnalysisService;
         private Data.Entities.AudioAnalysisEntity? _analysis;
+        private Data.Entities.AudioFeaturesEntity? _audioFeatures; // Phase 4: Musical Intelligence
 
         public TrackInspectorViewModel(Services.IAudioAnalysisService audioAnalysisService)
         {
@@ -39,11 +40,14 @@ namespace SLSKDONET.ViewModels
                     
                     // Reset analysis
                     _analysis = null;
+                    _audioFeatures = null; // Phase 4
                     NotifyAnalysisProperties();
+                    NotifyMusicalIntelligenceProperties(); // Phase 4
                     
                     if (value != null && !string.IsNullOrEmpty(value.TrackUniqueHash))
                     {
                         LoadAnalysisAsync(value.TrackUniqueHash);
+                        LoadAudioFeaturesAsync(value.TrackUniqueHash); // Phase 4
                     }
                 }
             }
@@ -55,6 +59,24 @@ namespace SLSKDONET.ViewModels
             {
                 _analysis = await _audioAnalysisService.GetAnalysisAsync(hash);
                 NotifyAnalysisProperties();
+            }
+            catch (Exception) { /* Fail silently */ }
+        }
+        
+        // Phase 4: Load Musical Intelligence data from AudioFeaturesEntity
+        private async void LoadAudioFeaturesAsync(string trackHash)
+        {
+            try
+            {
+                // Day 0 Adjustment #3: Use Task.Run to avoid UI thread blocking
+                _audioFeatures = await System.Threading.Tasks.Task.Run(async () =>
+                {
+                    using var db = new Data.AppDbContext();
+                    return await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                        .FirstOrDefaultAsync(db.AudioFeatures, f => f.TrackUniqueHash == trackHash);
+                });
+                
+                NotifyMusicalIntelligenceProperties();
             }
             catch (Exception) { /* Fail silently */ }
         }
@@ -71,6 +93,21 @@ namespace SLSKDONET.ViewModels
             OnPropertyChanged(nameof(IntegrityStatusColor));
             OnPropertyChanged(nameof(SpectralCutoffLabel));
             OnPropertyChanged(nameof(QualityConfidenceLabel));
+        }
+        
+        // Phase 4: Musical Intelligence Properties Notification
+        private void NotifyMusicalIntelligenceProperties()
+        {
+            OnPropertyChanged(nameof(EssentiaBpm));
+            OnPropertyChanged(nameof(BpmConfidence));
+            OnPropertyChanged(nameof(EssentiaCamelotKey));
+            OnPropertyChanged(nameof(EssentiaEnergy));
+            OnPropertyChanged(nameof(DropTime));
+            OnPropertyChanged(nameof(CueIntro));
+            OnPropertyChanged(nameof(CueBuild));
+            OnPropertyChanged(nameof(CuePhraseStart));
+            OnPropertyChanged(nameof(HasMusicalIntelligence));
+            OnPropertyChanged(nameof(HasCuePoints));
         }
 
         public double Energy => Track?.Energy ?? 0;
@@ -119,6 +156,47 @@ namespace SLSKDONET.ViewModels
         public bool IsTrustworthy => Track?.IsTrustworthy ?? true;
         public string Details => Track?.QualityDetails ?? "Analysis pending or no data available.";
         public string TrustColor => IsTrustworthy ? "#1DB954" : "#D32F2F";
+        
+        // Phase 4: Musical Intelligence Properties (from Essentia via AudioFeaturesEntity)
+        public float? EssentiaBpm => _audioFeatures?.Bpm > 0 ? _audioFeatures.Bpm : null;
+        public string BpmLabel => EssentiaBpm.HasValue ? $"{EssentiaBpm.Value:F1} BPM" : "--";
+        public float? BpmConfidence => _audioFeatures?.BpmConfidence;
+        public string BpmConfidenceLabel => BpmConfidence.HasValue ? $"({BpmConfidence.Value:P0})" : "";
+        
+        public string EssentiaCamelotKey
+        {
+            get
+            {
+                if (_audioFeatures == null || string.IsNullOrEmpty(_audioFeatures.Key)) return "";
+                
+                // Use KeyConverter to ensure Camelot format (Day 0 Adjustment #2)
+                var camelot = Utils.KeyConverter.ToCamelot(_audioFeatures.CamelotKey);
+                if (!string.IsNullOrEmpty(camelot)) return camelot;
+                
+                // Fallback: convert from raw Essentia key
+                return Utils.KeyConverter.ToCamelot($"{_audioFeatures.Key}{(_audioFeatures.Scale == "minor" ? "m" : "")}");
+            }
+        }
+        
+        public float? EssentiaEnergy => _audioFeatures?.Energy;
+        public float? Danceability2 => _audioFeatures?.Danceability; // Essentia version
+        
+        // Cue Points
+        public float? DropTime => _audioFeatures?.DropTimeSeconds;
+        public string DropTimeLabel => DropTime.HasValue ? $"{DropTime.Value:F1}s" : "--";
+        
+        public float? CueIntro => _audioFeatures?.CueIntro;
+        public string CueIntroLabel => CueIntro.HasValue ? $"Intro: {CueIntro.Value:F1}s" : "--";
+        
+        public float? CueBuild => _audioFeatures?.CueBuild;
+        public string CueBuildLabel => CueBuild.HasValue ? $"Build: {CueBuild.Value:F1}s" : "--";
+        
+        public float? CuePhraseStart => _audioFeatures?.CuePhraseStart;
+        public string CuePhraseStartLabel => CuePhraseStart.HasValue ? $"Phrase: {CuePhraseStart.Value:F1}s" : "--";
+        
+        // Computed
+        public bool HasMusicalIntelligence => EssentiaBpm.HasValue || !string.IsNullOrEmpty(EssentiaCamelotKey);
+        public bool HasCuePoints => DropTime.HasValue || CueIntro.HasValue;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
