@@ -23,6 +23,7 @@ public class ProjectListViewModel : INotifyPropertyChanged
     private readonly DownloadManager _downloadManager;
     private readonly Services.Export.RekordboxService _rekordboxService;
     private readonly INotificationService _notificationService;
+    private readonly Services.Musical.ManualCueGenerationService _cueGenerationService;
 
     // Master List: All import jobs/projects
     private ObservableCollection<PlaylistJob> _allProjects = new();
@@ -121,6 +122,7 @@ public class ProjectListViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand LoadAllTracksCommand { get; }
     public System.Windows.Input.ICommand ImportLikedSongsCommand { get; }
     public System.Windows.Input.ICommand ExportProjectCommand { get; }
+    public System.Windows.Input.ICommand GenerateCuesCommand { get; } // Phase 4.2: Manual cue generation
 
     // Services
     private readonly ImportOrchestrator _importOrchestrator;
@@ -152,7 +154,8 @@ public class ProjectListViewModel : INotifyPropertyChanged
         IEventBus eventBus,
         IDialogService dialogService,
         Services.Export.RekordboxService rekordboxService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        Services.Musical.ManualCueGenerationService cueGenerationService)
     {
         _logger = logger;
         _libraryService = libraryService;
@@ -163,6 +166,7 @@ public class ProjectListViewModel : INotifyPropertyChanged
         _dialogService = dialogService;
         _rekordboxService = rekordboxService;
         _notificationService = notificationService;
+        _cueGenerationService = cueGenerationService;
 
         // Initialize commands
         OpenProjectCommand = new RelayCommand<PlaylistJob>(project => SelectedProject = project);
@@ -172,6 +176,7 @@ public class ProjectListViewModel : INotifyPropertyChanged
         LoadAllTracksCommand = new RelayCommand(() => SelectedProject = _allTracksJob);
         ImportLikedSongsCommand = new AsyncRelayCommand(ExecuteImportLikedSongsAsync, () => IsSpotifyAuthenticated);
         ExportProjectCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportProjectAsync);
+        GenerateCuesCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteGenerateCuesAsync); // Phase 4.2
 
         // Subscribe to auth changes
         _spotifyAuthService.AuthenticationChanged += (s, authenticated) => 
@@ -491,6 +496,56 @@ public class ProjectListViewModel : INotifyPropertyChanged
             _logger.LogError(ex, "Failed to export playlist to Rekordbox");
             _notificationService.Show(
                 "Export Failed", 
+                $"Error: {ex.Message}",
+                NotificationType.Error);
+        }
+    }
+
+    // Phase 4.2: Manual Cue Generation
+    private async Task ExecuteGenerateCuesAsync(PlaylistJob? job)
+    {
+        if (job == null) return;
+
+        try
+        {
+            var confirmed = await _dialogService.ConfirmAsync(
+                "Generate DJ Cues", 
+                $"This will analyze all tracks in '{job.SourceTitle}' and generate drop markers + cue points.\n\nContinue?");
+            
+            if (!confirmed) return;
+
+            _logger.LogInformation("Starting cue generation for playlist: {Title}", job.SourceTitle);
+            
+            // Show progress notification
+            _notificationService.Show(
+                "Generating Cues", 
+                $"Processing tracks in '{job.SourceTitle}'...",
+                NotificationType.Information);
+
+            var progress = new Progress<int>(percent =>
+            {
+                // Update progress notification if needed
+                _logger.LogDebug("Cue generation progress: {Percent}%", percent);
+            });
+
+            var result = await _cueGenerationService.GenerateCuesForPlaylistAsync(job.Id, progress);
+            
+            // Show completion notification
+            var message = $"✅ Success: {result.Success}\n⏭️ Skipped: {result.Skipped}\n❌ Failed: {result.Failed}";
+            
+            _notificationService.Show(
+                "Cue Generation Complete", 
+                message,
+                result.Failed > 0 ? NotificationType.Warning : NotificationType.Success);
+                
+            _logger.LogInformation("Cue generation complete: {Success} success, {Failed} failed, {Skipped} skipped",
+                result.Success, result.Failed, result.Skipped);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate cues for playlist");
+            _notificationService.Show(
+                "Cue Generation Failed", 
                 $"Error: {ex.Message}",
                 NotificationType.Error);
         }
