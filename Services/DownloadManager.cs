@@ -48,6 +48,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     private readonly SLSKDONET.Services.IO.IFileWriteService _fileWriteService; // Phase 1A
     private readonly CrashRecoveryJournal _crashJournal; // Phase 2A
     private readonly IEnrichmentTaskRepository _enrichmentTaskRepository; // [NEW]
+    private readonly IAudioAnalysisService _audioAnalysisService; // Phase 3: Local Audio Analysis
 
     // Phase 2.5: Concurrency control with SemaphoreSlim throttling
     private readonly CancellationTokenSource _globalCts = new();
@@ -83,7 +84,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         PathProviderService pathProvider,
         SLSKDONET.Services.IO.IFileWriteService fileWriteService,
         CrashRecoveryJournal crashJournal,
-        IEnrichmentTaskRepository enrichmentTaskRepository) // [NEW] Injected
+        IEnrichmentTaskRepository enrichmentTaskRepository,
+        IAudioAnalysisService audioAnalysisService) // [NEW] Injected
     {
         _logger = logger;
         _config = config;
@@ -96,8 +98,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         _enrichmentOrchestrator = enrichmentOrchestrator; 
         _pathProvider = pathProvider;
         _fileWriteService = fileWriteService;
-        _crashJournal = crashJournal;
         _enrichmentTaskRepository = enrichmentTaskRepository;
+        _audioAnalysisService = audioAnalysisService;
 
         // Initialize from config, but allow runtime changes
         int initialLimit = _config.MaxConcurrentDownloads > 0 ? _config.MaxConcurrentDownloads : 4;
@@ -1847,6 +1849,36 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 };
                 await _libraryService.SaveOrUpdateLibraryEntryAsync(libraryEntry);
                 _logger.LogInformation("📚 Added to library: {Artist} - {Title}", ctx.Model.Artist, ctx.Model.Title);
+
+                _logger.LogInformation("📚 Added to library: {Artist} - {Title}", ctx.Model.Artist, ctx.Model.Title);
+
+                // Phase 3: Local Audio Analysis (FFmpeg)
+                try
+                {
+                    var analysisParams = new { Path = finalPath, Hash = ctx.Model.TrackUniqueHash };
+                    _ = Task.Run(async () => 
+                    {
+                        try
+                        {
+                            var analysis = await _audioAnalysisService.AnalyzeFileAsync(analysisParams.Path, analysisParams.Hash);
+                            if (analysis != null)
+                            {
+                                using var db = new AppDbContext();
+                                db.AudioAnalysis.Add(analysis);
+                                await db.SaveChangesAsync();
+                                _logger.LogInformation("🔊 Audio analysis completed for {Track}", ctx.Model.Title);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Audio analysis failed for {Track}", ctx.Model.Title);
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to trigger audio analysis for {Track}", ctx.Model.Title);
+                }
 
                 // Phase 3.1: Finalize with Metadata Service (Tagging)
                 // [Fixed] Finalization is now handled by persistent enrichment pipeline

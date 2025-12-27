@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<LibraryHealthEntity> LibraryHealth { get; set; }
     public DbSet<Entities.PendingOrchestrationEntity> PendingOrchestrations { get; set; }
     public DbSet<Entities.EnrichmentTaskEntity> EnrichmentTasks { get; set; }
+    public DbSet<Entities.AudioAnalysisEntity> AudioAnalysis { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

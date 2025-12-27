@@ -7,6 +7,14 @@ namespace SLSKDONET.ViewModels
 {
     public class TrackInspectorViewModel : INotifyPropertyChanged
     {
+        private readonly Services.IAudioAnalysisService _audioAnalysisService;
+        private Data.Entities.AudioAnalysisEntity? _analysis;
+
+        public TrackInspectorViewModel(Services.IAudioAnalysisService audioAnalysisService)
+        {
+            _audioAnalysisService = audioAnalysisService;
+        }
+
         private PlaylistTrack? _track;
         public PlaylistTrack? Track
         {
@@ -28,13 +36,74 @@ namespace SLSKDONET.ViewModels
                     OnPropertyChanged(nameof(Energy));
                     OnPropertyChanged(nameof(Danceability));
                     OnPropertyChanged(nameof(Valence));
+                    
+                    // Reset analysis
+                    _analysis = null;
+                    NotifyAnalysisProperties();
+                    
+                    if (value != null && !string.IsNullOrEmpty(value.TrackUniqueHash))
+                    {
+                        LoadAnalysisAsync(value.TrackUniqueHash);
+                    }
                 }
             }
+        }
+
+        private async void LoadAnalysisAsync(string hash)
+        {
+            try
+            {
+                _analysis = await _audioAnalysisService.GetAnalysisAsync(hash);
+                NotifyAnalysisProperties();
+            }
+            catch (Exception) { /* Fail silently */ }
+        }
+
+        public void NotifyAnalysisProperties()
+        {
+            OnPropertyChanged(nameof(LoudnessLabel));
+            OnPropertyChanged(nameof(TruePeakLabel));
+            OnPropertyChanged(nameof(DynamicRangeLabel));
+            OnPropertyChanged(nameof(TechDetailsLabel));
+            
+            // Integrity Scout
+            OnPropertyChanged(nameof(IntegrityStatusText));
+            OnPropertyChanged(nameof(IntegrityStatusColor));
+            OnPropertyChanged(nameof(SpectralCutoffLabel));
+            OnPropertyChanged(nameof(QualityConfidenceLabel));
         }
 
         public double Energy => Track?.Energy ?? 0;
         public double Danceability => Track?.Danceability ?? 0;
         public double Valence => Track?.Valence ?? 0;
+
+        // Audio Analysis Properties
+        public string LoudnessLabel => _analysis != null ? $"{_analysis.LoudnessLufs:F1} LUFS" : "--";
+        public string TruePeakLabel => _analysis != null ? $"{_analysis.TruePeakDb:F1} dBTP" : "--";
+        public string DynamicRangeLabel => _analysis != null ? $"{_analysis.DynamicRange:F1} LU" : "--";
+        public string TechDetailsLabel => _analysis != null ? $"{_analysis.Codec.ToUpper()} | {_analysis.SampleRate}Hz | {_analysis.Channels}ch" : "Technical analysis pending...";
+
+        // Integrity Scout Properties
+        public string IntegrityStatusText 
+        {
+            get
+            {
+                if (_analysis == null) return "Unknown";
+                return _analysis.IsUpscaled ? "UPSCALED / FAKE" : "VERIFIED CLEAN";
+            }
+        }
+
+        public string IntegrityStatusColor
+        {
+            get
+            {
+                if (_analysis == null) return "#666666";
+                return _analysis.IsUpscaled ? "#D32F2F" : "#1DB954"; // Red for fake, Green for clean
+            }
+        }
+
+        public string SpectralCutoffLabel => _analysis != null ? $"{_analysis.FrequencyCutoff / 1000.0:F1} kHz" : "--";
+        public string QualityConfidenceLabel => _analysis != null ? $"{_analysis.QualityConfidence:P0}" : "--";
 
         public bool HasTrack => Track != null;
 

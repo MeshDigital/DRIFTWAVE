@@ -465,6 +465,57 @@ public class DatabaseService
                 await context.Database.ExecuteSqlRawAsync(createEnrichmentTableSql);
             }
 
+            // Phase 3: Ensure AudioAnalysis table exists (Manual Patch)
+            try 
+            {
+                await context.Database.ExecuteSqlRawAsync("SELECT Id FROM audio_analysis LIMIT 1");
+            }
+            catch 
+            {
+                try 
+                {
+                    await context.Database.ExecuteSqlRawAsync("SELECT IsUpscaled FROM audio_analysis LIMIT 1");
+                }
+                catch
+                {
+                    _logger.LogWarning("Schema Patch: Adding missing columns to 'audio_analysis'");
+                    try
+                    {
+                        await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_analysis ADD COLUMN IsUpscaled INTEGER DEFAULT 0 NOT NULL;");
+                        await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_analysis ADD COLUMN SpectralHash TEXT DEFAULT '' NOT NULL;");
+                        await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_analysis ADD COLUMN FrequencyCutoff INTEGER DEFAULT 0 NOT NULL;");
+                        await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_analysis ADD COLUMN QualityConfidence REAL DEFAULT 0 NOT NULL;");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to patch audio_analysis schema");
+                    }
+                }
+
+                _logger.LogWarning("Schema Patch: Creating missing table 'audio_analysis'");
+                var createAudioAnalysisTableSql = @"
+                    CREATE TABLE IF NOT EXISTS audio_analysis (
+                        Id TEXT NOT NULL CONSTRAINT PK_audio_analysis PRIMARY KEY,
+                        TrackUniqueHash TEXT NOT NULL,
+                        Bitrate INTEGER NOT NULL,
+                        SampleRate INTEGER NOT NULL,
+                        Channels INTEGER NOT NULL,
+                        Codec TEXT NOT NULL,
+                        DurationMs INTEGER NOT NULL,
+                        LoudnessLufs REAL NOT NULL,
+                        TruePeakDb REAL NOT NULL,
+                        DynamicRange REAL NOT NULL,
+                        AnalyzedAt TEXT NOT NULL,
+                        IsUpscaled INTEGER NOT NULL DEFAULT 0,
+                        SpectralHash TEXT NOT NULL DEFAULT '',
+                        FrequencyCutoff INTEGER NOT NULL DEFAULT 0,
+                        QualityConfidence REAL NOT NULL DEFAULT 0
+                    );
+                    CREATE INDEX IF NOT EXISTS IX_audio_analysis_TrackUniqueHash ON audio_analysis (TrackUniqueHash);
+                ";
+                await context.Database.ExecuteSqlRawAsync(createAudioAnalysisTableSql);
+            }
+
             // Check for LibraryHealth table
             try
             {
