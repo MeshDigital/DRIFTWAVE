@@ -16,6 +16,14 @@
                         <TextBlock Text="📀"/>
                     </MenuItem.Icon>
                 </MenuItem>
+                <Separator/>
+                <MenuItem Header="Generate Auto-Cues" 
+                          Command="{Binding $parent[views:LibraryPage].DataContext.Projects.GenerateCuesCommand}"
+                          CommandParameter="{Binding}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🎯"/>
+                    </MenuItem.Icon>
+                </MenuItem>
             </ContextMenu>
         </Grid.ContextMenu>
         <!-- Tiny Album Art -->
