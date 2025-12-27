@@ -38,6 +38,10 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
     private readonly ReadOnlyObservableCollection<UnifiedTrackViewModel> _failedDownloads;
     public ReadOnlyObservableCollection<UnifiedTrackViewModel> FailedDownloads => _failedDownloads;
 
+    // Phase 2: Active Groups (Album-Centric)
+    private readonly ReadOnlyObservableCollection<DownloadGroupViewModel> _activeGroups;
+    public ReadOnlyObservableCollection<DownloadGroupViewModel> ActiveGroups => _activeGroups;
+
     // Swimlanes (Derived from Active)
     private readonly ReadOnlyObservableCollection<UnifiedTrackViewModel> _expressItems;
     public ReadOnlyObservableCollection<UnifiedTrackViewModel> ExpressItems => _expressItems;
@@ -163,6 +167,17 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
         _activeDownloads.ToObservableChangeSet()
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ => QueuedCount = _activeDownloads.Count(x => x.State == PlaylistTrackState.Queued || x.State == PlaylistTrackState.Pending))
+            .DisposeWith(_subscriptions);
+
+        // Phase 2: Grouping Pipeline (Active Only)
+        // Group by AlbumId (or null for Singles)
+        sharedSource
+            .Filter(x => x.IsActive || x.IsIndeterminate) // Only group active items
+            .Group(x => x.Model.PlaylistId == Guid.Empty ? (Guid?)null : x.Model.PlaylistId)
+            .Transform((IGroup<UnifiedTrackViewModel, string, Guid?> group) => new DownloadGroupViewModel(group))
+            .DisposeMany() // Dispose GroupVMs when removed
+            .Bind(out _activeGroups) 
+            .Subscribe()
             .DisposeWith(_subscriptions);
 
         // Completed Pipeline

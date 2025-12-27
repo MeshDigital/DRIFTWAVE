@@ -69,7 +69,12 @@
 - 🎯 **NEW FOCUS**: Robust "Paste & Import" Workflow.
 - ✅ **NEW FOCUS**: Repairing Spotify Metadata Enrichment Pipeline (6-Layer Architecture).
 - ✅ **Queue Visibility**: Increased internal queue buffer from 100 to 5000.
+- ✅ **Queue Visibility**: Increased internal queue buffer from 100 to 5000.
 - ✅ **Concurrency Control**: Added dynamic slider (1-20).
+- ✅ **Download Center Upgrade (Phase 2)**:
+  - ✅ **Album Grouping**: Active downloads grouped by Project/Album.
+  - ✅ **Group Controls**: Pause/Resume/Cancel All support.
+  - ✅ **Visuals**: Aggregate progress bars and speed indicators.
 
 ---
 
@@ -167,10 +172,11 @@
     - [x] **Refactor `DownloadsViewModel`**
         - [x] Use `DynamicData` for reactive sorting/filtering (SourceCache).
         - [x] Create three `ObservableCollection`s (Express, Standard, Background) derived from source.
-    - [x] **Implement "Swimlane" View (`DownloadsPage.axaml`)**
-        - [x] Use `Expander` controls for each lane.
-        - [x] Implement `ItemsRepeater` for each lane for virtualization/performance.
-        - [x] Add "Radar" animation for Searching state.
+    - [x] **Implement "Grouped" View (`DownloadsPage.axaml`)**
+        - [x] **Album-Centric Grouping**: Group actively downloading tracks by `PlaylistId`.
+        - [x] **Aggregate Progress**: Show album-level progress bar and speed.
+        - [x] **Group Controls**: Pause/Resume/Cancel entire albums at once.
+        - [x] **Singles Handling**: Fallback to "Singles & Ad-Hoc" group.
     - [x] **"VIP Pass" Command**
         - [x] Add ContextMenu option to promote track to Express Lane (force Priority 0).
     - [ ] **Hardening**

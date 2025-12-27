@@ -22,6 +22,14 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     // Core Data
     public PlaylistTrack Model { get; }
     
+    // New: Raw Speed for Aggregation
+    private long _downloadSpeed;
+    public long DownloadSpeed 
+    { 
+        get => _downloadSpeed; 
+        set => this.RaiseAndSetIfChanged(ref _downloadSpeed, value); 
+    }
+    
     public UnifiedTrackViewModel(
         PlaylistTrack model, 
         DownloadManager downloadManager, 
@@ -69,11 +77,11 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
             _downloadManager.HardRetryTrack(GlobalId),
             this.WhenAnyValue(x => x.IsFailed));
             
-        CleanCommand = ReactiveCommand.Create(() =>
+        CleanCommand = ReactiveCommand.CreateFromTask(async () =>
         {
              // Handled by parent collection usually, but could arguably be here if we had a Delete service method
              // For now, this command might just be a placeholder or call a service to remove self
-             _downloadManager.DeleteTrackFromDiskAndHistoryAsync(GlobalId);
+             await _downloadManager.DeleteTrackFromDiskAndHistoryAsync(GlobalId);
         }, this.WhenAnyValue(x => x.IsCompleted, x => x.IsFailed, (c, f) => c || f));
 
         // Subscribe to Events
