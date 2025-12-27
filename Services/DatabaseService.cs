@@ -527,15 +527,40 @@ public class DatabaseService
                     CREATE TABLE IF NOT EXISTS audio_features (
                         Id TEXT NOT NULL CONSTRAINT PK_audio_features PRIMARY KEY,
                         TrackUniqueHash TEXT NOT NULL,
-                        Bpm REAL NOT NULL,
+                        
+                        -- Core Musical Features
+                        Bpm REAL NOT NULL DEFAULT 0,
+                        BpmConfidence REAL NOT NULL DEFAULT 0,
                         Key TEXT NOT NULL DEFAULT '',
                         Scale TEXT NOT NULL DEFAULT '',
-                        Energy REAL NOT NULL,
-                        Danceability REAL NOT NULL,
+                        KeyConfidence REAL NOT NULL DEFAULT 0,
+                        CamelotKey TEXT NOT NULL DEFAULT '',
+                        
+                        -- Sonic Characteristics
+                        Energy REAL NOT NULL DEFAULT 0,
+                        Danceability REAL NOT NULL DEFAULT 0,
+                        SpectralCentroid REAL NOT NULL DEFAULT 0,
+                        SpectralComplexity REAL NOT NULL DEFAULT 0,
+                        OnsetRate REAL NOT NULL DEFAULT 0,
+                        DynamicComplexity REAL NOT NULL DEFAULT 0,
+                        LoudnessLUFS REAL NOT NULL DEFAULT 0,
+                        
+                        -- Drop Detection & Cue Points
+                        DropTimeSeconds REAL NULL,
+                        CueIntro REAL NOT NULL DEFAULT 0,
+                        CueBuild REAL NULL,
+                        CueDrop REAL NULL,
+                        CuePhraseStart REAL NULL,
+                        
+                        -- Identity & Metadata
                         Fingerprint TEXT NOT NULL DEFAULT '',
+                        AnalysisVersion TEXT NOT NULL DEFAULT '',
                         AnalyzedAt TEXT NOT NULL
                     );
                     CREATE INDEX IF NOT EXISTS IX_audio_features_TrackUniqueHash ON audio_features (TrackUniqueHash);
+                    CREATE INDEX IF NOT EXISTS IX_audio_features_Bpm ON audio_features (Bpm);
+                    CREATE INDEX IF NOT EXISTS IX_audio_features_CamelotKey ON audio_features (CamelotKey);
+                    CREATE INDEX IF NOT EXISTS IX_audio_features_DropTimeSeconds ON audio_features (DropTimeSeconds);
                 ";
                 await context.Database.ExecuteSqlRawAsync(createAudioFeaturesTableSql);
             }
