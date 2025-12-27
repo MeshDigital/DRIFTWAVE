@@ -18,9 +18,10 @@ public interface IAudioIntelligenceService
 
 /// <summary>
 /// Phase 4: Musical Intelligence - Essentia Sidecar Integration.
-/// Wraps the Essentia CLI binary for musical feature extraction (BPM, Key, Energy, Drop Detection).
+/// Wraps the Essentia CLI binary for musical feature extraction.
+/// Implements IDisposable to kill orphaned analysis processes on shutdown.
 /// </summary>
-public class EssentiaAnalyzerService : IAudioIntelligenceService
+public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
 {
     private readonly ILogger<EssentiaAnalyzerService> _logger;
     private readonly PathProviderService _pathProvider;
@@ -31,6 +32,10 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService
     
     private string? _essentiaPath;
     private bool _binaryValidated = false;
+    
+    // Track running processes to kill them on shutdown
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Process> _activeProcesses = new();
+    private bool _isDisposing = false;
 
     public EssentiaAnalyzerService(
         ILogger<EssentiaAnalyzerService> logger,
@@ -115,6 +120,9 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService
 
         var tempJsonPath = Path.GetTempFileName();
         
+        // Capture Process ID for cleanup in finally block
+        int processId = 0;
+
         try
         {
             // Phase 4.1: Process Priority Control
@@ -134,6 +142,25 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService
 
             using var process = new Process { StartInfo = startInfo };
             process.Start();
+            
+            // Track process for cleanup
+            try 
+            {
+                processId = process.Id;
+                if (!_isDisposing)
+                {
+                    _activeProcesses.TryAdd(processId, process);
+                }
+                else
+                {
+                    try { process.Kill(); } catch { }
+                    return null;
+                }
+            }
+            catch 
+            {
+                // Ignored - if we can't get ID, we can't track it
+            }
             
             // Phase 4.1: Set BelowNormal priority to prevent UI stutter
             try
@@ -257,6 +284,12 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService
         }
         finally
         {
+            // Stop tracking process
+            if (processId > 0)
+            {
+                _activeProcesses.TryRemove(processId, out _);
+            }
+
             // Cleanup temp file
             try
             {
@@ -264,5 +297,27 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService
             }
             catch { /* Ignore cleanup errors */ }
         }
+    }
+
+    public void Dispose()
+    {
+        _isDisposing = true;
+        foreach (var kvp in _activeProcesses)
+        {
+            try
+            {
+                var proc = kvp.Value;
+                if (!proc.HasExited)
+                {
+                    _logger.LogWarning("Killing orphaned Essentia process {Pid} during shutdown", kvp.Key);
+                    proc.Kill();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("Error killing Essentia process: {Msg}", ex.Message);
+            }
+        }
+        _activeProcesses.Clear();
     }
 }

@@ -108,10 +108,43 @@ public partial class App : Application
                             Serilog.Log.Information("Stopping forensic logger...");
                             disposable.Dispose();
                         }
+
+                        // Phase 4.1: Ensure Essentia processes are killed
+                        var essentiaService = Services?.GetService<SLSKDONET.Services.IAudioIntelligenceService>();
+                        if (essentiaService is IDisposable disposableEssentia)
+                        {
+                             Serilog.Log.Information("Cleaning up Essentia processes...");
+                             disposableEssentia.Dispose();
+                        }
+
+                        // Stop Download Manager (cancels downloads and saves state)
+                        var downloadManager = Services?.GetService<DownloadManager>();
+                        if (downloadManager != null)
+                        {
+                             Serilog.Log.Information("Stopping Download Manager...");
+                             downloadManager.Dispose();
+                        }
+                        
+                        // Phase 1: Stop Library Enrichment Worker
+                        var enrichmentWorker = Services?.GetService<LibraryEnrichmentWorker>();
+                        if (enrichmentWorker != null)
+                        {
+                            Serilog.Log.Information("Stopping library enrichment worker...");
+                            await enrichmentWorker.StopAsync(); // It has StopAsync, not just Dispose
+                            enrichmentWorker.Dispose();
+                        }
+                        
+                        // Phase 9: Stop Metadata Orchestrator
+                        var orchestrator = Services?.GetService<MetadataEnrichmentOrchestrator>();
+                        if (orchestrator is IDisposable disposableOrchestrator)
+                        {
+                            Serilog.Log.Information("Stopping metadata orchestrator...");
+                            disposableOrchestrator.Dispose();
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Serilog.Log.Warning(ex, "Failed to close database connections");
+                        Serilog.Log.Warning(ex, "Failed to close database connections or stop services");
                     }
 
                     Serilog.Log.Information("Application shutdown completed");
