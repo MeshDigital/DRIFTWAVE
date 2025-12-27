@@ -15,17 +15,20 @@ namespace SLSKDONET.Services.Musical;
 public class ManualCueGenerationService
 {
     private readonly ILogger<ManualCueGenerationService> _logger;
+    private readonly TrackForensicLogger _forensicLogger; // Phase 4.7: Forensic Timeline
     private readonly IAudioIntelligenceService _essentiaService;
     private readonly DropDetectionEngine _dropEngine;
     private readonly CueGenerationEngine _cueEngine;
 
     public ManualCueGenerationService(
         ILogger<ManualCueGenerationService> logger,
+        TrackForensicLogger forensicLogger, // Phase 4.7
         IAudioIntelligenceService essentiaService,
         DropDetectionEngine dropEngine,
         CueGenerationEngine cueEngine)
     {
         _logger = logger;
+        _forensicLogger = forensicLogger;
         _essentiaService = essentiaService;
         _dropEngine = dropEngine;
         _cueEngine = cueEngine;
@@ -39,6 +42,9 @@ public class ManualCueGenerationService
     {
         var result = new CueGenerationResult();
         
+        // Phase 4.7: Create correlation ID for this batch operation
+        var batchCorrelationId = CorrelationIdExtensions.NewCorrelationId();
+        
         using var db = new AppDbContext();
         
         // Get all tracks in playlist
@@ -49,16 +55,26 @@ public class ManualCueGenerationService
         if (tracks.Count == 0)
         {
             _logger.LogWarning("No tracks found in playlist {PlaylistId}", playlistId);
+            _forensicLogger.Warning(batchCorrelationId, Data.Entities.ForensicStage.CueGeneration, 
+                $"No tracks found in playlist {playlistId}");
             return result;
         }
 
         result.TotalTracks = tracks.Count;
         _logger.LogInformation("Starting cue generation for {Count} tracks in playlist {PlaylistId}", 
             tracks.Count, playlistId);
+        
+        // Phase 4.7: Log user action initiation
+        _forensicLogger.Info(batchCorrelationId, Data.Entities.ForensicStage.CueGeneration,
+            $"User triggered batch cue generation for {tracks.Count} tracks",
+            new { PlaylistId = playlistId, TrackCount = tracks.Count });
 
         for (int i = 0; i < tracks.Count; i++)
         {
             var track = tracks[i];
+            
+            // Phase 4.7: Each track gets its own correlation ID (child of batch)
+            var trackCorrelationId = CorrelationIdExtensions.NewCorrelationId();
             
             try
             {
@@ -69,6 +85,9 @@ public class ManualCueGenerationService
                 if (existingFeatures?.DropTimeSeconds != null)
                 {
                     _logger.LogDebug("Track {Title} already has cues - skipping", track.Title);
+                    _forensicLogger.Info(trackCorrelationId, Data.Entities.ForensicStage.CueGeneration,
+                        "Track already has cues - skipped",
+                        new { Title = track.Title, ExistingDrop = existingFeatures.DropTimeSeconds });
                     result.Skipped++;
                     continue;
                 }
@@ -76,6 +95,14 @@ public class ManualCueGenerationService
                 // Trigger analysis with cue generation enabled
                 if (!string.IsNullOrEmpty(track.ResolvedFilePath) && System.IO.File.Exists(track.ResolvedFilePath))
                 {
+                    // Phase 4.7: Log analysis start
+                    _forensicLogger.Info(trackCorrelationId, Data.Entities.ForensicStage.MusicalAnalysis,
+                        "Starting musical analysis with cue generation",
+                        new { TrackIdentifier = track.TrackUniqueHash, Title = track.Title });
+                    
+                    using var timedOp = _forensicLogger.TimedOperation(trackCorrelationId, 
+                        Data.Entities.ForensicStage.MusicalAnalysis, "Essentia Analysis");
+                    
                     var features = await _essentiaService.AnalyzeTrackAsync(
                         track.ResolvedFilePath, 
                         track.TrackUniqueHash, 
@@ -90,11 +117,28 @@ public class ManualCueGenerationService
                         result.Success++;
                         _logger.LogInformation("✅ Generated cues for {Title}: Drop={Drop:F1}s", 
                             track.Title, features.DropTimeSeconds);
+                        
+                        // Phase 4.7: Log success with cue details
+                        _forensicLogger.Info(trackCorrelationId, Data.Entities.ForensicStage.Persistence,
+                            "Cues generated and saved to database",
+                            new { 
+                                BPM = features.Bpm,
+                                Key = features.CamelotKey,
+                                DropTime = features.DropTimeSeconds,
+                                CueIntro = features.CueIntro,
+                                CueBuild = features.CueBuild,
+                                CuePhraseStart = features.CuePhraseStart
+                            });
                     }
                     else
                     {
                         result.Failed++;
                         _logger.LogWarning("Failed to generate cues for {Title}", track.Title);
+                        
+                        // Phase 4.7: Log failure
+                        _forensicLogger.Warning(trackCorrelationId, Data.Entities.ForensicStage.MusicalAnalysis,
+                            "Cue generation failed - no drop detected or analysis returned null",
+                            new { Title = track.Title });
                     }
                 }
             }
@@ -102,6 +146,10 @@ public class ManualCueGenerationService
             {
                 result.Failed++;
                 _logger.LogError(ex, "Error generating cues for track {Title}", track.Title);
+                
+                // Phase 4.7: Log exception with stack trace
+                _forensicLogger.Error(trackCorrelationId, Data.Entities.ForensicStage.CueGeneration,
+                    $"Exception during cue generation for {track.Title}", ex);
             }
 
             // Report progress
