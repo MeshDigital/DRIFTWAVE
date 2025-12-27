@@ -100,6 +100,14 @@ public partial class App : Application
                         {
                             healthMonitor.Dispose();
                         }
+                        
+                        // Phase 4.7: Stop Forensic Logger consumer  
+                        var forensicLogger = Services?.GetService<TrackForensicLogger>();
+                        if (forensicLogger != null && forensicLogger is IDisposable disposable)
+                        {
+                            Serilog.Log.Information("Stopping forensic logger...");
+                            disposable.Dispose();
+                        }
                     }
                     catch (Exception ex)
                     {

@@ -11,7 +11,7 @@ namespace SLSKDONET.Services;
 /// Track-scoped forensic logger that writes correlation-based logs.
 /// Wraps standard ILogger with automatic CorrelationId prefixing and database persistence.
 /// </summary>
-public class TrackForensicLogger
+public class TrackForensicLogger : IDisposable
 {
     private readonly ILogger<TrackForensicLogger> _logger;
     private readonly Channel<Data.Entities.ForensicLogEntry> _logChannel;
@@ -105,6 +105,22 @@ public class TrackForensicLogger
         };
         
         _logChannel.Writer.TryWrite(entry);
+    }
+    
+    /// <summary>
+    /// Signals the consumer to stop and waits for remaining logs to be persisted
+    /// </summary>
+    public void Dispose()
+    {
+        _logger.LogInformation("Forensic logger shutting down, flushing remaining entries...");
+        
+        // Complete the channel to signal consumer to stop
+        _logChannel.Writer.Complete();
+        
+        // Give consumer up to 5 seconds to finish writing remaining entries
+        Task.Delay(5000).Wait();
+        
+        _logger.LogInformation("Forensic logger shutdown complete");
     }
     
     /// <summary>
