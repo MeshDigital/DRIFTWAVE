@@ -17,34 +17,40 @@
                 <!-- Search Input Row -->
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                     <!-- Search Box -->
-                    <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="4">
+                    <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Height="40">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#888"/>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="12,0,8,0" Foreground="#888"/>
                             <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Watermark="Search for tracks, artists..."
                                      Background="Transparent" BorderThickness="0"
-                                     FontSize="16" VerticalContentAlignment="Center" Margin="4,0"/>
+                                     FontSize="14" VerticalContentAlignment="Center" Margin="0" Padding="0"/>
                             <Button Command="{Binding ClearSearchCommand}" Background="Transparent" BorderThickness="0" 
-                                    IsVisible="{Binding CanSearch}" Margin="0,0,4,0">
-                                <TextBlock Text="✕" Foreground="#888"/>
+                                    IsVisible="{Binding CanSearch}" Margin="0,0,4,0" Padding="8">
+                                <TextBlock Text="✕" Foreground="#888" VerticalAlignment="Center"/>
                             </Button>
                         </Grid>
                     </Border>
                     
                     <!-- CSV/Paste Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0" Spacing="8">
-                        <Button Command="{Binding BrowseCsvCommand}" Classes="secondary" ToolTip.Tip="Import CSV">
-                            <TextBlock Text="📂 CSV"/>
+                        <Button Command="{Binding BrowseCsvCommand}" Classes="secondary hover-bright" Height="40" ToolTip.Tip="Import CSV">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="📂"/>
+                                <TextBlock Text="CSV"/>
+                            </StackPanel>
                         </Button>
-                        <Button Command="{Binding PasteTracklistCommand}" Classes="secondary" ToolTip.Tip="Paste Tracklist">
-                            <TextBlock Text="📋 Paste"/>
+                        <Button Command="{Binding PasteTracklistCommand}" Classes="secondary hover-bright" Height="40" ToolTip.Tip="Paste Tracklist">
+                             <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="📋"/>
+                                <TextBlock Text="Paste"/>
+                            </StackPanel>
                         </Button>
                     </StackPanel>
                     
                     <!-- Search Button -->
-                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="secondary" Margin="12,0,0,0" Padding="20,0" Height="40">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="SEARCH"/>
+                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="secondary accent" Margin="12,0,0,0" Padding="24,0" Height="40">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="SEARCH" FontWeight="SemiBold"/>
                             <TextBlock Text="➡️"/>
                         </StackPanel>
                     </Button>
