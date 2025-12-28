@@ -72,6 +72,44 @@
   - One-Click Missions framework
   - Vibe Search NLP integration
   - Implementation status and Q1 2026 roadmap
+- **[DOCS/MISSION_CONTROL_TECHNICAL.md](DOCS/MISSION_CONTROL_TECHNICAL.md)** - Technical deep-dive (Dec 28, 2025) ⭐ NEW
+  - MissionControlService & DashboardService architecture
+  - Health aggregation and throttled event publishing
+  - Zombie download detection
+  - Performance optimization strategies
+
+#### Phase 3-4: Musical Intelligence & System Health ⭐ NEW (Dec 28, 2025)
+- **[DOCS/DOWNLOAD_HEALTH_MONITORING.md](DOCS/DOWNLOAD_HEALTH_MONITORING.md)** - Download stall detection and auto-retry 🚀
+  - DownloadHealthMonitor service ("The Heart" of Phase 3B)
+  - Stall vs Queued detection logic
+  - 15-second monitoring loop
+  - Auto-intervention and retry strategies
+  - Performance impact and scalability
+- **[DOCS/SEARCH_NORMALIZATION.md](DOCS/SEARCH_NORMALIZATION.md)** - Musical identity preservation (Phase 4.6 Hotfix) 🚀
+  - SearchNormalizationService architecture
+  - Two-pass processing (protect → clean → restore)
+  - Musical identity patterns vs junk patterns
+  - Edge case handling and validation
+- **[DOCS/DROP_DETECTION_AND_CUE_GENERATION.md](DOCS/DROP_DETECTION_AND_CUE_GENERATION.md)** - DJ cue point automation (Phase 4.2) 🚀
+  - DropDetectionEngine: Signal intersection (loudness, spectral, onset)
+  - CueGenerationEngine: 32-bar phrase structure
+  - Confidence scoring system
+  - Beat grid alignment and constraints
+  - Genre-specific tuning
+- **[DOCS/FORENSIC_LOGGING_SYSTEM.md](DOCS/FORENSIC_LOGGING_SYSTEM.md)** - Correlation-based audit trail (Phase 4.7) 🚀
+  - TrackForensicLogger: Correlation ID architecture
+  - Channel-based non-blocking persistence
+  - Stage-based event categorization
+  - Forensic Timeline UI integration
+  - Debugging workflows and performance profiling
+
+#### Audit & Quality Assurance ⭐ NEW (Dec 28, 2025)
+- **[DOCS/UNDOCUMENTED_FEATURES_AUDIT.md](DOCS/UNDOCUMENTED_FEATURES_AUDIT.md)** - Comprehensive feature audit 📋
+  - 12 undocumented features identified
+  - 8 potential issues and recommendations
+  - Documentation coverage metrics (52% → 65%)
+  - Prioritized action plan
+  - Quality checklist
 
 ### Checklist & Status
 - **[CHECKLIST.md](CHECKLIST.md)** - Complete project checklist
