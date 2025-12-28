@@ -61,7 +61,7 @@
                     </Grid>
                     
                     <!-- Max Concurrent Downloads -->
-                    <Grid ColumnDefinitions="180,100,*">
+                    <Grid ColumnDefinitions="180,120,*">
                         <TextBlock Grid.Column="0" Text="Max Concurrent Downloads:" VerticalAlignment="Center" Foreground="#DDD"/>
                         <NumericUpDown Grid.Column="1" 
                                        Value="{Binding MaxConcurrentDownloads, Mode=TwoWay}"
@@ -107,7 +107,7 @@
                     <TextBlock Text="Default Search Filters" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
                     
                     <!-- Min Bitrate -->
-                    <Grid ColumnDefinitions="180,150,*">
+                    <Grid ColumnDefinitions="180,120,*">
                         <TextBlock Grid.Column="0" Text="Min Bitrate:" VerticalAlignment="Center" Foreground="#DDD"/>
                         <NumericUpDown Grid.Column="1" 
                                        Value="{Binding MinBitrate, Mode=TwoWay}"
@@ -124,7 +124,7 @@
                     </Grid>
                     
                     <!-- Max Bitrate -->
-                    <Grid ColumnDefinitions="180,150,*">
+                    <Grid ColumnDefinitions="180,120,*">
                         <TextBlock Grid.Column="0" Text="Max Bitrate:" VerticalAlignment="Center" Foreground="#DDD"/>
                         <NumericUpDown Grid.Column="1" 
                                        Value="{Binding MaxBitrate, Mode=TwoWay}"
@@ -161,7 +161,7 @@
                     <StackPanel Spacing="4">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="🧠" FontSize="20" VerticalAlignment="Center"/>
-                            <TextBlock Text="Quality Guard &amp; The Brain" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Smart Features &amp; Integrity" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
                         </StackPanel>
                         <TextBlock Text="Sonic intelligence for adaptive search and upscale protection" 
                                    Foreground="#AAA" FontSize="12"/>
@@ -202,7 +202,7 @@
                     </Grid>
 
                     <!-- Relaxation Timeout -->
-                    <Grid ColumnDefinitions="180,150,*" IsEnabled="{Binding EnableRelaxationStrategy}">
+                    <Grid ColumnDefinitions="180,120,*" IsEnabled="{Binding EnableRelaxationStrategy}">
                         <TextBlock Grid.Column="0" Text="Relaxation Timeout:" VerticalAlignment="Center" Foreground="#DDD"/>
                         <NumericUpDown Grid.Column="1" 
                                        Value="{Binding RelaxationTimeoutSeconds}"
@@ -236,7 +236,7 @@
                         </Grid>
 
                         <!-- Max Retries Numeric -->
-                        <Grid ColumnDefinitions="180,150,*" IsEnabled="{Binding AutoRetryFailedDownloads}">
+                        <Grid ColumnDefinitions="180,120,*" IsEnabled="{Binding AutoRetryFailedDownloads}">
                             <TextBlock Grid.Column="0" Text="Max Retry Attempts:" VerticalAlignment="Center" Foreground="#DDD"/>
                             <NumericUpDown Grid.Column="1" 
                                            Value="{Binding MaxDownloadRetries}"
@@ -396,7 +396,7 @@
             <!-- Phase 8: Self-Healing Library (Upgrade Scout) -->
             <Border Background="#252526" CornerRadius="8" Padding="20" BorderBrush="#3E3E3E" BorderThickness="1">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="Self-Healing Library (Upgrade Scout)" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                    <TextBlock Text="Library Self-Healing (Upgrade Scout)" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
                     
                     <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12">
                         Automatically scan your library for low-quality or faked tracks and search for high-fidelity replacements.
@@ -409,7 +409,7 @@
                                       OnContent="Active" OffContent="Disabled"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="180,100,*">
+                    <Grid ColumnDefinitions="180,120,*">
                         <TextBlock Grid.Column="0" Text="Min Bitrate Threshold:" VerticalAlignment="Center" Foreground="#DDD"/>
                         <NumericUpDown Grid.Column="1" 
                                        Value="{Binding UpgradeMinBitrateThreshold, Mode=TwoWay}"
@@ -422,7 +422,7 @@
                                    VerticalAlignment="Center" Foreground="#666" FontSize="11" Margin="12,0,0,0"/>
                     </Grid>
 
-                    <Grid ColumnDefinitions="180,100,*">
+                    <Grid ColumnDefinitions="180,120,*">
                         <TextBlock Grid.Column="0" Text="Min Quality Gain:" VerticalAlignment="Center" Foreground="#DDD"/>
                         <NumericUpDown Grid.Column="1" 
                                        Value="{Binding UpgradeMinGainKbps, Mode=TwoWay}"
@@ -452,7 +452,7 @@
                     <TextBlock Text="Dependencies" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
                     
                     <TextBlock TextWrapping="Wrap" Foreground="#AAA" FontSize="12">
-                        Phase 8 features require external dependencies. Ensure these are installed for full functionality.
+                        Smart features require external dependencies. Ensure these are installed for full functionality.
                     </TextBlock>
 
                     <!-- FFmpeg Status Card -->

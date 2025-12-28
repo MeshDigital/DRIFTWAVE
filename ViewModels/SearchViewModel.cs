@@ -117,6 +117,47 @@ public partial class SearchViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _maxBitrate, value);
     }
 
+    // Phase 5: Ranking Weights (Control Surface)
+    private double _bitrateWeight = 1.0;
+    public double BitrateWeight
+    {
+        get => _bitrateWeight;
+        set { if (SetProperty(ref _bitrateWeight, value)) OnRankingWeightsChanged(); }
+    }
+
+    private double _reliabilityWeight = 1.0;
+    public double ReliabilityWeight
+    {
+        get => _reliabilityWeight;
+        set { if (SetProperty(ref _reliabilityWeight, value)) OnRankingWeightsChanged(); }
+    }
+
+    private double _matchWeight = 1.0;
+    public double MatchWeight
+    {
+        get => _matchWeight;
+        set { if (SetProperty(ref _matchWeight, value)) OnRankingWeightsChanged(); }
+    }
+
+    // Format Toggles (Zone C)
+    public bool IsFlacEnabled
+    {
+        get => FilterViewModel.FilterFlac;
+        set { FilterViewModel.FilterFlac = value; this.RaisePropertyChanged(); OnRankingWeightsChanged(); }
+    }
+    
+    public bool IsMp3Enabled
+    {
+        get => FilterViewModel.FilterMp3;
+        set { FilterViewModel.FilterMp3 = value; this.RaisePropertyChanged(); OnRankingWeightsChanged(); }
+    }
+
+    public bool IsWavEnabled
+    {
+        get => FilterViewModel.FilterWav;
+        set { FilterViewModel.FilterWav = value; this.RaisePropertyChanged(); OnRankingWeightsChanged(); }
+    }
+
 
     // Commands
     public ICommand UnifiedSearchCommand { get; }
@@ -126,6 +167,7 @@ public partial class SearchViewModel : ReactiveObject
     public ICommand CancelSearchCommand { get; }
     public ICommand AddToDownloadsCommand { get; }
     public ICommand DownloadSelectedCommand { get; }
+    public ICommand ApplyPresetCommand { get; } // Phase 5: Search Presets
 
     public SearchViewModel(
         ILogger<SearchViewModel> logger,
@@ -162,15 +204,16 @@ public partial class SearchViewModel : ReactiveObject
         var filterPredicate = FilterViewModel.FilterChanged;
 
         _searchResults.Connect()
+            .AutoRefresh(x => x.CurrentRank) // Phase 5: Re-sort when rank changes
             .Filter(filterPredicate)
+            .Sort(SortExpressionComparer<SearchResult>.Descending(t => t.CurrentRank)) // Phase 5: Dynamic Sorting
             .ObserveOn(RxApp.MainThreadScheduler)
             .Bind(out _publicSearchResults)
             .DisposeMany() // Ensure items are disposed if needed
             .Subscribe(set => 
             {
                 // Update Hidden Count
-                // Total in source - Total in public view
-                // Note: Count retrieval needs to be thread safe, SourceList.Count is generally safe
+                // Note: Count retrieval needs to be thread safe
                 HiddenResultsCount = _searchResults.Count - _publicSearchResults.Count;
             });
 
@@ -184,6 +227,7 @@ public partial class SearchViewModel : ReactiveObject
         CancelSearchCommand = ReactiveCommand.Create(ExecuteCancelSearch);
         AddToDownloadsCommand = ReactiveCommand.CreateFromTask(ExecuteAddToDownloadsAsync);
         DownloadSelectedCommand = ReactiveCommand.CreateFromTask(ExecuteDownloadSelectedAsync);
+        ApplyPresetCommand = ReactiveCommand.Create<string>(ExecuteApplyPreset);
         
         // Phase 12.6: Bi-directional filter sync - wire callback
         FilterViewModel.OnTokenSyncRequested = HandleTokenSync;
@@ -498,6 +542,39 @@ public partial class SearchViewModel : ReactiveObject
         StatusText = "Ready";
     }
 
+    private void ExecuteApplyPreset(string presetName)
+    {
+        switch (presetName)
+        {
+            case "Deep Dive":
+                BitrateWeight = 0.5;
+                ReliabilityWeight = 0.5;
+                MatchWeight = 2.0;
+                IsFlacEnabled = false; // reset filters
+                break;
+            case "Quick Grab":
+                BitrateWeight = 1.5;
+                ReliabilityWeight = 2.0;
+                MatchWeight = 1.0;
+                break;
+            case "High Fidelity":
+                BitrateWeight = 2.0;
+                ReliabilityWeight = 1.0;
+                MatchWeight = 1.0;
+                IsFlacEnabled = true;
+                IsMp3Enabled = false;
+                break;
+             case "Balanced":
+             default:
+                BitrateWeight = 1.0;
+                ReliabilityWeight = 1.0;
+                MatchWeight = 1.0;
+                IsFlacEnabled = false;
+                IsMp3Enabled = false;
+                break;
+        }
+    }
+
     private void OnTrackStateChanged(TrackStateChangedEvent evt)
     {
         // Update any matching search results via UI thread
@@ -555,4 +632,80 @@ public partial class SearchViewModel : ReactiveObject
         this.RaiseAndSetIfChanged(ref field, value, propertyName);
         return true;
     }
-}
+
+    // Phase 5: Real-time Ranking Update
+    private void OnRankingWeightsChanged()
+    {
+        // Update Static Weights
+        var weights = new Configuration.ScoringWeights
+        {
+            QualityWeight = BitrateWeight,
+            AvailabilityWeight = ReliabilityWeight,
+            MusicalWeight = MatchWeight,
+            MetadataWeight = MatchWeight,
+            StringWeight = MatchWeight,
+            ConditionsWeight = 1.0
+        };
+        ResultSorter.SetWeights(weights);
+
+        // FilterViewModel changes update reactive filter automatically, 
+        // but Sort needs Score updates.
+        RecalculateScores();
+    }
+
+    private void RecalculateScores()
+    {
+        if (_searchResults.Count == 0 || string.IsNullOrWhiteSpace(SearchQuery)) return;
+
+        // Parse query for context (Simplified)
+        // Ideally handled by ScoringContext logic
+        var searchTrack = new Models.Track { Title = SearchQuery, Artist = "" }; 
+        // Note: Full parsing requires more robust logic, but this suffices for relative re-ranking
+        // if user types "Artist - Title", string similarity will handle it.
+
+        var evaluator = new Models.FileConditionEvaluator();
+        
+        // Add Bitrate condition as preferred (to rank higher)
+        evaluator.AddPreferred(new Models.BitrateCondition 
+        { 
+            MinBitrate = MinBitrate, 
+            MaxBitrate = MaxBitrate 
+        });
+
+        // Add Format condition
+        evaluator.AddPreferred(new Models.FormatCondition 
+        { 
+            AllowedFormats = GetActiveFormats() 
+        });
+
+        // Batch update
+        var items = _searchResults.Items.ToList();
+        foreach (var item in items)
+        {
+             // Use ResultSorter to update CurrentRank inside the Model
+             ResultSorter.CalculateRank(item.Model, searchTrack, evaluator);
+             // Trigger notification on wrapper if needed, or DynamicData Sort will pick up property change?
+             // DynamicData Sort usually requires a Refresh signal if property changes in-place.
+             // We can force it by simulating a reset or using a mutable property.
+             // However, SearchResult.CurrentRank defaults to Model.CurrentRank.
+             // We need to notify change.
+             item.RefreshRank(); 
+        }
+        
+        // Force re-sort in DynamicData (Trigger via Refresh if using Sort(IObservable<IComparer>))
+        // Since we use static Sort expression, we might need to Refresh() the source list or use auto-refresh.
+        // For simplicity: Clear and AddRange works but flickers.
+        // Better: Use .AutoRefresh(x => x.CurrentRank) in pipeline.
+    }
+    
+    private List<string> GetActiveFormats()
+    {
+        var list = new List<string>();
+        if (IsFlacEnabled) list.Add("flac");
+        if (IsMp3Enabled) list.Add("mp3");
+        if (IsWavEnabled) list.Add("wav");
+        if (list.Count == 0) list.AddRange(new[] { "mp3", "flac", "wav" }); // Default all if none
+        return list;
+    }
+    }
+

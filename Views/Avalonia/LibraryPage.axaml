@@ -469,6 +469,23 @@
                                             <TextBlock Text="{Binding Bitrate, StringFormat='{}{0}kbps'}" FontSize="11" Foreground="#666"/>
                                         </StackPanel>
                                         
+                                        <!-- Line 1 Right: Status Badge -->
+                                        <Border Grid.Row="0" Grid.Column="2" 
+                                                Background="#1AFFFFFF" 
+                                                CornerRadius="4" 
+                                                Padding="8,2" 
+                                                VerticalAlignment="Center"
+                                                Margin="0,0,12,0">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding MetadataStatusSymbol}" VerticalAlignment="Center" FontSize="10"/>
+                                                <TextBlock Text="{Binding StatusText}" 
+                                                           Foreground="{Binding StatusColor}" 
+                                                           FontWeight="Bold" 
+                                                           FontSize="11"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
                                         <!-- Actions -->
                                         <Button Grid.RowSpan="2" Grid.Column="3" Theme="{StaticResource SimpleButton}" Padding="8">
                                             <TextBlock Text="⋮" FontSize="16" Foreground="#888"/>

@@ -170,12 +170,6 @@ public class SettingsViewModel : INotifyPropertyChanged
         set { _config.RelaxationTimeoutSeconds = value; OnPropertyChanged(); }
     }
 
-    public bool SpotifyUseApi
-    {
-        get => _config.SpotifyUseApi;
-        set { _config.SpotifyUseApi = value; OnPropertyChanged(); }
-    }
-
     public bool SpotifyEnableAudioFeatures
     {
         get => _config.SpotifyEnableAudioFeatures;
@@ -559,9 +553,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         SaveSettingsCommand = new RelayCommand(SaveSettings);
         BrowseDownloadPathCommand = new AsyncRelayCommand(BrowseDownloadPathAsync);
         BrowseSharedFolderCommand = new AsyncRelayCommand(BrowseSharedFolderAsync);
-        SaveSettingsCommand = new RelayCommand(SaveSettings);
-        BrowseDownloadPathCommand = new AsyncRelayCommand(BrowseDownloadPathAsync);
-        BrowseSharedFolderCommand = new AsyncRelayCommand(BrowseSharedFolderAsync);
+
         ConnectSpotifyCommand = new AsyncRelayCommand(ConnectSpotifyAsync, () => IsSpotifyDisconnected);
         DisconnectSpotifyCommand = new AsyncRelayCommand(DisconnectSpotifyAsync, () => IsSpotifyConnected);
         TestSpotifyConnectionCommand = new AsyncRelayCommand(TestSpotifyConnectionAsync); // Always allow testing if user expands advanced

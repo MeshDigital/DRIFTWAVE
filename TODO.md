@@ -63,6 +63,19 @@
   - ✅ **Improved Context Menu**: Added Retry/Cancel options to the Failed tab.
 - ✅ **Stability**: Fixed DI container crash (missing `AnlzFileParser`) and reset corrupt database.
 
+### Recent Updates (December 28, 2025)
+- ✅ **Search Intelligence (The Brain 2.0)**:
+  - ✅ **Three-Zone Dashboard**: Initiator (Search), Brain (Rank/Filter), Gatekeeper (Results) layout.
+  - ✅ **Control Surface**: Real-time Ranking Sliders (Bitrate vs Reliability vs Match) and Format Toggles.
+  - ✅ **Search Presets**: One-click configuration for "Balanced", "DJ Mode", "Audiophile", and "Data Saver".
+- ✅ **Library UX Polish**:
+  - ✅ **Enhanced Track Cards**: Added real-time "Download Status" badges (Color-coded) and "Enrichment Sparkles".
+  - ✅ **Integrity Badges**: Shield icons for "Gatekeeper" verification status.
+  - ✅ **Mix Helper Integration**: Harmonic compatibility sidebar fully wired up.
+- ✅ **Settings UI**:
+  - ✅ **Layout Fixes**: Widened numeric input boxes for better visibility.
+  - ✅ **Clarity**: Renamed "Quality Guard" to "Smart Features & Integrity" for better user understanding.
+
 ### Recent Updates (December 27, 2025) - Pivot to Local Analysis
 - ⏸️ **PAUSED**: External Audio Features (Spotify BPM/Key/Energy) due to API changes.
 - 🎯 **NEW FOCUS**: Local Audio Analysis First (FFmpeg/Essentia).

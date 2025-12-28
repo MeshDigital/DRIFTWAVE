@@ -31,6 +31,12 @@ public class SearchResult : INotifyPropertyChanged
     public double CurrentRank => Model.CurrentRank;
     public string ScoreBreakdown => Model.ScoreBreakdown ?? $"Rank: {CurrentRank:F1}";
 
+    public void RefreshRank()
+    {
+        OnPropertyChanged(nameof(CurrentRank));
+        OnPropertyChanged(nameof(ScoreBreakdown));
+    }
+
     // Phase 12.6: Multi-line row template properties
     public string PrimaryDisplay => $"{Artist} - {Title}";
     public string FileFormat => System.IO.Path.GetExtension(Model.Filename ?? "")?.TrimStart('.').ToUpperInvariant() ?? "MP3";

@@ -9,429 +9,231 @@
              x:Class="SLSKDONET.Views.Avalonia.SearchPage"
              Background="#1E1E1E" Foreground="White">
     
-    <!-- Main Grid with Import Preview Overlay -->
-    <Grid>
-        <!-- Search Results (Main Content) - ZIndex 0 -->
-        <Grid RowDefinitions="Auto,Auto,*,Auto" ZIndex="0">
+    <DockPanel>
         
-            <!-- Header -->
-            <Border Grid.Row="0" Background="#252526" Padding="24,20" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Search (DEBUG v2)" FontSize="28" FontWeight="Bold" Foreground="White"/>
-                    <TextBlock Text="Find music from Soulseek, import from Spotify, or upload CSV" 
-                               FontSize="13" Foreground="#A0A0A0"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Dynamic Search Bar -->
-            <Border Grid.Row="1" Background="#1E1E1E" Padding="24,20">
-                <StackPanel Spacing="16">
-                    <!-- Unified Input Row -->
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                        
-                        <!-- Main Search Input -->
-                        <Border Grid.Column="0" 
-                                Background="#252526" 
-                                BorderBrush="#0078D4" 
-                                BorderThickness="2" 
-                                CornerRadius="8"
-                                Padding="4">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <!-- Input Box -->
-                                <TextBox Grid.Column="1"
-                                         x:Name="SearchInput"
-                                         Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Watermark="Enter song, artist, Spotify URL, or CSV file path..."
-                                         Background="Transparent"
-                                         BorderThickness="0"
-                                         Foreground="White"
-                                         FontSize="15"
-                                         Padding="8,8"
-                                         VerticalContentAlignment="Center"/>
-                                
-                                <!-- Clear Button -->
-                                <Button Grid.Column="2"
-                                        Command="{Binding ClearSearchCommand}"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Padding="8,4"
-                                        Margin="0,0,4,0"
-                                        IsVisible="{Binding CanSearch}">
-                                    <TextBlock Text="✕" FontSize="14" Foreground="#808080"/>
-                                </Button>
-                            </Grid>
-                        </Border>
-
-                        <!-- Browse CSV Button -->
-                        <Button Grid.Column="1" 
-                                Content="📂 Browse CSV..." 
-                                Command="{Binding BrowseCsvCommand}"
-                                Classes="secondary"
-                                Height="42"
-                                Margin="12,0,0,0"
-                                Padding="12,0"
-                                VerticalAlignment="Top"/>
-
-                        <!-- Paste Tracklist Button -->
-                        <Button Grid.Column="2" 
-                                Content="📋 Paste Tracklist" 
-                                Command="{Binding PasteTracklistCommand}"
-                                Classes="secondary"
-                                Height="42"
-                                Margin="12,0,0,0"
-                                Padding="12,0"
-                                ToolTip.Tip="Paste a tracklist from YouTube, SoundCloud, etc."
-                                VerticalAlignment="Top"
-                                IsVisible="{Binding !IsSpotifyBrowseMode}"/>
-
-                        <!-- Search Button -->
-                        <Button Grid.Column="3"
-                                Classes="primary"
-                                Command="{Binding UnifiedSearchCommand}"
-                                Height="42"
-                                Padding="24,0"
-                                Margin="12,0,0,0"
-                                VerticalAlignment="Top"
-                                IsEnabled="{Binding CanSearch}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="Search / Import" FontSize="14" FontWeight="SemiBold"/>
-                                <TextBlock Text="➡️" FontSize="14"/>
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-
-                    <!-- Advanced Filters Panel (Legacy/Optional) -->
-                    <Expander Header="Advanced Filters &amp; Ranking" 
-                              IsExpanded="False"
-                              Background="#252526"
-                              CornerRadius="4"
-                              IsVisible="{Binding !IsSpotifyBrowseMode}">
-                        <StackPanel Spacing="16" Margin="12">
-                            <!-- Ranking Preset -->
-                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-                                <TextBlock Grid.Row="0" Grid.Column="0" 
-                                           Text="Ranking Priority:" 
-                                           VerticalAlignment="Center" 
-                                           FontWeight="SemiBold"
-                                           Margin="0,0,16,0"/>
-                                
-                                <ComboBox Grid.Row="0" Grid.Column="1" 
-                                          SelectedItem="{Binding RankingPreset}"
-                                          Width="200"
-                                          HorizontalAlignment="Left">
-                                    <ComboBoxItem Content="⚖️ Balanced Default" Tag="{x:Static models:RankingPreset.Balanced}"/>
-                                    <ComboBoxItem Content="💎 High Quality (FLAC/320)" Tag="{x:Static models:RankingPreset.HighQuality}"/>
-                                    <ComboBoxItem Content="⚡ Fastest Download" Tag="{x:Static models:RankingPreset.FastestDownload}"/>
-                                </ComboBox>
-                            </Grid>
-                        </StackPanel>
-                    </Expander>
-
-                    <!-- Quick Actions -->
-                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="True">
-                         <!-- Album Search Toggle -->
-                        <ToggleButton IsChecked="{Binding IsAlbumSearch, Mode=TwoWay}"
-                                      Background="#2D2D2D"
-                                      Padding="12,8"
-                                      CornerRadius="6">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="💿" FontSize="14"/>
-                                <TextBlock Text="Album Search Mode" FontSize="13"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        
-                        <!-- Cancel Search -->
-                        <Button Command="{Binding CancelSearchCommand}"
-                                Background="#D32F2F"
-                                Foreground="White"
-                                Padding="12,8"
-                                CornerRadius="6"
-                                IsVisible="{Binding IsSearching}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="⏹" FontSize="14"/>
-                                <TextBlock Text="Cancel" FontSize="13" FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-
-                    <!-- Status Bar (Small) -->
-                    <Border Background="#1A4CAF50" 
-                            CornerRadius="4" 
-                            Padding="12,8" 
-                            IsVisible="{Binding IsSearching}">
+        <!-- ZONE A: The Initiator (Top Bar) -->
+        <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1" Padding="16">
+            <StackPanel Spacing="16">
+                <!-- Search Input Row -->
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                    <!-- Search Box -->
+                    <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Padding="4">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <ProgressBar Grid.Column="0" 
-                                         IsIndeterminate="True" 
-                                         Width="16" 
-                                         Height="16"
-                                         Foreground="#4CAF50"/>
-                            <TextBlock Grid.Column="1" 
-                                       Text="{Binding StatusText}" 
-                                       Foreground="White" 
-                                       FontSize="12"
-                                       VerticalAlignment="Center"
-                                       Margin="12,0"/>
-                            <TextBlock Grid.Column="2"
-                                       Text="{Binding SearchResults.Count, StringFormat='{}{0} results'}"
-                                       Foreground="#A0A0A0"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"/>
-                        </Grid>
-                    </Border>
-                </StackPanel>
-            </Border>
-
-            <!-- Results Area -->
-            <Grid Grid.Row="2">
-
-                <!-- Album Search Results -->
-                <ScrollViewer IsVisible="{Binding IsAlbumSearch}">
-                    <StackPanel Margin="24,0,24,24" IsVisible="True">
-                        <!-- Album Results Header -->
-                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding AlbumResults.Count, StringFormat='Found {0} albums'}" 
-                                       FontSize="18" 
-                                       FontWeight="SemiBold" 
-                                       Foreground="White"/>
-                        </Grid>
-
-                        <!-- Album Results Grid (Cards) -->
-                        <ItemsControl ItemsSource="{Binding AlbumResults}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <controls:AlbumCard DataContext="{Binding}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- Track Search Results (Virtualization Fix: Removed outer ScrollViewer) -->
-                <Grid Grid.Row="2" RowDefinitions="Auto,*" IsVisible="{Binding !IsAlbumSearch}">
-                    
-                    <StackPanel Grid.Row="0" Margin="24,0,24,16" IsVisible="True">
-                    
-                        <!-- Instant Filter HUD -->
-                        <Border Margin="0,0,0,16" Background="#2D2D2D" CornerRadius="8" Padding="16,12">
-                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-                                    <PathIcon Data="{StaticResource icons_filter}" Width="16" Height="16" Foreground="#A0A0A0"/>
-                                    <TextBlock Text="Filters:" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    <CheckBox Content="MP3" IsChecked="{Binding FilterViewModel.FilterMp3, Mode=TwoWay}" Margin="0,0,12,0"/>
-                                    <CheckBox Content="FLAC" IsChecked="{Binding FilterViewModel.FilterFlac, Mode=TwoWay}" Margin="0,0,12,0"/>
-                                    <CheckBox Content="WAV" IsChecked="{Binding FilterViewModel.FilterWav, Mode=TwoWay}" Margin="0,0,12,0"/>
-                                    
-                                    <!-- Reliability Toggle -->
-                                    <CheckBox Content="High Reliability" 
-                                              IsChecked="{Binding FilterViewModel.UseHighReliability, Mode=TwoWay}"
-                                              ToolTip.Tip="Hide peers with long queues (>50)"/>
-                                    
-                                    <!-- Phase 12.6: Hide Suspects (Curation Quality) -->
-                                    <CheckBox Content="🚫 Hide Suspects" 
-                                              IsChecked="{Binding FilterViewModel.HideSuspects, Mode=TwoWay}"
-                                              ToolTip.Tip="Hide potential fakes/upscales (enabled by default)"/>
-                                </StackPanel>
-                                
-                                <!-- Hidden Count Badge -->
-                                <Border Grid.Column="1" HorizontalAlignment="Left" Margin="24,0,0,0" 
-                                        Background="#3E3E3E" CornerRadius="10" Padding="8,2"
-                                        IsVisible="{Binding !!HiddenResultsCount}">
-                                    <TextBlock Text="{Binding HiddenResultsCount, StringFormat='{}{0} results hidden'}"
-                                               FontSize="11" Foreground="#A0A0A0"/>
-                                </Border>
-
-                                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                                    <TextBlock Text="Min Quality:" VerticalAlignment="Center" Foreground="#A0A0A0"/>
-                                    <Slider Value="{Binding FilterViewModel.MinBitrate}" Minimum="0" Maximum="3000" Width="150" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding FilterViewModel.MinBitrate, StringFormat='{}{0} kbps'}" Width="60" VerticalAlignment="Center" Foreground="#CCFFFFFF"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <!-- Results Header -->
-                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
-                                <TextBlock Text="{Binding SearchResults.Count, StringFormat='Found {0} tracks'}" 
-                                           FontSize="18" FontWeight="SemiBold" Foreground="White"/>
-                                <Border Background="#0078D4" CornerRadius="12" Padding="8,4" IsVisible="{Binding !!SelectedTrackCount}">
-                                    <TextBlock Text="{Binding SelectedTrackCount, StringFormat='{}{0} selected'}" 
-                                               FontSize="12" Foreground="White" FontWeight="SemiBold"/>
-                                </Border>
-                            </StackPanel>
-                            <Button Grid.Column="1" Classes="primary" Command="{Binding AddToDownloadsCommand}"
-                                    IsEnabled="{Binding !!SelectedTrackCount}" Padding="16,10">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="⬇️" FontSize="14"/>
-                                    <TextBlock Text="Add To Downloads" FontSize="13" FontWeight="SemiBold"/>
-                                </StackPanel>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#888"/>
+                            <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Watermark="Search for tracks, artists..."
+                                     Background="Transparent" BorderThickness="0"
+                                     FontSize="16" VerticalContentAlignment="Center" Margin="4,0"/>
+                            <Button Command="{Binding ClearSearchCommand}" Background="Transparent" BorderThickness="0" 
+                                    IsVisible="{Binding CanSearch}" Margin="0,0,4,0">
+                                <TextBlock Text="✕" Foreground="#888"/>
                             </Button>
                         </Grid>
-
-                    </StackPanel>
-
-                    <!-- Results DataGrid (Now in '*' row to allow internal scrolling/virtualization) -->
-                    <DataGrid Grid.Row="1" 
-                              x:Name="ResultsGrid"
-                              ItemsSource="{Binding SearchResults}"
-                              AutoGenerateColumns="False"
-                              Background="Transparent"
-                              BorderThickness="0"
-                              GridLinesVisibility="Horizontal"
-                              RowBackground="Transparent"
-                              Foreground="#DDD"
-                              HeadersVisibility="Column"
-                              CanUserReorderColumns="False"
-                              CanUserResizeColumns="True"
-                              CanUserSortColumns="True"
-                              IsReadOnly="True"
-                              SelectionMode="Extended"
-                              Margin="24,0,24,0">
-                              
-                        <DataGrid.Styles>
-                            <Style Selector="DataGridRow:pointerover">
-                                <Setter Property="Background" Value="#1AFFFFFF"/>
-                            </Style>
-                            <Style Selector="DataGridRow:selected">
-                                <Setter Property="Background" Value="#2A0078D4"/>
-                            </Style>
-                            <!-- Phase 12.6: Golden Match highlighting (top 5%) -->
-                            <Style Selector="DataGridRow.golden">
-                                <Setter Property="Background" Value="#1AFFD700"/>
-                                <Setter Property="BorderBrush" Value="#FFD700"/>
-                                <Setter Property="BorderThickness" Value="0,0,0,2"/>
-                            </Style>
-                        </DataGrid.Styles>
-                        
-                        <!-- Context Menu -->
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Download Selected" Command="{Binding DownloadSelectedCommand}">
-                                    <MenuItem.Icon>
-                                        <TextBlock Text="⬇️"/>
-                                    </MenuItem.Icon>
-                                </MenuItem>
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-
-                        <DataGrid.Columns>
-                            <!-- Phase 12.6: Integrity Badge Column -->
-                            <DataGridTemplateColumn Header="" Width="40">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding IntegrityBadge}" 
-                                                   HorizontalAlignment="Center" 
-                                                   VerticalAlignment="Center"
-                                                   FontSize="14"
-                                                   ToolTip.Tip="{Binding IntegrityTooltip}"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            
-                            <!-- Status Column -->
-                            <DataGridTextColumn Header="Status" Binding="{Binding StatusIcon}" Width="60"/>
-                            
-                            <!-- Phase 12.6: Rank Column with Percentile indicator -->
-                            <DataGridTemplateColumn Header="Rank" Width="70">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{Binding RowBackground}" 
-                                                CornerRadius="4" 
-                                                Padding="4,2"
-                                                Opacity="{Binding HeatMapOpacity}">
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <TextBlock Text="{Binding CurrentRank, StringFormat='{}{0:F1}'}" 
-                                                           HorizontalAlignment="Center" 
-                                                           VerticalAlignment="Center"
-                                                           ToolTip.Tip="{Binding ScoreBreakdown}"/>
-                                                <TextBlock Text="🔥" IsVisible="{Binding IsGoldenMatch}" FontSize="12" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            
-                            <!-- Phase 12.6: Two-Line Track Info Column -->
-                            <DataGridTemplateColumn Header="Track" Width="*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Spacing="2" Margin="8,4" Opacity="{Binding HeatMapOpacity}">
-                                            <!-- Line 1: Artist - Title -->
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{Binding PrimaryDisplay}" 
-                                                           FontWeight="SemiBold" 
-                                                           FontSize="13"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="✓" 
-                                                           Foreground="#4CAF50" 
-                                                           FontWeight="Bold" 
-                                                           IsVisible="{Binding HasFreeUploadSlot}"
-                                                           ToolTip.Tip="Free upload slot available"/>
-                                            </StackPanel>
-                                            <!-- Line 2: Technical Metadata -->
-                                            <TextBlock Text="{Binding TechnicalMetadata}" 
-                                                       FontSize="11" 
-                                                       Foreground="#808080" 
-                                                       FontFamily="Consolas, Courier New, monospace"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <!-- Empty State (Overlay) -->
-                    <Border Grid.Row="1" Background="#252526" CornerRadius="8" Padding="48,32" IsVisible="{Binding !SearchResults.Count}" Margin="24,24,24,0" VerticalAlignment="Top">
-                        <StackPanel HorizontalAlignment="Center" Spacing="16">
-                            <TextBlock Text="🔍" FontSize="48" HorizontalAlignment="Center"/>
-                            <TextBlock Text="No results yet" FontSize="18" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Try searching for a track, artist, or album" FontSize="13" Foreground="#A0A0A0" HorizontalAlignment="Center"/>
-                        </StackPanel>
                     </Border>
-                </Grid>
-            </Grid>
-
-            <!-- Bottom Action Bar -->
-            <Grid Grid.Row="3" Background="#252526">
-                <!-- Status Bar -->
-                <Border BorderBrush="#3E3E3E" BorderThickness="0,1,0,0" Padding="24,12">
-                     <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Text="{Binding StatusText}" Foreground="#A0A0A0" FontSize="12" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="{Binding SearchResults.Count, StringFormat='Total: {0} tracks'}" Foreground="#A0A0A0" FontSize="12" VerticalAlignment="Center"/>
+                    
+                    <!-- CSV/Paste Buttons -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0" Spacing="8">
+                        <Button Command="{Binding BrowseCsvCommand}" Classes="secondary" ToolTip.Tip="Import CSV">
+                            <TextBlock Text="📂 CSV"/>
+                        </Button>
+                        <Button Command="{Binding PasteTracklistCommand}" Classes="secondary" ToolTip.Tip="Paste Tracklist">
+                            <TextBlock Text="📋 Paste"/>
+                        </Button>
+                    </StackPanel>
+                    
+                    <!-- Search Button -->
+                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="primary" Margin="12,0,0,0" Padding="20,0" Height="40">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="SEARCH"/>
+                            <TextBlock Text="➡️"/>
                         </StackPanel>
-                    </Grid>
-                </Border>
+                    </Button>
+                </Grid>
                 
-                <!-- Floating Action Bar (FAB) - Slide Up Animation would be ideal, toggled by visibility for now -->
-                <Border Background="#2A0078D4" Padding="24,12" IsVisible="{Binding !!SelectedResults.Count}">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                           <TextBlock Text="{Binding SelectedResults.Count, StringFormat='{}{0} selected'}" 
-                                      Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
-                       </StackPanel>
-                       
-                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12">
-                           <Button Classes="primary" Command="{Binding DownloadSelectedCommand}" Padding="24,8">
-                               <StackPanel Orientation="Horizontal" Spacing="8">
-                                   <TextBlock Text="⬇️"/>
-                                   <TextBlock Text="Download All"/>
-                               </StackPanel>
-                           </Button>
-                       </StackPanel>
-                    </Grid>
-                </Border>
-            </Grid>
+                <!-- Presets Row -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="Presets:" VerticalAlignment="Center" Foreground="#888" FontWeight="SemiBold"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Deep Dive" Classes="pill" Content="🌊 Deep Dive" ToolTip.Tip="Match Priority, low bitrate threshold"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Quick Grab" Classes="pill" Content="⚡ Quick Grab" ToolTip.Tip="Reliability &amp; Speed Priority"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="High Fidelity" Classes="pill" Content="💎 High Fidelity" ToolTip.Tip="Strict Quality, FLAC only"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Balanced" Classes="pill" Content="⚖️ Balanced" ToolTip.Tip="Reset to defaults"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+        
+        <!-- ZONE B: The Brain (Sidebar) -->
+        <Border DockPanel.Dock="Left" Width="280" Background="#222" BorderBrush="#3E3E3E" BorderThickness="0,0,1,0" Padding="16">
+            <StackPanel Spacing="24">
+                <TextBlock Text="Ranking Logic" FontSize="18" FontWeight="Bold" Foreground="#DDD"/>
+                
+                <!-- Bitrate Weight -->
+                <StackPanel Spacing="8">
+                     <Grid ColumnDefinitions="*,Auto">
+                         <TextBlock Text="Bitrate (Quality)" Foreground="#AAA"/>
+                         <TextBlock Text="{Binding BitrateWeight, StringFormat='x{0:F1}'}" Foreground="#4EC9B0"/>
+                     </Grid>
+                     <Slider Value="{Binding BitrateWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                </StackPanel>
+                
+                <!-- Reliability Weight -->
+                <StackPanel Spacing="8">
+                     <Grid ColumnDefinitions="*,Auto">
+                         <TextBlock Text="Reliability (Slots)" Foreground="#AAA"/>
+                         <TextBlock Text="{Binding ReliabilityWeight, StringFormat='x{0:F1}'}" Foreground="#007ACC"/>
+                     </Grid>
+                     <Slider Value="{Binding ReliabilityWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                </StackPanel>
+                
+                <!-- Match Weight -->
+                <StackPanel Spacing="8">
+                     <Grid ColumnDefinitions="*,Auto">
+                         <TextBlock Text="Match Accuracy" Foreground="#AAA"/>
+                         <TextBlock Text="{Binding MatchWeight, StringFormat='x{0:F1}'}" Foreground="#DCDCAA"/>
+                     </Grid>
+                     <Slider Value="{Binding MatchWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                </StackPanel>
+                
+                <Separator Background="#333" Height="1"/>
+                
+                <!-- Stats / Debug -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Status" FontWeight="SemiBold" Foreground="#888"/>
+                    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Foreground="White"/>
+                    <TextBlock Text="{Binding SearchResults.Count, StringFormat='Visible: {0}'}" Foreground="#888"/>
+                    <TextBlock Text="{Binding HiddenResultsCount, StringFormat='Hidden: {0}'}" Foreground="#666" FontSize="11"/>
+                </StackPanel>
+                
+            </StackPanel>
+        </Border>
+        
+        <!-- ZONE C: Gatekeeper & Results (Main Content) -->
+        <Grid RowDefinitions="Auto,*">
+            
+            <!-- Filters & Toggles -->
+            <Border Grid.Row="0" Background="#1E1E1E" Padding="16,12" BorderBrush="#333" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <!-- Format Toggles -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Formats:" VerticalAlignment="Center" Foreground="#888" Margin="0,0,8,0"/>
+                        <ToggleButton IsChecked="{Binding IsMp3Enabled}" Content="MP3" CornerRadius="4"/>
+                        <ToggleButton IsChecked="{Binding IsFlacEnabled}" Content="FLAC" CornerRadius="4"/>
+                        <ToggleButton IsChecked="{Binding IsWavEnabled}" Content="WAV" CornerRadius="4"/>
+                    </StackPanel>
+                    
+                    <!-- Safety Toggle -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16">
+                         <ToggleSwitch IsChecked="{Binding FilterViewModel.HideSuspects}" OnContent="Safety On" OffContent="Safety Off" ToolTip.Tip="Filter out potential fake/upscaled files"/>
+                         
+                         <!-- Add to Downloads Button -->
+                         <Button Command="{Binding AddToDownloadsCommand}" IsEnabled="{Binding !!SelectedTrackCount}" Classes="primary" Padding="16,6">
+                             <StackPanel Orientation="Horizontal" Spacing="6">
+                                 <TextBlock Text="⬇️"/>
+                                 <TextBlock Text="{Binding SelectedTrackCount, StringFormat='Download ({0})'}" />
+                             </StackPanel>
+                         </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            
+            <!-- Results DataGrid -->
+            <DataGrid Grid.Row="1" ItemsSource="{Binding SearchResults}"
+                      AutoGenerateColumns="False" SelectionMode="Extended"
+                      GridLinesVisibility="Horizontal" Background="Transparent" RowBackground="Transparent"
+                      CanUserSortColumns="True" HeadersVisibility="Column"
+                      Margin="16,0">
+                
+                <DataGrid.Styles>
+                     <Style Selector="DataGridRow.golden">
+                        <Setter Property="Background" Value="#1AFFD700"/>
+                        <Setter Property="BorderBrush" Value="#FFD700"/>
+                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                    </Style>
+                </DataGrid.Styles>
+                
+                <DataGrid.Columns>
+                    <!-- Integrity -->
+                    <DataGridTemplateColumn Header=" " Width="30">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding IntegrityBadge}" ToolTip.Tip="{Binding IntegrityTooltip}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- Rank -->
+                    <DataGridTemplateColumn Header="Rank" Width="60" SortMemberPath="CurrentRank">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding RowBackground}" CornerRadius="4" Padding="4,2" HorizontalAlignment="Center" ToolTip.Tip="{Binding ScoreBreakdown}">
+                                    <TextBlock Text="{Binding CurrentRank, StringFormat='{}{0:F1}'}" FontWeight="Bold"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- Track Details (Multi-line) -->
+                    <DataGridTemplateColumn Header="Track Details" Width="*" SortMemberPath="Title">
+                         <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="4" Opacity="{Binding HeatMapOpacity}">
+                                    <TextBlock Text="{Binding PrimaryDisplay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                         <TextBlock Text="{Binding FileFormat}" Foreground="#4EC9B0" FontSize="11"/>
+                                         <TextBlock Text="{Binding Bitrate, StringFormat='{}{0}kbps'}" Foreground="#AAA" FontSize="11"/>
+                                         <TextBlock Text="•" Foreground="#444"/>
+                                         <TextBlock Text="{Binding Size, Converter={x:Static models:SizeConverter.Instance}}" Foreground="#888" FontSize="11"/>
+                                         <TextBlock Text="•" Foreground="#444"/>
+                                         <TextBlock Text="{Binding Username}" Foreground="#007ACC" FontSize="11"/>
+                                         <TextBlock Text="✓" Foreground="Green" IsVisible="{Binding HasFreeUploadSlot}" FontSize="11"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                         </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    
+                    <!-- Status -->
+                    <DataGridTextColumn Header="Status" Binding="{Binding StatusIcon}" Width="50"/>
+                    
+                </DataGrid.Columns>
+                
+                 <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Download Selected" Command="{Binding DownloadSelectedCommand}"/>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+            </DataGrid>
+            
+            <!-- Empty State -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsVisible="{Binding !SearchResults.Count}">
+                 <TextBlock Text="Waiting for Signal..." Foreground="#444" FontSize="24" HorizontalAlignment="Center"/>
+                 <TextBlock Text="Use the controls to initiate a search" Foreground="#333" HorizontalAlignment="Center"/>
+            </StackPanel>
+            
         </Grid>
         
-        <!-- Note: ImportPreviewPage is now shown via NavigationService.NavigateTo("ImportPreview") in ImportOrchestrator -->
-        <!-- Removed embedded overlay to fix dual-overlay bug (Dec 21, 2024) -->
-        
-    </Grid>
+    </DockPanel>
+    
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Background" Value="#333"/>
+            <Setter Property="Foreground" Value="#DDD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Background" Value="#444"/>
+            <Setter Property="BorderBrush" Value="#666"/>
+        </Style>
+         <Style Selector="ToggleButton">
+            <Setter Property="Background" Value="#333"/>
+            <Setter Property="Foreground" Value="#AAA"/>
+             <Setter Property="Padding" Value="12,6"/>
+        </Style>
+        <Style Selector="ToggleButton:checked">
+             <Setter Property="Background" Value="#0078D4"/>
+             <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </UserControl.Styles>
 </UserControl>
