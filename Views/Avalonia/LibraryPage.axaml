@@ -176,14 +176,18 @@
             <Border Grid.Row="0" Background="#252526" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1" Padding="20,16">
                 <Grid ColumnDefinitions="*,Auto">
                     <!-- Left: Search and Filters -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16">
+                    <!-- Left: Search and Filters -->
+                    <Grid Grid.Column="0" ColumnDefinitions="*,Auto">
                         <!-- Modern Search Box -->
-                        <Border Background="#2D2D2D" 
+                        <Border Grid.Column="0"
+                                Background="#2D2D2D" 
                                 BorderBrush="#3E3E3E" 
                                 BorderThickness="1"
                                 CornerRadius="8"
                                 Padding="12,0"
-                                Width="300">
+                                HorizontalAlignment="Stretch"
+                                MaxWidth="600"
+                                Margin="0,0,16,0">
                             <Grid ColumnDefinitions="Auto,*">
                                 <TextBlock Grid.Column="0" 
                                           Text="🔍" 
@@ -202,7 +206,7 @@
                         </Border>
                         
                         <!-- Chip-style Filters -->
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                             <ToggleButton Content="All" 
                                          IsChecked="{Binding Tracks.IsFilterAll, Mode=TwoWay}"
                                          Classes="chip"
@@ -216,7 +220,7 @@
                                          Classes="chip"
                                          Padding="16,8"/>
                         </StackPanel>
-                    </StackPanel>
+                    </Grid>
                     
                     <!-- Right: Icon Actions -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">

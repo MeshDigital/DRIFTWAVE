@@ -42,7 +42,7 @@
                     </StackPanel>
                     
                     <!-- Search Button -->
-                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="primary" Margin="12,0,0,0" Padding="20,0" Height="40">
+                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="secondary" Margin="12,0,0,0" Padding="20,0" Height="40">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="SEARCH"/>
                             <TextBlock Text="➡️"/>
