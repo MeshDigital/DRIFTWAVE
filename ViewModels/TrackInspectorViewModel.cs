@@ -170,7 +170,9 @@ namespace SLSKDONET.ViewModels
                 try
                 {
                     _eventBus.Publish(new SLSKDONET.Models.AnalysisProgressEvent(
-                        Track.TrackUniqueHash, 0, "Initializing re-fetch search..."));
+                        TrackGlobalId: Track.TrackUniqueHash, 
+                        CurrentStep: "Initializing re-fetch search...", 
+                        ProgressPercent: 0));
                     
                     // Trigger discovery and queueing
                     await _discoveryService.DiscoverAndQueueTrackAsync(Track);
@@ -179,7 +181,9 @@ namespace SLSKDONET.ViewModels
                 {
                     _logger?.LogError(ex, "Re-fetch upgrade failed");
                     _eventBus.Publish(new SLSKDONET.Models.AnalysisProgressEvent(
-                        Track.TrackUniqueHash, 0, $"Re-fetch failed: {ex.Message}"));
+                        TrackGlobalId: Track.TrackUniqueHash, 
+                        CurrentStep: $"Re-fetch failed: {ex.Message}", 
+                        ProgressPercent: 0));
                 }
             });
         }

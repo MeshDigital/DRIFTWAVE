@@ -160,6 +160,7 @@ public record AnalysisRequest(string FilePath, string TrackHash);
 
 public class AnalysisWorker : BackgroundService
 {
+    private readonly AnalysisQueueService _queue;
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisWorker> _logger;
@@ -289,7 +290,7 @@ public class AnalysisWorker : BackgroundService
                     if (techResult != null)
                     {
                         libraryEntry.Bitrate = techResult.Bitrate;
-                        libraryEntry.Integrity = techResult.IsUpscaled ? IntegrityLevel.Upscaled : IntegrityLevel.Clean;
+                        libraryEntry.Integrity = techResult.IsUpscaled ? IntegrityLevel.Suspicious : IntegrityLevel.Verified;
                     }
                 }
 

@@ -56,3 +56,18 @@
 
 - **Dependencies**: No new NuGet packages added.
 - **Database**: No schema changes required (uses existing indices).
+## [0.1.0-alpha.6] - Unified UI & Build Stability
+
+### New Features
+* **Unified Command Bar**: A single, sleek top bar replaces the split top/bottom layout.
+  * **Global Activity Indicator**: Centralized spinner for all background tasks.
+  * **Status & Telemetry**: Combined download, upload, and analysis stats in one view.
+  * **Optimized Layout**: Increased vertical space for the main library view.
+* **Flexible Player**: Added "Dock to Bottom" vs "Sidebar" toggle (Internal logic ready).
+
+### Fixes & Stability
+* **Build Restoration**: Resolved 13+ compilation errors to restore `net9.0` build.
+  * Fixed `IntegrityLevel` enum mismatches (Suspicious/Verified).
+  * Fixed `AnalysisProgressEvent` type conversion errors.
+  * Fixed missing fields in `AnalysisWorker` (`_queue`) and `DownloadDiscoveryService` (`_logger`).
+* **Search Diagnostics**: Added `SearchScore` to `SearchAttemptLog` for better debugging.

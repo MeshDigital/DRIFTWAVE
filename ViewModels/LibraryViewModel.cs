@@ -140,6 +140,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand DownloadAlbumCommand { get; }
     public System.Windows.Input.ICommand ExportMonthlyDropCommand { get; }
     public System.Windows.Input.ICommand FindHarmonicMatchesCommand { get; }
+    public System.Windows.Input.ICommand ToggleMixHelperCommand { get; } // NEW
     public System.Windows.Input.ICommand ToggleInspectorCommand { get; } // Slide-in Inspector
     public System.Windows.Input.ICommand CloseInspectorCommand { get; } // NEW
     public System.Windows.Input.ICommand AnalyzeAlbumCommand { get; } // Queue album for analysis

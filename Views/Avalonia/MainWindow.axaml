@@ -294,7 +294,7 @@
         </Grid>
 
         <!-- Login Overlay -->
-        <Grid Grid.RowSpan="2" 
+        <Grid Grid.RowSpan="3" 
               Background="#DD000000" 
               IsVisible="{Binding ConnectionViewModel.IsLoginOverlayVisible}" 
               ZIndex="1000">
@@ -381,8 +381,6 @@
                       but for now we'll host the same control or a variant. -->
                  <views:PlayerControl DataContext="{Binding PlayerViewModel}"/>
              </Grid>
-        </Border>
-
         </Border>
     </Grid>
 </Window>

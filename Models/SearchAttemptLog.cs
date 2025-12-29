@@ -11,6 +11,10 @@ public class SearchAttemptLog
     public int RejectedByQuality { get; set; }
     public int RejectedByFormat { get; set; }
     public int RejectedByBlacklist { get; set; }
+    
+    // Fix: Added SearchScore to resolve build error in DownloadDiscoveryService
+    public double SearchScore { get; set; }
+    
     public DateTime AttemptedAt { get; set; } = DateTime.UtcNow;
     
     /// <summary>

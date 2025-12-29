@@ -138,6 +138,10 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     }
     
     public string? Genres => GenresDisplay;
+    public int Popularity => Model.Popularity ?? 0;
+    public string? Duration => DurationDisplay;
+    public string? Bitrate => Model.Bitrate?.ToString() ?? Model.BitrateScore?.ToString() ?? "—";
+    public string? Status => StatusText;
 
     public WaveformAnalysisData WaveformData => new WaveformAnalysisData 
     { 

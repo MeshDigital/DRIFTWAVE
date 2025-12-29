@@ -16,6 +16,9 @@ namespace SLSKDONET.Services;
 /// </summary>
 public class DownloadDiscoveryService
 {
+    private readonly ILogger<DownloadDiscoveryService> _logger;
+    private readonly SearchOrchestrationService _searchOrchestrator;
+    private readonly SearchResultMatcher _matcher;
     private readonly AppConfig _config;
     private readonly IEventBus _eventBus;
     private readonly TrackForensicLogger _forensicLogger;
