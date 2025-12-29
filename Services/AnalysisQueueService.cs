@@ -198,11 +198,12 @@ public class AnalysisWorker : BackgroundService
                 var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
                 var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
                 
-                var dbContext = new AppDbContext();
+                // FIX: Dispose DbContext properly to prevent connection leaks
+                using var dbContext = new AppDbContext();
 
-                _logger.LogInformation("🧠 Starting Unified Analysis for: {Hash}", trackHash);
+                _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
                 
-                // Enhancement #4: Stuck File Watchdog - 60s timeout for full suite
+                // Enhancement: Stuck File Watchdog - 60s timeout (standardized)
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
                 
@@ -299,8 +300,8 @@ public class AnalysisWorker : BackgroundService
             catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {
                 // Timeout occurred (not app shutdown)
-                _logger.LogError("⏱ Track analysis timed out after 45s - skipping: {Hash}", trackHash);
-                errorMessage = "Analysis timed out (45s)";
+                _logger.LogError("⏱ Track analysis timed out after 60s - skipping: {Hash}", trackHash);
+                errorMessage = "Analysis timed out (60s)";
             }
             catch (Exception ex)
             {

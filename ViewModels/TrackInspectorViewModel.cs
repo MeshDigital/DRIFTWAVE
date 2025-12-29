@@ -16,6 +16,7 @@ namespace SLSKDONET.ViewModels
     public class TrackInspectorViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly Services.IAudioAnalysisService _audioAnalysisService;
+        private readonly Services.AnalysisQueueService _analysisQueue;
         private readonly Services.IEventBus _eventBus;
         private readonly Services.DownloadDiscoveryService _discoveryService;
         private readonly ILogger<TrackInspectorViewModel> _logger;
@@ -34,8 +35,16 @@ namespace SLSKDONET.ViewModels
         public AnalysisProgressViewModel? ProgressModal
         {
             get => _progressModal;
-            set => SetProperty(ref _progressModal, value);
+            set 
+            {
+                if (SetProperty(ref _progressModal, value))
+                {
+                    OnPropertyChanged(nameof(IsProgressModalVisible));
+                }
+            }
         }
+
+        public bool IsProgressModalVisible => ProgressModal != null;
 
         // Phase 3: Interactive Commands
         public System.Windows.Input.ICommand ForceReAnalyzeCommand { get; }
@@ -44,11 +53,13 @@ namespace SLSKDONET.ViewModels
 
         public TrackInspectorViewModel(
             Services.IAudioAnalysisService audioAnalysisService, 
+            Services.AnalysisQueueService analysisQueue,
             Services.IEventBus eventBus,
             Services.DownloadDiscoveryService discoveryService,
             ILogger<TrackInspectorViewModel> logger)
         {
             _audioAnalysisService = audioAnalysisService;
+            _analysisQueue = analysisQueue;
             _eventBus = eventBus;
             _discoveryService = discoveryService;
             _logger = logger;
@@ -83,18 +94,19 @@ namespace SLSKDONET.ViewModels
                         ProgressModal?.Dispose();
                         ProgressModal = null;
                         IsAnalyzing = false;
+                        OnPropertyChanged(nameof(IsProgressModalVisible));
                     }
                 })
                 .DisposeWith(_disposables);
             
-            // Phase 3: Interactive Commands
+            // Interactive Commands
             ForceReAnalyzeCommand = ReactiveCommand.CreateFromTask(async () =>
             {
                 if (Track == null || string.IsNullOrEmpty(Track.TrackUniqueHash)) return;
                 
                 try
                 {
-                    // Delete existing analysis from database
+                    // 1. Delete existing analysis from database
                     using var db = new Data.AppDbContext();
                     var existing = await db.AudioAnalysis
                         .FirstOrDefaultAsync(a => a.TrackUniqueHash == Track.TrackUniqueHash);
@@ -103,19 +115,28 @@ namespace SLSKDONET.ViewModels
                         db.AudioAnalysis.Remove(existing);
                         await db.SaveChangesAsync();
                     }
-                    
-                    // Clear current analysis
+                    // 2. Clear current analysis in UI
                     _analysis = null;
                     NotifyAnalysisProperties();
                     
-                    // Re-queue for analysis (assuming there's a service to queue)
-                    // You'll need to inject AnalysisQueueService or similar
-                    // For now, just trigger a reload which will find it missing
-                    LoadAnalysisAsync(Track.TrackUniqueHash);
+                    // 3. Re-queue for analysis
+                    if (!string.IsNullOrEmpty(Track.ResolvedFilePath))
+                    {
+                        IsAnalyzing = true;
+                        ProgressModal = new AnalysisProgressViewModel(Track.TrackUniqueHash, _eventBus);
+                        OnPropertyChanged(nameof(IsProgressModalVisible));
+                        
+                        _analysisQueue.QueueAnalysis(Track.ResolvedFilePath, Track.TrackUniqueHash);
+                    }
+                    else
+                    {
+                        // Fallback if no file path
+                        LoadAnalysisAsync(Track.TrackUniqueHash);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Re-analyze failed: {ex.Message}");
+                    _logger?.LogError(ex, "Re-analyze failed");
                 }
             });
             

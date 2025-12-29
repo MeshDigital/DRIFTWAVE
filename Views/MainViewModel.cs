@@ -225,6 +225,7 @@ public class MainViewModel : INotifyPropertyChanged
         _navigationService.RegisterPage("ImportPreview", typeof(Avalonia.ImportPreviewPage));
         _navigationService.RegisterPage("UpgradeScout", typeof(Avalonia.UpgradeScoutView));
         _navigationService.RegisterPage("Inspector", typeof(Avalonia.InspectorPage));
+        _navigationService.RegisterPage("AnalysisQueue", typeof(Avalonia.AnalysisQueuePage));
         
         // Subscribe to navigation events
         _navigationService.Navigated += OnNavigated;
@@ -558,9 +559,13 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void NavigateAnalysisQueue()
     {
-        CurrentPage = AnalysisQueueViewModel;
-        // Keeping CurrentPageType consistent if needed for binding
-        CurrentPageType = PageType.Inspector; 
+        // FIX: Use NavigationService to ensure View is loaded
+        _navigationService.NavigateTo("AnalysisQueue");
+        
+        if (CurrentPage is Avalonia.AnalysisQueuePage page)
+        {
+             page.DataContext = AnalysisQueueViewModel;
+        }
     }
 
     private void NavigateToImport()

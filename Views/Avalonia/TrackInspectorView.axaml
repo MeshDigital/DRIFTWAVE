@@ -233,7 +233,7 @@
         </ScrollViewer>
 
         <!-- Empty State -->
-        <StackPanel Grid.Row="1" VerticalAlignment="Center" IsVisible="{Binding !HasTrack}">
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" IsVisible="{Binding HasTrack, Converter={StaticResource BoolInverseConverter}}">
             <TextBlock Text="🔍" FontSize="48" HorizontalAlignment="Center"/>
             <TextBlock Text="Select a track to inspect" FontSize="16" Foreground="#666" HorizontalAlignment="Center" Margin="0,16,0,0"/>
         </StackPanel>
@@ -241,7 +241,7 @@
         <!-- Progress Modal Overlay -->
         <ContentControl Grid.Row="0" Grid.RowSpan="2"
                         Content="{Binding ProgressModal}"
-                        IsVisible="{Binding !!ProgressModal}">
+                        IsVisible="{Binding IsProgressModalVisible}">
             <ContentControl.ContentTemplate>
                 <DataTemplate>
                     <controls:AnalysisProgressModal/>

@@ -1,4 +1,25 @@
-# Recent Changes - December 28, 2025 (Evening Session)
+# Recent Changes
+
+## [0.1.0-alpha.5] - Analysis & Inspector Update
+
+### New Features
+* **Analysis Queue Dashboard**: New page to monitor background audio analysis tasks.
+  * View pending vs. processed track counts.
+  * Pause/Resume analysis to save CPU usage during gaming.
+  * "Stuck File" watchdog automatically skips files that take longer than 60s.
+* **Track Inspector Enhancements**:
+  * **Re-fetch / Upgrade**: New button to force re-analysis of a track.
+  * **Forensic Logs**: View detailed logs of why a download was rejected or modified.
+* **Download Manager**:
+  * **Smart Deduplication**: Improved logic to prevent duplicate queue items.
+
+### Fixes
+* **Memory Leak**: Fixed DbContext leak in background analysis worker.
+* **Navigation**: Fixed Analysis Queue page not appearing when clicked.
+* **UI**: Fixed visibility issues in Track Inspector empty state.
+* **Performance**: Download queue now uses dictionary lookups for faster deduplication.
+
+ - December 28, 2025 (Evening Session)
 
 ## 🚀 Major Features
 
