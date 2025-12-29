@@ -14,6 +14,7 @@
         <!-- Like/Heart Converters -->
         <converters:BoolToHeartConverter x:Key="BoolToHeartConverter"/>
         <converters:BoolToHeartColorConverter x:Key="BoolToHeartColorConverter"/>
+        <converters:ActiveColorConverter x:Key="ActiveColorConverter"/>
         
         <!-- Boolean State Converters -->
         <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>

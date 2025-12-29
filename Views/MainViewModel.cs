@@ -318,6 +318,7 @@ public class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(HasActiveAnalysis));
                 OnPropertyChanged(nameof(AnalysisETA));
                 OnPropertyChanged(nameof(HasETA));
+                OnPropertyChanged(nameof(IsGlobalActivityActive)); // Notify unified activity
             }
         }
     }
@@ -414,7 +415,19 @@ public class MainViewModel : INotifyPropertyChanged
     public bool IsInitializing
     {
         get => _isInitializing;
-        set => SetProperty(ref _isInitializing, value);
+        set 
+        {
+            if (SetProperty(ref _isInitializing, value))
+            {
+                OnPropertyChanged(nameof(IsGlobalActivityActive));
+            }
+        }
+    }
+    
+    // Computed property to drive the global activity spinner
+    public bool IsGlobalActivityActive 
+    {
+        get => (TodoCount > 0) || (AnalysisQueueCount > 0) || IsInitializing;
     }
 
     // Phase 7: Spotify Hub Properties
@@ -596,6 +609,8 @@ public class MainViewModel : INotifyPropertyChanged
     public int SuccessfulCount => AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Completed);
     public int FailedCount => AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Failed);
     public int TodoCount => AllGlobalTracks.Count(t => t.State == PlaylistTrackState.Pending);
+    
+    // In OnTrackUpdated, TodoCount changes will now also notify IsGlobalActivityActive
     public double DownloadProgressPercentage
     {
         get
@@ -617,6 +632,7 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(FailedCount));
             OnPropertyChanged(nameof(TodoCount));
             OnPropertyChanged(nameof(DownloadProgressPercentage));
+            OnPropertyChanged(nameof(IsGlobalActivityActive)); // Notify unified activity
         });
     }
 
