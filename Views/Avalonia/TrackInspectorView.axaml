@@ -17,7 +17,10 @@
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
             <TextBlock Text="Track Inspector" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Background="Transparent" Padding="4">
+            <Button Grid.Column="1" 
+                    Background="Transparent" 
+                    Padding="4"
+                    Command="{Binding $parent[UserControl;1].DataContext.CloseInspectorCommand}">
                 <TextBlock Text="✕" Foreground="#666"/>
             </Button>
         </Grid>
@@ -86,17 +89,29 @@
                             </Border>
                             
                             <!-- Analyzing Badge -->
-                            <Border Background="#448AFF33"
-                                    CornerRadius="8" 
-                                    Padding="12,6"
-                                    HorizontalAlignment="Left"
-                                    Margin="0,8,0,0"
-                                   IsVisible="{Binding IsAnalyzing}">
-                                <TextBlock Text="🔄 Analyzing..." 
-                                           Foreground="#448AFF" 
-                                           FontSize="12"
-                                           FontWeight="SemiBold"/>
-                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                <Border Background="#448AFF33"
+                                        CornerRadius="8" 
+                                        Padding="12,6"
+                                        HorizontalAlignment="Left"
+                                       IsVisible="{Binding IsAnalyzing}">
+                                    <TextBlock Text="🔄 Analyzing..." 
+                                               Foreground="#448AFF" 
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                </Border>
+                                
+                                <Button Command="{Binding ReFetchUpgradeCommand}"
+                                        Classes="accent"
+                                        Padding="12,6"
+                                        CornerRadius="8"
+                                        ToolTip.Tip="Search for better quality or replace missing file">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="🚀" FontSize="12"/>
+                                        <TextBlock Text="Re-fetch / Upgrade" FontSize="12" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
                 </Border>

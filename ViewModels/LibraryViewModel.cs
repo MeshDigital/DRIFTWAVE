@@ -140,8 +140,8 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand DownloadAlbumCommand { get; }
     public System.Windows.Input.ICommand ExportMonthlyDropCommand { get; }
     public System.Windows.Input.ICommand FindHarmonicMatchesCommand { get; }
-    public System.Windows.Input.ICommand ToggleMixHelperCommand { get; } // Phase 9: Toggle sidebar
     public System.Windows.Input.ICommand ToggleInspectorCommand { get; } // Slide-in Inspector
+    public System.Windows.Input.ICommand CloseInspectorCommand { get; } // NEW
     public System.Windows.Input.ICommand AnalyzeAlbumCommand { get; } // Queue album for analysis
 
     private bool _isInspectorOpen;
@@ -232,6 +232,7 @@ public class LibraryViewModel : INotifyPropertyChanged
                 IsInspectorOpen = !IsInspectorOpen;
             }
         });
+        CloseInspectorCommand = new RelayCommand<object>(_ => IsInspectorOpen = false); // NEW
         AnalyzeAlbumCommand = new AsyncRelayCommand<string>(ExecuteAnalyzeAlbumAsync);
         
         

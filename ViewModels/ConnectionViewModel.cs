@@ -82,6 +82,7 @@ public class ConnectionViewModel : INotifyPropertyChanged
 
     // Commands
     public ICommand LoginCommand { get; }
+    public ICommand ShowLoginCommand { get; }
     public ICommand DismissLoginCommand { get; }
     public ICommand DisconnectCommand { get; }
 
@@ -112,6 +113,7 @@ public class ConnectionViewModel : INotifyPropertyChanged
         IsLoginOverlayVisible = !_config.AutoConnectEnabled || string.IsNullOrEmpty(_config.Username);
 
         LoginCommand = new AsyncRelayCommand<string>(LoginAsync);
+        ShowLoginCommand = new RelayCommand(ShowLogin);
         DismissLoginCommand = new RelayCommand(DismissLogin);
         DisconnectCommand = new RelayCommand(Disconnect);
 
@@ -121,6 +123,7 @@ public class ConnectionViewModel : INotifyPropertyChanged
         {
             try
             {
+                bool wasConnected = IsConnected;
                 if (evt.IsConnected)
                 {
                     HandleStateChange("Connected");
@@ -128,6 +131,19 @@ public class ConnectionViewModel : INotifyPropertyChanged
                 else
                 {
                     HandleStateChange(evt.State);
+                    
+                    // Auto-reconnect logic (Phase 13.5)
+                    if (wasConnected && AutoConnectEnabled && !IsInitializing)
+                    {
+                        _logger.LogInformation("Soulseek connection lost. Auto-reconnect in 5s...");
+                        Task.Run(async () => {
+                            await Task.Delay(5000);
+                            if (!IsConnected && AutoConnectEnabled)
+                            {
+                                await AttemptAutoConnect();
+                            }
+                        });
+                    }
                 }
             }
             catch (Exception ex)
@@ -266,6 +282,11 @@ public class ConnectionViewModel : INotifyPropertyChanged
         {
             Dispatcher.UIThread.Post(() => IsInitializing = false);
         }
+    }
+
+    private void ShowLogin()
+    {
+        IsLoginOverlayVisible = true;
     }
 
     private void DismissLogin()

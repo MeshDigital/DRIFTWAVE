@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using SLSKDONET.Data; // For AppDbContext
 using SLSKDONET.Models; // For Events
+using Microsoft.EntityFrameworkCore;
 
 namespace SLSKDONET.Services;
 
@@ -159,14 +160,15 @@ public record AnalysisRequest(string FilePath, string TrackHash);
 
 public class AnalysisWorker : BackgroundService
 {
-    private readonly AnalysisQueueService _queue;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisWorker> _logger;
 
-    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, ILogger<AnalysisWorker> logger)
+    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger)
     {
         _queue = queue;
         _serviceProvider = serviceProvider;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -192,31 +194,107 @@ public class AnalysisWorker : BackgroundService
                 _queue.NotifyProcessingStarted(trackHash, request.FilePath);
 
                 using var scope = _serviceProvider.CreateScope();
-                var analyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
+                var essentiaAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
+                var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
+                var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
+                
                 var dbContext = new AppDbContext();
 
-                _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
+                _logger.LogInformation("🧠 Starting Unified Analysis for: {Hash}", trackHash);
                 
-                // Enhancement #4: Stuck File Watchdog - 45s timeout per track
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+                // Enhancement #4: Stuck File Watchdog - 60s timeout for full suite
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
                 
-                // Note: Interface doesn't support CancellationToken yet, but timeout helps detect hangs
-                var analysisTask = analyzer.AnalyzeTrackAsync(request.FilePath, trackHash);
-                var result = await analysisTask.WaitAsync(linkedCts.Token);
-                
-                if (result != null)
+                // 1. Generate Waveform (Visuals)
+                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Generating waveform...", 10));
+                var waveformData = await waveformAnalyzer.GenerateWaveformAsync(request.FilePath);
+
+                // 2. Run Musical Analysis (BPM/Key/Energy)
+                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
+                var musicalResult = await essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash);
+
+                // 3. Run Technical Analysis (LUFS/Integrity)
+                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
+                var techResult = await audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash);
+
+                // 4. Save Everything Atomically
+                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Saving results...", 90));
+
+                // Update Detailed Feature Tables
+                if (musicalResult != null)
                 {
-                    dbContext.AudioFeatures.Add(result);
-                    await dbContext.SaveChangesAsync(stoppingToken);
-                    _logger.LogInformation("✅ Musical Intel saved for {Hash}", trackHash);
-                    analysisSucceeded = true;
+                    var existingFeatures = await dbContext.AudioFeatures.FirstOrDefaultAsync(f => f.TrackUniqueHash == trackHash, stoppingToken);
+                    if (existingFeatures != null) dbContext.AudioFeatures.Remove(existingFeatures);
+                    dbContext.AudioFeatures.Add(musicalResult);
                 }
-                else
+
+                if (techResult != null)
                 {
-                    _logger.LogWarning("⚠️ Analysis returned null for {Hash}", trackHash);
-                    errorMessage = "Analysis returned null";
+                    var existingAnalysis = await dbContext.AudioAnalysis.FirstOrDefaultAsync(a => a.TrackUniqueHash == trackHash, stoppingToken);
+                    if (existingAnalysis != null) dbContext.AudioAnalysis.Remove(existingAnalysis);
+                    dbContext.AudioAnalysis.Add(techResult);
                 }
+
+                // Update Playlist Tracks (UI Source)
+                var playlistTracks = await dbContext.PlaylistTracks
+                    .Where(t => t.TrackUniqueHash == trackHash)
+                    .ToListAsync(stoppingToken);
+
+                foreach (var track in playlistTracks)
+                {
+                    track.IsEnriched = true;
+                    if (waveformData != null)
+                    {
+                        track.WaveformData = waveformData.PeakData;
+                        track.RmsData = waveformData.RmsData;
+                    }
+                    
+                    if (musicalResult != null)
+                    {
+                        track.BPM = musicalResult.Bpm;
+                        track.MusicalKey = musicalResult.Key + (musicalResult.Scale == "minor" ? "m" : "");
+                        track.Energy = musicalResult.Energy;
+                        track.Danceability = musicalResult.Danceability;
+                    }
+
+                    if (techResult != null)
+                    {
+                        track.Bitrate = techResult.Bitrate;
+                        track.QualityConfidence = techResult.QualityConfidence;
+                        track.FrequencyCutoff = techResult.FrequencyCutoff;
+                        track.IsTrustworthy = !techResult.IsUpscaled;
+                        track.SpectralHash = techResult.SpectralHash;
+                    }
+                }
+
+                // Update Library Entry (Global Source)
+                var libraryEntry = await dbContext.LibraryEntries.FirstOrDefaultAsync(e => e.UniqueHash == trackHash, stoppingToken);
+                if (libraryEntry != null)
+                {
+                    libraryEntry.IsEnriched = true;
+                    if (waveformData != null)
+                    {
+                        libraryEntry.WaveformData = waveformData.PeakData;
+                        libraryEntry.RmsData = waveformData.RmsData;
+                    }
+                    if (musicalResult != null)
+                    {
+                        libraryEntry.BPM = musicalResult.Bpm;
+                        libraryEntry.MusicalKey = musicalResult.Key + (musicalResult.Scale == "minor" ? "m" : "");
+                        libraryEntry.Energy = musicalResult.Energy;
+                        libraryEntry.Danceability = musicalResult.Danceability;
+                    }
+                    if (techResult != null)
+                    {
+                        libraryEntry.Bitrate = techResult.Bitrate;
+                        libraryEntry.Integrity = techResult.IsUpscaled ? IntegrityLevel.Upscaled : IntegrityLevel.Clean;
+                    }
+                }
+
+                await dbContext.SaveChangesAsync(stoppingToken);
+                _logger.LogInformation("✅ Unified Analysis saved for {Hash}", trackHash);
+                analysisSucceeded = true;
             }
             catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {

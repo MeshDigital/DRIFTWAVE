@@ -71,47 +71,48 @@ public class LibraryEnrichmentWorker : IDisposable
     {
         try
         {
+            var token = _cts?.Token ?? CancellationToken.None;
             // Initial delay to let app stabilize
-            await Task.Delay(TimeSpan.FromSeconds(30), _cts.Token);
+            await Task.Delay(TimeSpan.FromSeconds(30), token);
             _logger.LogInformation("LibraryEnrichmentWorker loop active.");
 
-            while (!_cts.Token.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
                 // Circuit Breaker Check
                 if (SpotifyEnrichmentService.IsServiceDegraded)
                 {
                     _logger.LogWarning("Spotify Service Degraded (Circuit Breaker Active). Worker pausing for 1 minute.");
-                    await Task.Delay(TimeSpan.FromMinutes(1), _cts.Token);
+                    await Task.Delay(TimeSpan.FromMinutes(1), token);
                     continue;
                 }
 
                 try 
                 {
-                    bool workDone = await ProcessBatchAsync();
+                    bool workDone = await ProcessBatchAsync(token);
                     
                     if (!workDone)
                     {
                         // Wait if no work was found
-                        await Task.Delay(TimeSpan.FromMinutes(IdleDelayMinutes), _cts.Token);
+                        await Task.Delay(TimeSpan.FromMinutes(IdleDelayMinutes), token);
                     }
                     else 
                     {
                          // Brief pause between batches
-                         await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token);
+                         await Task.Delay(TimeSpan.FromSeconds(5), token);
                     }
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error in EnrichmentLoop");
-                    await Task.Delay(TimeSpan.FromMinutes(1), _cts.Token);
+                    await Task.Delay(TimeSpan.FromMinutes(1), token);
                 }
             }
         }
         catch (OperationCanceledException) { /* Graceful shutdown */ }
     }
 
-    private async Task<bool> ProcessBatchAsync()
+    private async Task<bool> ProcessBatchAsync(CancellationToken ct)
     {
         bool didWork = false;
         int enrichedCount = 0;
@@ -125,7 +126,7 @@ public class LibraryEnrichmentWorker : IDisposable
             _logger.LogInformation("Enrichment Stage 0: Identification for {Count} PlaylistTracks", unidentifiedPlaylist.Count);
             foreach (var track in unidentifiedPlaylist)
             {
-                if (_cts.Token.IsCancellationRequested) break;
+                if (ct.IsCancellationRequested) break;
                 
                 // Cache-First Check
                 var cached = await _enrichmentService.GetCachedMetadataAsync(track.Artist, track.Title);
@@ -137,7 +138,7 @@ public class LibraryEnrichmentWorker : IDisposable
                      continue; // Skip API call
                 }
 
-                await Task.Delay(RateLimitDelayMs, _cts.Token); 
+                await Task.Delay(RateLimitDelayMs, ct); 
 
                 try 
                 {
@@ -165,7 +166,7 @@ public class LibraryEnrichmentWorker : IDisposable
             
             foreach (var track in unidentified)
             {
-                if (_cts.Token.IsCancellationRequested) break;
+                if (ct.IsCancellationRequested) break;
                 
                 // Cache-First Check
                 var cached = await _enrichmentService.GetCachedMetadataAsync(track.Artist, track.Title);
@@ -177,7 +178,7 @@ public class LibraryEnrichmentWorker : IDisposable
                      continue; // Skip API call
                 }
 
-                await Task.Delay(RateLimitDelayMs, _cts.Token); 
+                await Task.Delay(RateLimitDelayMs, ct); 
 
                 try 
                 {

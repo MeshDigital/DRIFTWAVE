@@ -16,24 +16,24 @@ namespace SLSKDONET.Services;
 /// </summary>
 public class DownloadDiscoveryService
 {
-    private readonly ILogger<DownloadDiscoveryService> _logger;
-    private readonly SearchOrchestrationService _searchOrchestrator;
-    private readonly SearchResultMatcher _matcher;
     private readonly AppConfig _config;
     private readonly IEventBus _eventBus;
+    private readonly TrackForensicLogger _forensicLogger;
 
     public DownloadDiscoveryService(
         ILogger<DownloadDiscoveryService> logger,
         SearchOrchestrationService searchOrchestrator,
         SearchResultMatcher matcher,
         AppConfig config,
-        IEventBus eventBus)
+        IEventBus eventBus,
+        TrackForensicLogger forensicLogger)
     {
         _logger = logger;
         _searchOrchestrator = searchOrchestrator;
         _matcher = matcher;
         _config = config;
         _eventBus = eventBus;
+        _forensicLogger = forensicLogger;
     }
 
     public record DiscoveryResult(Track? BestMatch, SearchAttemptLog? Log)
@@ -74,6 +74,7 @@ public class DownloadDiscoveryService
 
         var query = $"{track.Artist} {track.Title}";
         _logger.LogInformation("Discovery started for: {Query} (GlobalId: {Id})", query, track.TrackUniqueHash);
+        _forensicLogger.Info(track.TrackUniqueHash, Data.Entities.ForensicStage.Discovery, $"Search Query: \"{query}\"");
 
         try
         {
@@ -130,6 +131,9 @@ public class DownloadDiscoveryService
                 {
                     _logger.LogInformation("🚀 THRESHOLD TRIGGER: Found 'Gold' match ({Score:P0}) early! Skipping rest of search. File: {File}", 
                         score, searchTrack.Filename);
+                    _forensicLogger.Info(track.TrackUniqueHash, Data.Entities.ForensicStage.Matching, 
+                        $"Threshold Trigger (Gold): Approved {searchTrack.Username}'s file ({score:P0}). Bitrate: {searchTrack.Bitrate}kbps",
+                        new { searchTrack.Filename, score, searchTrack.Bitrate, searchTrack.Username });
                     return new DiscoveryResult(searchTrack, log);
                 }
 
@@ -159,6 +163,9 @@ public class DownloadDiscoveryService
                 {
                     _logger.LogInformation("🥈 SPECULATIVE TRIGGER: 5s timeout reached with Silver match ({Score:P0}). Starting speculative download. File: {File}", 
                         bestSilverScore, bestSilverMatch.Filename);
+                    _forensicLogger.Info(track.TrackUniqueHash, Data.Entities.ForensicStage.Matching, 
+                        $"Speculative Trigger (Silver): 5s timeout reached. Approved {bestSilverMatch.Username}'s file ({bestSilverScore:P0})",
+                        new { bestSilverMatch.Filename, bestSilverScore, bestSilverMatch.Bitrate, bestSilverMatch.Username });
                     return new DiscoveryResult(bestSilverMatch, log);
                 }
 
@@ -184,6 +191,8 @@ public class DownloadDiscoveryService
             if (bestMatch != null)
             {
                 _logger.LogInformation("🧠 BRAIN: Matcher selected: {Filename} (Score > 0.7)", bestMatch.Filename);
+                _forensicLogger.Info(track.TrackUniqueHash, Data.Entities.ForensicStage.Matching, 
+                    $"Brain Selected: Approved {bestMatch.Username}'s file (Score: {log.SearchScore:P0}). File: {bestMatch.Filename}");
                 return new DiscoveryResult(bestMatch, log);
             }
 

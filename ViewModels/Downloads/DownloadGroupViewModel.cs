@@ -19,7 +19,7 @@ public class DownloadGroupViewModel : ReactiveObject, IDisposable
     private bool _isExpanded = true;
     private double _totalProgress;
     private double _totalSpeed;
-    private string _statusText;
+    private string _statusText = "Initializing";
     private bool _hasFailures;
     // private bool _isPaused; // Unused
 
@@ -66,7 +66,7 @@ public class DownloadGroupViewModel : ReactiveObject, IDisposable
     public IReactiveCommand ResumeCommand { get; }
     public IReactiveCommand CancelCommand { get; }
 
-    public DownloadGroupViewModel(IGroup<UnifiedTrackViewModel, string, Guid?> group)
+    public DownloadGroupViewModel(IGroup<UnifiedTrackViewModel, string, Guid> group)
     {
         GroupKey = group.Key;
         

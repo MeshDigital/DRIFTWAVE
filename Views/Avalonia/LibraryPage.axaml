@@ -354,7 +354,7 @@
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="4"/>
-                            <Setter Property="Height" Value="72"/>  <!-- Fixed height for virtualization -->
+                            <Setter Property="MinHeight" Value="72"/>  <!-- Allow expansion -->
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="BorderThickness" Value="0,0,0,1"/>
@@ -506,56 +506,88 @@
                                         
                                         <!-- Actions -->
                                         <StackPanel Grid.RowSpan="2" Grid.Column="3" Orientation="Horizontal">
+                                             <ToggleButton IsChecked="{Binding IsExpanded}"
+                                                           Classes="icon-button"
+                                                           Padding="8"
+                                                           ToolTip.Tip="Expand Details">
+                                                <TextBlock Text="{Binding IsExpanded, Converter={StaticResource RankColorConverter}, ConverterParameter='▼;▶'}" FontSize="12" Foreground="#888"/>
+                                            </ToggleButton>
+                                            
                                              <Button Command="{Binding $parent[UserControl].DataContext.ToggleInspectorCommand}" 
                                                     CommandParameter="{Binding}"
-                                                    
- 
+                                                    Classes="icon-button"
                                                     Padding="8"
                                                     ToolTip.Tip="Inspect Track">
                                                 <TextBlock Text="🔬" FontSize="14" Foreground="#888"/>
-                                            </Button>
-                                            <Button 
- Padding="8">
-                                                <TextBlock Text="⋮" FontSize="16" Foreground="#888"/>
                                             </Button>
                                         </StackPanel>
                                     </Grid>
                                     
                                     <!-- EXPANDING INSPECTOR CARD (Row Details) -->
-                                    <!-- In a real implementation we would bind IsVisible to an IsExpanded property -->
                                     <Border Grid.Row="1" 
-                                            Background="#1E1E1E" 
+                                            Background="#181818" 
                                             BorderBrush="#333" 
                                             BorderThickness="0,1,0,0" 
                                             Margin="-8,8,-8,-6"
-                                            Padding="16"
+                                            Padding="20"
                                             IsVisible="{Binding IsExpanded}">
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Grid ColumnDefinitions="Auto,*,400">
                                             <!-- High Res Art -->
-                                            <Border Grid.Column="0" Width="120" Height="120" CornerRadius="4" Background="#111" Margin="0,0,20,0">
+                                            <Border Grid.Column="0" Width="140" Height="140" CornerRadius="8" Background="#111" Margin="0,0,24,0" BoxShadow="0 4 12 0 #80000000">
                                                 <Image Source="{Binding AlbumArtUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
                                             </Border>
                                             
                                             <!-- Detailed Stats -->
-                                            <StackPanel Grid.Column="1" Spacing="8">
-                                                <TextBlock Text="ANALYSIS DATA" FontSize="10" FontWeight="Bold" Foreground="#666"/>
+                                            <StackPanel Grid.Column="1" Spacing="12">
+                                                <TextBlock Text="ACOUSTIC FINGERPRINT" FontSize="10" FontWeight="Bold" Foreground="#555" LetterSpacing="1"/>
                                                 
-                                                <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,4">
-                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Energy" Width="80" Foreground="#888"/>
-                                                    <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding Energy}" Maximum="1" Width="150" Height="6" Foreground="#4EC9B0" Background="#333"/>
+                                                <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4">
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Energy" Foreground="#888" VerticalAlignment="Center"/>
+                                                    <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding Energy}" Maximum="1" Width="200" HorizontalAlignment="Left" Height="6" Foreground="#4EC9B0" Background="#222" CornerRadius="3"/>
                                                     
-                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Danceability" Width="80" Foreground="#888" Margin="0,8"/>
-                                                    <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding Danceability}" Maximum="1" Width="150" Height="6" Foreground="#9C27B0" Background="#333" Margin="0,8"/>
+                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Danceability" Foreground="#888" Margin="0,12" VerticalAlignment="Center"/>
+                                                    <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding Danceability}" Maximum="1" Width="200" HorizontalAlignment="Left" Height="6" Foreground="#9C27B0" Background="#222" CornerRadius="3" Margin="0,12"/>
                                                     
-                                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Valence" Width="80" Foreground="#888"/>
-                                                    <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding Valence}" Maximum="1" Width="150" Height="6" Foreground="#FF9800" Background="#333"/>
+                                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Valence" Foreground="#888" VerticalAlignment="Center"/>
+                                                    <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding Valence}" Maximum="1" Width="200" HorizontalAlignment="Left" Height="6" Foreground="#FF9800" Background="#222" CornerRadius="3"/>
                                                 </Grid>
+                                                
+                                                <Separator Height="1" Background="#222" Margin="0,8"/>
+                                                
+                                                <StackPanel Orientation="Horizontal" Spacing="24">
+                                                    <StackPanel>
+                                                        <TextBlock Text="QUALITY" FontSize="10" Foreground="#555"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2">
+                                                            <TextBlock Text="{Binding IntegritySymbol}" Foreground="#4EC9B0"/>
+                                                            <TextBlock Text="{Binding IntegrityText}" Foreground="#CCC"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    
+                                                    <StackPanel>
+                                                        <TextBlock Text="LOUDNESS" FontSize="10" Foreground="#555"/>
+                                                        <TextBlock Text="{Binding LoudnessDisplay}" Foreground="#CCC" Margin="0,2"/>
+                                                    </StackPanel>
+                                                    
+                                                    <StackPanel>
+                                                        <TextBlock Text="FILE SIZE" FontSize="10" Foreground="#555"/>
+                                                        <TextBlock Text="{Binding FileSizeDisplay}" Foreground="#CCC" Margin="0,2"/>
+                                                    </StackPanel>
+                                                </StackPanel>
                                             </StackPanel>
                                             
-                                            <!-- Waveform Placeholder (Phase 2) -->
-                                            <Border Grid.Column="2" Width="300" Height="80" Background="#111" CornerRadius="4" VerticalAlignment="Top">
-                                                <TextBlock Text="Waveform Analysis Pending..." VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#444" FontSize="11"/>
-                                            </Border>
+                                            <!-- High-Fidelity Waveform -->
+                                            <StackPanel Grid.Column="2" Spacing="8">
+                                                <TextBlock Text="SIGNAL OVERVIEW" FontSize="10" FontWeight="Bold" Foreground="#555" LetterSpacing="1"/>
+                                                <Border Height="100" Background="#111" CornerRadius="4" Padding="4">
+                                                    <controls:WaveformControl WaveformData="{Binding WaveformData}"
+                                                                              Height="90"
+                                                                              VerticalAlignment="Center"/>
+                                                </Border>
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <TextBlock Grid.Column="0" Text="0:00" FontSize="10" Foreground="#444"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding DurationDisplay}" FontSize="10" Foreground="#444"/>
+                                                </Grid>
+                                            </StackPanel>
                                         </Grid>
                                     </Border>
                                 </Grid>

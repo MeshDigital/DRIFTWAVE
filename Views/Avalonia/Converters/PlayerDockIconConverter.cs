@@ -16,6 +16,10 @@ public class PlayerDockIconConverter : IValueConverter
         {
             return location == PlayerDockLocation.BottomBar ? "⬇️" : "➡️";
         }
+        if (value is bool isBottom)
+        {
+            return isBottom ? "⬇️" : "➡️";
+        }
         return "➡️";
     }
 

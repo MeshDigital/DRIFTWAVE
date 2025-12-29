@@ -35,7 +35,7 @@ public class DatabaseService
         _logger.LogInformation("[{Ms}ms] Database Init: EnsureCreated completed", sw.ElapsedMilliseconds);
 
         // Phase 1B: Configure WAL mode for better concurrency
-        var connection = context.Database.GetDbConnection() as SqliteConnection;
+        SqliteConnection? connection = context.Database.GetDbConnection() as SqliteConnection;
         if (connection != null)
         {
             context.ConfigureSqliteOptimizations(connection);
@@ -53,9 +53,9 @@ public class DatabaseService
                 await ApplyIndexRecommendationsAsync(auditReport);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Index audit failed (non-fatal)");
+            _logger.LogWarning("Index audit failed (non-fatal)");
         }
         #endif
 
@@ -63,7 +63,9 @@ public class DatabaseService
         try 
         {
             // Optimize: Check all columns at once using PRAGMA table_info
-            await connection.OpenAsync();
+            if (connection != null)
+            {
+                await connection.OpenAsync();
             
             // Phase 0B: Rename PlaylistJobs -> Projects (if table exists)
             using (var cmd = connection.CreateCommand())
@@ -80,8 +82,7 @@ public class DatabaseService
                     _logger.LogInformation("[{Ms}ms] Database Init: Table renamed to 'Projects'", sw.ElapsedMilliseconds);
                 }
             }
-            
-            using var cmdSchema = connection.CreateCommand();
+                using var cmdSchema = connection!.CreateCommand();
             cmdSchema.CommandText = "PRAGMA table_info(PlaylistTracks)";
             var existingColumns = new HashSet<string>();
             
@@ -486,8 +487,8 @@ public class DatabaseService
                         await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_analysis ADD COLUMN FrequencyCutoff INTEGER DEFAULT 0 NOT NULL;");
                         await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_analysis ADD COLUMN QualityConfidence REAL DEFAULT 0 NOT NULL;");
                     }
-                catch (Exception ex)
-                {
+                    catch (Exception)
+                    {
                     // Failed to alter columns - table might not exist,create it
                     _logger.LogWarning("Schema Patch: Creating missing table 'audio_analysis'");
                     var createAudioAnalysisTableSql = @"
@@ -589,10 +590,9 @@ public class DatabaseService
                 await context.Database.ExecuteSqlRawAsync(createHealthTableSql);
             }
 
-            // Patch LibraryEntries columns
-            using (var schemaCmd = connection.CreateCommand())
+            using (var schemaCmd = connection!.CreateCommand())
             {
-                cmdSchema.CommandText = "PRAGMA table_info(LibraryEntries)";
+                schemaCmd.CommandText = "PRAGMA table_info(LibraryEntries)";
                 var libColumns = new HashSet<string>();
                 using (var reader = await schemaCmd.ExecuteReaderAsync())
                 {
@@ -638,9 +638,9 @@ public class DatabaseService
             }
 
             // Patch Tracks columns
-            using (var schemaCmd = connection.CreateCommand())
+            using (var schemaCmd = connection!.CreateCommand())
             {
-                cmdSchema.CommandText = "PRAGMA table_info(Tracks)";
+                schemaCmd.CommandText = "PRAGMA table_info(Tracks)";
                 var tracksColumns = new HashSet<string>();
                 using (var reader = await schemaCmd.ExecuteReaderAsync())
                 {
@@ -699,9 +699,9 @@ public class DatabaseService
             }
 
             // Patch PlaylistTracks columns (Phase 8 Support)
-            using (var schemaCmd = connection.CreateCommand())
+            using (var schemaCmd = connection!.CreateCommand())
             {
-                cmdSchema.CommandText = "PRAGMA table_info(PlaylistTracks)";
+                schemaCmd.CommandText = "PRAGMA table_info(PlaylistTracks)";
                 var ptColumns = new HashSet<string>();
                 using (var reader = await schemaCmd.ExecuteReaderAsync())
                 {
@@ -730,11 +730,12 @@ public class DatabaseService
                 }
             }
             
-            await connection.CloseAsync();
+            await connection!.CloseAsync();
         }
-        catch (Exception ex)
+    }
+        catch (Exception)
         {
-            _logger.LogError(ex, "Failed to patch database schema");
+            _logger.LogError("Failed to patch database schema");
         }
 
         _logger.LogInformation("[{Ms}ms] Database initialized and schema verified.", sw.ElapsedMilliseconds);

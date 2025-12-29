@@ -62,23 +62,38 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     private double _energy = 0.0; 
     public double Energy
     {
-        get => _energy;
-        set => SetProperty(ref _energy, value);
+        get => Model.Energy ?? 0.0;
+        set
+        {
+            Model.Energy = value;
+            OnPropertyChanged();
+        }
     }
 
     private double _danceability = 0.0;
     public double Danceability
     {
-        get => _danceability;
-        set => SetProperty(ref _danceability, value);
+        get => Model.Danceability ?? 0.0;
+        set
+        {
+            Model.Danceability = value;
+            OnPropertyChanged();
+        }
     }
 
     private double _valence = 0.0;
     public double Valence
     {
-        get => _valence;
-        set => SetProperty(ref _valence, value);
+        get => Model.Valence ?? 0.0;
+        set
+        {
+            Model.Valence = value;
+            OnPropertyChanged();
+        }
     }
+    
+    public double BPM => Model.BPM ?? 0.0;
+    public string MusicalKey => Model.MusicalKey ?? "—";
     
     public string GlobalId { get; set; } // TrackUniqueHash
     
@@ -122,11 +137,21 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         }
     }
     
-    public string? Duration => DurationDisplay;
-    public string? Bitrate => Model.Bitrate.HasValue ? Model.Bitrate.Value.ToString() : string.Empty;
-    public string? Status => State.ToString();
-    public int Popularity => Model.Popularity ?? 0;
     public string? Genres => GenresDisplay;
+
+    public WaveformAnalysisData WaveformData => new WaveformAnalysisData 
+    { 
+        PeakData = Model.WaveformData ?? Array.Empty<byte>(), 
+        RmsData = Model.RmsData ?? Array.Empty<byte>(),
+        DurationSeconds = (Model.CanonicalDuration ?? 0) / 1000.0
+    };
+    
+    // Technical Stats
+    public int SampleRate => Model.BitrateScore ?? 0; // Or add SampleRate to Model
+    public string LoudnessDisplay => Model.QualityConfidence.HasValue ? $"{Model.QualityConfidence:P0} Confidence" : "—";
+    
+    public string IntegritySymbol => Model.IsTrustworthy == false ? "⚠️" : "✓";
+    public string IntegrityText => Model.IsTrustworthy == false ? "Upscale Detected" : "Clean";
     // AlbumArtPath and Progress are already present in this class.
 
     // Reference to the underlying model if needed for persistence later

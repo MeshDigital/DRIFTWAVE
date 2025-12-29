@@ -108,7 +108,7 @@ public class HarmonicMatchService
             var candidates = allTracks
                 .Where(t => t.Id != seedTrackId) // Exclude seed track
                 .Where(t => !string.IsNullOrEmpty(t.Key))
-                .Where(t => compatibleKeys.Contains(t.Key)) // Key compatibility
+                .Where(t => compatibleKeys.Contains(t.Key!)) // Key compatibility
                 .ToList();
 
             // Score and filter results

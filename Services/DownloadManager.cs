@@ -449,27 +449,34 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         
         lock (_collectionLock)
         {
-            // Build a set of existing track IDs for fast lookup
-            var existingTrackIds = new HashSet<Guid>(_downloads.Select(d => d.Model.Id));
+            // Build maps for fast lookup
+            var existingById = _downloads.ToDictionary(d => d.Model.Id);
+            var existingByHash = _downloads.GroupBy(d => d.Model.TrackUniqueHash)
+                                          .ToDictionary(g => g.Key, g => g.First());
             
             foreach (var track in tracks)
             {
-                // Check if already queued
-                if (existingTrackIds.Contains(track.Id))
+                // SMART RETRY: Check by ID first, then by Hash
+                DownloadContext? existingCtx = null;
+                if (existingById.TryGetValue(track.Id, out var byId))
+                    existingCtx = byId;
+                else if (existingByHash.TryGetValue(track.TrackUniqueHash, out var byHash))
+                    existingCtx = byHash;
+
+                if (existingCtx != null)
                 {
-                    // Fix: Retry if in a terminal/failure state
-                    var existingCtx = _downloads.FirstOrDefault(d => d.Model.Id == track.Id);
-                    if (existingCtx != null && (existingCtx.State == PlaylistTrackState.Failed || 
-                                              existingCtx.State == PlaylistTrackState.Cancelled || 
-                                              existingCtx.State == PlaylistTrackState.Deferred))
+                    // If already queued and in a terminal/failure state, retry it
+                    if (existingCtx.State == PlaylistTrackState.Failed || 
+                        existingCtx.State == PlaylistTrackState.Cancelled || 
+                        existingCtx.State == PlaylistTrackState.Deferred)
                     {
-                        _logger.LogInformation("Retrying existing track {Title} (State: {State}) - Bumping to Priority 0", track.Title, existingCtx.State);
+                        _logger.LogInformation("Retrying existing track {Title} (Hash: {Hash}, State: {State}) - Bumping priority", 
+                            track.Title, track.TrackUniqueHash, existingCtx.State);
                         
                         // Smart Download: Bump priority to top (User Intent)
                         existingCtx.Model.Priority = 0;
                         
                         // Reset State
-                        // Do not await here to avoid blocking loop
                         _ = UpdateStateAsync(existingCtx, PlaylistTrackState.Pending);
                         
                         // Reset Retry Counters
@@ -478,15 +485,14 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                         existingCtx.FailureReason = null;
                         
                         // Queue for enrichment/download
-                        // Fire-and-forget for synchronous method
                         _ = _enrichmentTaskRepository.QueueTaskAsync(existingCtx.Model.Id, existingCtx.Model.PlaylistId);
-                        queued++; // Count as queued now
+                        queued++;
                         continue;
                     }
 
                     skipped++;
-                    _logger.LogDebug("Skipping track {Artist} - {Title}: already queued (State: {State})", 
-                        track.Artist, track.Title, existingCtx?.State);
+                    _logger.LogDebug("Skipping track {Artist} - {Title}: already active (State: {State})", 
+                        track.Artist, track.Title, existingCtx.State);
                     continue;
                 }
                 

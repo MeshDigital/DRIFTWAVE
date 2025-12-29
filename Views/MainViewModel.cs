@@ -133,6 +133,7 @@ public class MainViewModel : INotifyPropertyChanged
         // Downloads Page Commands
         PauseAllDownloadsCommand = new RelayCommand(PauseAllDownloads);
         ResumeAllDownloadsCommand = new RelayCommand(ResumeAllDownloads);
+        RetryAllFailedDownloadsCommand = new RelayCommand(RetryAllFailedDownloads); // NEW
         CancelDownloadsCommand = new RelayCommand(CancelAllowedDownloads);
         // Using generic RelayCommand<PlaylistTrackViewModel> for DeleteTrackCommand
         DeleteTrackCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(DeleteTrackAsync);
@@ -376,7 +377,8 @@ public class MainViewModel : INotifyPropertyChanged
     public bool HasETA => !string.IsNullOrEmpty(AnalysisETA);
 
 
-    public bool IsPlayerInSidebar => !_isPlayerAtBottom;
+    public bool IsPlayerInSidebar => !IsPlayerAtBottom && IsPlayerSidebarVisible;
+    public bool IsPlayerAtBottomVisible => IsPlayerAtBottom && IsPlayerSidebarVisible;
 
     private double _baseFontSize = 14.0;
     public double BaseFontSize
@@ -480,6 +482,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ResetZoomCommand { get; }
     public ICommand ToggleAnalysisPauseCommand { get; }
     public ICommand ExecuteBrainTestCommand { get; }
+    public ICommand RetryAllFailedDownloadsCommand { get; }
     
     // Downloads Page Commands
     public ICommand PauseAllDownloadsCommand { get; }
@@ -750,6 +753,16 @@ public class MainViewModel : INotifyPropertyChanged
     private async void ResumeAllDownloads()
     {
         foreach (var track in AllGlobalTracks.Where(t => t.State == PlaylistTrackState.Paused))
+        {
+            await _downloadManager.ResumeTrackAsync(track.GlobalId);
+        }
+    }
+
+    private async void RetryAllFailedDownloads()
+    {
+        var failed = AllGlobalTracks.Where(t => t.State == PlaylistTrackState.Failed).ToList();
+        _logger.LogInformation("Retrying {Count} failed downloads", failed.Count);
+        foreach (var track in failed)
         {
             await _downloadManager.ResumeTrackAsync(track.GlobalId);
         }

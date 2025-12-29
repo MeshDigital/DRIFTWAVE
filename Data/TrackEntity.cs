@@ -160,6 +160,7 @@ public class PlaylistTrackEntity
     public string? SpotifyArtistId { get; set; }
     public string? AlbumArtUrl { get; set; }
     public byte[]? WaveformData { get; set; }
+    public byte[]? RmsData { get; set; }
     public string? ArtistImageUrl { get; set; }
     public string? Genres { get; set; }
     public int? Popularity { get; set; }
@@ -240,6 +241,8 @@ public class LibraryEntryEntity
     public string? SpotifyAlbumId { get; set; }
     public string? SpotifyArtistId { get; set; }
     public string? AlbumArtUrl { get; set; }
+    public byte[]? WaveformData { get; set; }
+    public byte[]? RmsData { get; set; }
     public string? ArtistImageUrl { get; set; }
     public string? Genres { get; set; }
     public int? Popularity { get; set; }

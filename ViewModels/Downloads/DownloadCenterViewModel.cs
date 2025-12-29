@@ -149,8 +149,7 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
         
         sharedSource
             .Filter(x => x.IsActive || x.IsIndeterminate) // Use helper properties
-            .Sort(activeComparer)
-            .Bind(out _activeDownloads)
+            .SortAndBind(out _activeDownloads, activeComparer)
             .DisposeMany() // Dispose VMs when removed from Active? No, they might move to Completed.
             // CAREFUL: DisposeMany() here would dispose items when filtered out.
             // Since items move between collections, we should ONLY dispose when removed from Source.
@@ -173,8 +172,8 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
         // Group by AlbumId (or null for Singles)
         sharedSource
             .Filter(x => x.IsActive || x.IsIndeterminate) // Only group active items
-            .Group(x => x.Model.PlaylistId == Guid.Empty ? (Guid?)Guid.Empty : x.Model.PlaylistId)
-            .Transform((IGroup<UnifiedTrackViewModel, string, Guid?> group) => new DownloadGroupViewModel(group))
+            .Group(x => x.Model.PlaylistId)
+            .Transform((IGroup<UnifiedTrackViewModel, string, Guid> group) => new DownloadGroupViewModel(group))
             .DisposeMany() // Dispose GroupVMs when removed
             .SortAndBind(out _activeGroups, SortExpressionComparer<DownloadGroupViewModel>.Descending(x => x.LastActivity))
             .Subscribe()
@@ -183,8 +182,7 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
         // Completed Pipeline
         sharedSource
             .Filter(x => x.State == PlaylistTrackState.Completed)
-            .Sort(SortExpressionComparer<UnifiedTrackViewModel>.Descending(x => x.Model.AddedAt)) // Sort by date
-            .Bind(out _completedDownloads)
+            .SortAndBind(out _completedDownloads, SortExpressionComparer<UnifiedTrackViewModel>.Descending(x => x.Model.AddedAt))
             .Subscribe();
 
          _completedDownloads.ToObservableChangeSet()

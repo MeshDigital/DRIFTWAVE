@@ -153,7 +153,7 @@ public class HierarchicalLibraryViewModel
             Foreground = Brushes.White
         };
 
-        border.Bind(Border.BackgroundProperty, new Binding(nameof(PlaylistTrackViewModel.StatusColor)) { Converter = new FuncValueConverter<string, IBrush>(c => Brush.Parse(c)) });
+        border.Bind(Border.BackgroundProperty, new Binding(nameof(PlaylistTrackViewModel.StatusColor)) { Converter = new FuncValueConverter<string, IBrush>(c => Brush.Parse(c ?? "#333333")) });
         textBlock.Bind(TextBlock.TextProperty, new Binding(nameof(PlaylistTrackViewModel.StatusText)));
 
         border.Child = textBlock;
@@ -171,7 +171,7 @@ public class HierarchicalLibraryViewModel
         };
 
         textBlock.Bind(TextBlock.TextProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatusSymbol)));
-        textBlock.Bind(TextBlock.ForegroundProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatusColor)) { Converter = new FuncValueConverter<string, IBrush>(c => Brush.Parse(c)) });
+        textBlock.Bind(TextBlock.ForegroundProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatusColor)) { Converter = new FuncValueConverter<string, IBrush>(c => Brush.Parse(c ?? "#FFFFFF")) });
         textBlock.Bind(ToolTip.TipProperty, new Binding(nameof(PlaylistTrackViewModel.MetadataStatus)));
 
         return textBlock;

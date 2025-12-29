@@ -9,6 +9,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using SLSKDONET.Data.Entities;
 using SLSKDONET.Models;
+using Microsoft.Extensions.Logging;
 
 namespace SLSKDONET.ViewModels
 {
@@ -16,6 +17,8 @@ namespace SLSKDONET.ViewModels
     {
         private readonly Services.IAudioAnalysisService _audioAnalysisService;
         private readonly Services.IEventBus _eventBus;
+        private readonly Services.DownloadDiscoveryService _discoveryService;
+        private readonly ILogger<TrackInspectorViewModel> _logger;
         private readonly CompositeDisposable _disposables = new();
         private Data.Entities.AudioAnalysisEntity? _analysis;
         private Data.Entities.AudioFeaturesEntity? _audioFeatures; // Phase 4: Musical Intelligence
@@ -37,11 +40,18 @@ namespace SLSKDONET.ViewModels
         // Phase 3: Interactive Commands
         public System.Windows.Input.ICommand ForceReAnalyzeCommand { get; }
         public System.Windows.Input.ICommand ExportLogsCommand { get; }
+        public System.Windows.Input.ICommand ReFetchUpgradeCommand { get; }
 
-        public TrackInspectorViewModel(Services.IAudioAnalysisService audioAnalysisService, Services.IEventBus eventBus)
+        public TrackInspectorViewModel(
+            Services.IAudioAnalysisService audioAnalysisService, 
+            Services.IEventBus eventBus,
+            Services.DownloadDiscoveryService discoveryService,
+            ILogger<TrackInspectorViewModel> logger)
         {
             _audioAnalysisService = audioAnalysisService;
             _eventBus = eventBus;
+            _discoveryService = discoveryService;
+            _logger = logger;
 
             // Phase 12.6: Listen for global track selection
             _eventBus.GetEvent<TrackSelectionChangedEvent>()
@@ -129,6 +139,26 @@ namespace SLSKDONET.ViewModels
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Export failed: {ex.Message}");
+                }
+            });
+
+            ReFetchUpgradeCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (Track == null) return;
+                
+                try
+                {
+                    _eventBus.Publish(new SLSKDONET.Models.AnalysisProgressEvent(
+                        Track.TrackUniqueHash, 0, "Initializing re-fetch search..."));
+                    
+                    // Trigger discovery and queueing
+                    await _discoveryService.DiscoverAndQueueTrackAsync(Track);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Re-fetch upgrade failed");
+                    _eventBus.Publish(new SLSKDONET.Models.AnalysisProgressEvent(
+                        Track.TrackUniqueHash, 0, $"Re-fetch failed: {ex.Message}"));
                 }
             });
         }
