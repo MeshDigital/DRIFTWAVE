@@ -138,11 +138,19 @@ public class DashboardService
                 .Take(count)
                 .ToListAsync();
                 
-            // Use LibraryService or mapper to convert to models if needed, 
-            // but for Dashboard maybe entities are fine if they have what we need.
-            // Let's assume we want models for the ViewModels.
-            // I'll check LibraryService for mapping logic.
-            return entities.Select(e => MapToModel(e)).ToList();
+            // For better accuracy on dashboard, we can refresh counts from the track table
+            // though this might be slower. Let's do it for the recent ones.
+            var models = new List<PlaylistJob>();
+            foreach (var entity in entities)
+            {
+                var model = MapToModel(entity);
+                // Dynamically fetch counts to ensure dashboard is 100% accurate
+                model.SuccessfulCount = await context.PlaylistTracks.CountAsync(t => t.PlaylistId == entity.Id && t.Status == TrackStatus.Downloaded);
+                model.TotalTracks = await context.PlaylistTracks.CountAsync(t => t.PlaylistId == entity.Id);
+                models.Add(model);
+            }
+
+            return models;
         }
         catch (Exception ex)
         {

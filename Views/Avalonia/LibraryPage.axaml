@@ -9,16 +9,17 @@
              xmlns:conv="clr-namespace:SLSKDONET.Views.Avalonia.Converters"
              xmlns:tree="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.TreeDataGrid"
              xmlns:rootConv="clr-namespace:SLSKDONET.Converters"
+             xmlns:helpers="clr-namespace:SLSKDONET.Helpers"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="SLSKDONET.Views.Avalonia.LibraryPage"
+             x:DataType="vm:LibraryViewModel"
              Background="#1E1E1E" Foreground="White">
 
     <UserControl.Resources>
-        <rootConv:StringToBrushConverter x:Key="StringToBrushConverter"/>
-        <conv:RankColorConverter x:Key="RankColorConverter"/>
-        <conv:BooleanToRedBrushConverter x:Key="BooleanToRedBrushConverter"/>
-        <conv:UpgradeStatusToVisibleConverter x:Key="UpgradeStatusToVisibleConverter"/>
         <conv:BitmapValueConverter x:Key="BitmapValueConverter"/>
+        <conv:RankColorConverter x:Key="RankColorConverter"/>
+        <rootConv:BoolOpacityConverter x:Key="BoolOpacityConverter"/>
+        <x:Double x:Key="NonDownloadedOpacity">0.3</x:Double>
     </UserControl.Resources>
 
     <Grid ColumnDefinitions="280,Auto,*,Auto,Auto,Auto,Auto">
@@ -464,7 +465,8 @@
                                                 Width="40" Height="40" 
                                                 CornerRadius="4" 
                                                 Margin="0,0,12,0"
-                                                Background="#222">
+                                                Background="#222"
+                                                Opacity="{Binding IsDownloaded, Converter={StaticResource BoolOpacityConverter}, ConverterParameter=0.3}">
                                             <Image Source="{Binding AlbumArtUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
                                         </Border>
 
@@ -482,7 +484,7 @@
                                         </StackPanel>
 
                                         <!-- Line 2: Technical Metadata -->
-                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" Opacity="{Binding IsDownloaded, Converter={StaticResource BoolOpacityConverter}, ConverterParameter=0.3}">
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Text="⏱" FontSize="11" Foreground="#666"/>
                                                 <TextBlock Text="{Binding Bpm, StringFormat='{}{0:F0}'}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>

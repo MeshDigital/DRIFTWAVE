@@ -68,7 +68,7 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         _ => "Needs Upgrades"
     };
 
-    public ObservableCollection<PlaylistJob> RecentPlaylists { get; } = new();
+    public ObservableCollection<PlaylistCardViewModel> RecentPlaylists { get; } = new();
     public ObservableCollection<SpotifyTrackViewModel> SpotifyRecommendations { get; } = new();
 
     private bool _isLoadingHealth = true;
@@ -190,7 +190,7 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         RefreshDashboardCommand = new AsyncRelayCommand(RefreshDashboardAsync);
         NavigateToSearchCommand = new RelayCommand(() => _navigationService.NavigateTo("Search"));
         NavigateLibraryCommand = new RelayCommand(() => _navigationService.NavigateTo("Library"));
-        ViewPlaylistCommand = new RelayCommand<PlaylistJob>(ExecuteViewPlaylist);
+        ViewPlaylistCommand = new RelayCommand<PlaylistCardViewModel>(ExecuteViewPlaylist);
         QuickSearchCommand = new AsyncRelayCommand<SpotifyTrackViewModel>(ExecuteQuickSearchAsync);
         ClearDeadLettersCommand = new AsyncRelayCommand(ClearDeadLettersAsync);
 
@@ -231,11 +231,12 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
     {
         try
         {
-            await Task.WhenAll(
-                LoadLibraryHealthAsync(),
-                LoadRecentPlaylistsAsync(),
-                LoadSpotifyRecommendationsAsync()
-            );
+            // Execute loading tasks in parallel for performance
+            var healthTask = LoadLibraryHealthAsync();
+            var recentTask = LoadRecentPlaylistsAsync();
+            var spotifyTask = LoadSpotifyRecommendationsAsync();
+
+            await Task.WhenAll(healthTask, recentTask, spotifyTask);
         }
         catch (Exception ex)
         {
@@ -309,11 +310,15 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         IsLoadingRecent = true;
         try
         {
-            var recent = await _dashboardService.GetRecentPlaylistsAsync(5);
+            var recent = await _dashboardService.GetRecentPlaylistsAsync(10); // Show more for horizontal scroll
+            
+            // Map to ViewModels on background thread
+            var viewModels = recent.Select(p => new PlaylistCardViewModel(p)).ToList();
+
             Dispatcher.UIThread.Post(() =>
             {
                 RecentPlaylists.Clear();
-                foreach (var p in recent) RecentPlaylists.Add(p);
+                foreach (var vm in viewModels) RecentPlaylists.Add(vm);
             });
         }
         finally
@@ -361,10 +366,10 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private void ExecuteViewPlaylist(PlaylistJob? playlist)
+    private void ExecuteViewPlaylist(PlaylistCardViewModel? card)
     {
-        if (playlist == null) return;
-        _libraryViewModel.SelectedProject = playlist;
+        if (card == null) return;
+        _libraryViewModel.SelectedProject = card.Model;
         _navigationService.NavigateTo("Library");
     }
 

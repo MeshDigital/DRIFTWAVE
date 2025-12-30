@@ -319,7 +319,17 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      Model.SpotifyTrackId = updatedTrack.SpotifyTrackId;
                      Model.SpotifyAlbumId = updatedTrack.SpotifyAlbumId;
                      Model.IsEnriched = updatedTrack.IsEnriched;
+                     Model.IsEnriched = updatedTrack.IsEnriched;
                      Model.Album = updatedTrack.Album;
+                     
+                     // Sync Audio Features & Extended Metadata
+                     Model.BPM = updatedTrack.BPM;
+                     Model.MusicalKey = updatedTrack.MusicalKey;
+                     Model.Energy = updatedTrack.Energy;
+                     Model.Danceability = updatedTrack.Danceability;
+                     Model.Valence = updatedTrack.Valence;
+                     Model.Popularity = updatedTrack.Popularity;
+                     Model.Genres = updatedTrack.Genres;
                      
                      // Load artwork if URL is available
                      if (!string.IsNullOrWhiteSpace(updatedTrack.AlbumArtUrl))
@@ -339,6 +349,17 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              OnPropertyChanged(nameof(MetadataStatus));
              OnPropertyChanged(nameof(MetadataStatusColor));
              OnPropertyChanged(nameof(MetadataStatusSymbol));
+             
+             // Notify Extended Props
+             OnPropertyChanged(nameof(BPM));
+             OnPropertyChanged(nameof(MusicalKey));
+             OnPropertyChanged(nameof(KeyDisplay));
+             OnPropertyChanged(nameof(BpmDisplay));
+             OnPropertyChanged(nameof(Energy));
+             OnPropertyChanged(nameof(Danceability));
+             OnPropertyChanged(nameof(Valence));
+             OnPropertyChanged(nameof(Genres));
+             OnPropertyChanged(nameof(Popularity));
         });
     }
 
@@ -415,6 +436,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                 OnPropertyChanged(nameof(CanCancel));
                 OnPropertyChanged(nameof(CanHardRetry));
                 OnPropertyChanged(nameof(CanDeleteFile));
+                
+                // Visual distinctions
+                OnPropertyChanged(nameof(IsDownloaded));
                 
                 // CommandManager.InvalidateRequerySuggested() happens automatically or via interaction
             }
@@ -617,6 +641,8 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     public bool CanCancel => State != PlaylistTrackState.Completed && State != PlaylistTrackState.Cancelled;
     public bool CanHardRetry => State == PlaylistTrackState.Failed || State == PlaylistTrackState.Cancelled; // Or Completed if we want to re-download
     public bool CanDeleteFile => State == PlaylistTrackState.Completed || State == PlaylistTrackState.Failed || State == PlaylistTrackState.Cancelled;
+
+    public bool IsDownloaded => State == PlaylistTrackState.Completed;
 
     // Visuals - Color codes for Avalonia (replacing WPF Brushes)
     public string StatusColor

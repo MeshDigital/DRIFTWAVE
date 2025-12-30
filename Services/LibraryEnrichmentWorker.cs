@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Data;
-using SLSKDONET.Events;
+using SLSKDONET.Models;
 
 namespace SLSKDONET.Services;
 
@@ -135,6 +135,10 @@ public class LibraryEnrichmentWorker : IDisposable
                      await _databaseService.UpdatePlaylistTrackEnrichmentAsync(track.Id, cached);
                      _logger.LogDebug("Cache Hit (PlaylistTrack): {Artist} - {Title}", track.Artist, track.Title);
                      enrichedCount++;
+                     
+                     // Notify UI
+                     _eventBus.Publish(new TrackMetadataUpdatedEvent(track.TrackUniqueHash));
+                     
                      continue; // Skip API call
                 }
 
@@ -149,6 +153,9 @@ public class LibraryEnrichmentWorker : IDisposable
                     {
                          _logger.LogDebug("Identified PlaylistTrack: {Artist} - {Title}", track.Artist, track.Title);
                          enrichedCount++;
+                         
+                         // Notify UI
+                         _eventBus.Publish(new TrackMetadataUpdatedEvent(track.TrackUniqueHash));
                     }
                 }
                 catch (Exception ex) { _logger.LogError(ex, "Stage 0 failed for track {Id}", track.Id); }
@@ -175,6 +182,10 @@ public class LibraryEnrichmentWorker : IDisposable
                      await _databaseService.UpdateLibraryEntryEnrichmentAsync(track.UniqueHash, cached);
                      _logger.LogDebug("Cache Hit (LibraryEntry): {Artist} - {Title}", track.Artist, track.Title);
                      enrichedCount++;
+                     
+                     // Notify UI
+                     _eventBus.Publish(new TrackMetadataUpdatedEvent(track.UniqueHash));
+                     
                      continue; // Skip API call
                 }
 
@@ -189,6 +200,9 @@ public class LibraryEnrichmentWorker : IDisposable
                     {
                          _logger.LogDebug("Identified LibraryEntry: {Artist} - {Title}", track.Artist, track.Title);
                          enrichedCount++;
+                         
+                         // Notify UI
+                         _eventBus.Publish(new TrackMetadataUpdatedEvent(track.UniqueHash));
                     }
                 }
                 catch (Exception ex) { _logger.LogError(ex, "Stage 1 failed for track {Hash}", track.UniqueHash); }
@@ -226,6 +240,27 @@ public class LibraryEnrichmentWorker : IDisposable
                         
                         enrichedCount += featuresMap.Count;
                         _logger.LogInformation("Stage 2 Complete: Enriched {Count} tracks with audio features", featuresMap.Count);
+                        
+                        // Notify UI for each updated track
+                        foreach (var trackId in featuresMap.Keys)
+                        {
+                            // We need UniqueHash, but we only have SpotifyID here.
+                            // The most robust way is to broadcast a general refresh or map IDs back.
+                            // Ideally, featuresMap keys are Spotify IDs. DB update handled mapping.
+                            // But event expects GlobalID (Hash).
+                            // For now, let's skip individual events for features to avoid N+1 lookups, 
+                            // OR relying on the LibraryMetadataEnrichedEvent (count based) if ViewModel listens to it.
+                            // Wait, PlaylistTrackViewModel only listens to TrackMetadataUpdatedEvent (HASH specific).
+                            // Let's attempt to map back using the 'allIds' list? No, that's just a list of IDs.
+                            // Actually, we have 'needingFeaturesEntries' and 'needingFeaturesPlaylist'.
+                            
+                            // Iterate the original fetch list to match verified updates
+                            foreach(var t in needingFeaturesPlaylist.Where(x => x.SpotifyTrackId == trackId))
+                                _eventBus.Publish(new TrackMetadataUpdatedEvent(t.TrackUniqueHash));
+                                
+                            foreach(var e in needingFeaturesEntries.Where(x => x.SpotifyTrackId == trackId))
+                                _eventBus.Publish(new TrackMetadataUpdatedEvent(e.UniqueHash));
+                        }
                      }
                  }
                  catch (Exception ex)
@@ -260,6 +295,24 @@ public class LibraryEnrichmentWorker : IDisposable
                         await _databaseService.UpdateLibraryEntriesGenresAsync(genreMap);
                         enrichedCount += genreMap.Count; // Count artists updated
                         _logger.LogInformation("Stage 3 Complete: Enriched {Count} artists with genres", genreMap.Count);
+                        
+                        // Notify UI - Map updated Artists back to Tracks
+                        if (tracks != null)
+                        {
+                            foreach (var t in tracks.Where(x => x.SpotifyArtistId != null && genreMap.ContainsKey(x.SpotifyArtistId)))
+                            {
+                                 _eventBus.Publish(new TrackMetadataUpdatedEvent(t.TrackUniqueHash));
+                            }
+                        }
+                        
+                        if (entries != null)
+                        {
+                            foreach (var e in entries.Where(x => x.SpotifyArtistId != null && genreMap.ContainsKey(x.SpotifyArtistId)))
+                            {
+                                 _eventBus.Publish(new TrackMetadataUpdatedEvent(e.UniqueHash));
+                            }
+                        }
+
                         didWork = true;
                     }
                 }

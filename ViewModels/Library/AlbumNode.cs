@@ -6,6 +6,10 @@ using System.Windows.Input;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
 using SLSKDONET.Views; // For RelayCommand
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using System;
+using System.Threading.Tasks;
 
 namespace SLSKDONET.ViewModels.Library;
 
@@ -53,6 +57,44 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
     public ObservableCollection<PlaylistTrackViewModel> Tracks { get; } = new();
     
     public ICommand DownloadAlbumCommand { get; }
+    public ICommand PlayAlbumCommand { get; } // New Command
+
+    // UI State
+    private bool _isLoading = false;
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } }
+    }
+
+    private Bitmap? _artworkBitmap;
+    public Bitmap? ArtworkBitmap
+    {
+        get => _artworkBitmap;
+        set { if (_artworkBitmap != value) { _artworkBitmap = value; OnPropertyChanged(); } }
+    }
+
+    public IBrush FallbackBrush => GenerateColorFromHash(AlbumTitle ?? "?");
+    public string FallbackLetter => !string.IsNullOrEmpty(AlbumTitle) ? AlbumTitle.Substring(0, 1).ToUpper() : "?";
+
+    // Track Count for UI binding
+    public int TrackCount => Tracks.Count;
+
+    // Helper for color generation
+    private IBrush GenerateColorFromHash(string input)
+    {
+        int hash = input.GetHashCode();
+        byte r = (byte)((hash & 0xFF0000) >> 16);
+        byte g = (byte)((hash & 0x00FF00) >> 8);
+        byte b = (byte)(hash & 0x0000FF);
+        
+        // Ensure color is not too dark
+        if (r < 50) r += 50;
+        if (g < 50) g += 50;
+        if (b < 50) b += 50;
+
+        return new SolidColorBrush(Color.FromRgb(r, g, b));
+    }
 
     public AlbumNode(string? albumTitle, string? artist, DownloadManager? downloadManager = null)
     {
@@ -61,6 +103,13 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         _downloadManager = downloadManager;
         
         DownloadAlbumCommand = new RelayCommand<object>(_ => DownloadAlbum());
+        PlayAlbumCommand = new RelayCommand<object>(_ => PlayAlbum());
+        
+        // Use async loading for bitmap if path exists
+        if (!string.IsNullOrEmpty(AlbumArtPath))
+        {
+             LoadArtworkAsync();
+        }
         
         Tracks.CollectionChanged += (s, e) => {
             if (e.NewItems != null)
@@ -86,6 +135,42 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         _downloadManager.QueueTracks(tracksToDownload);
     }
 
+    private void PlayAlbum()
+    {
+        // TODO: Wire up to PlayerService via LibraryViewModel or EventBus
+        // For now, simple placeholder or invoke a track play
+        if (Tracks.Any())
+        {
+            // Just requesting play of first track? Or queue all?
+            // PlayerViewModel.Instance.PlayTrack(Tracks.First()); 
+        }
+    }
+
+    private async void LoadArtworkAsync()
+    {
+        if (string.IsNullOrEmpty(AlbumArtPath)) return;
+        
+        IsLoading = true;
+        try 
+        {
+             await Task.Run(() => 
+             {
+                 if (System.IO.File.Exists(AlbumArtPath))
+                 {
+                     // Simple load, cache service would be better
+                     try {
+                        var bmp = new Bitmap(AlbumArtPath);
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() => ArtworkBitmap = bmp);
+                     } catch {}
+                 }
+             });
+        }
+        finally
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => IsLoading = false);
+        }
+    }
+
     private void UpdateAlbumArt()
     {
         // Use the art from the first track that has it
@@ -93,6 +178,7 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         if (art != AlbumArtPath)
         {
             AlbumArtPath = art;
+            LoadArtworkAsync(); // Reload bitmap when path changes
         }
     }
 

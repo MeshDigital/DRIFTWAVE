@@ -46,7 +46,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     }
 
     // Phase 9: Mix Helper Sidebar
-    private bool _isMixHelperVisible = true;
+    private bool _isMixHelperVisible = false;
     public bool IsMixHelperVisible
     {
         get => _isMixHelperVisible;

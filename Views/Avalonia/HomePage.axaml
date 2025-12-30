@@ -180,19 +180,16 @@
                                 </StackPanel>
                             </Grid>
                             
-                            <ScrollViewer Grid.Row="1" MaxHeight="250">
-                                <ItemsRepeater ItemsSource="{Binding ActiveOperations}">
-                                    <ItemsRepeater.Layout>
-                                        <StackLayout Orientation="Vertical" Spacing="4"/>
-                                    </ItemsRepeater.Layout>
-                                    <ItemsRepeater.ItemTemplate>
+                            <ScrollViewer Grid.Row="1" MaxHeight="200" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                                <ItemsControl ItemsSource="{Binding ActiveOperations}">
+                                    <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#0DFFFFFF" CornerRadius="4" Padding="8,6">
-                                                <TextBlock Text="{Binding}" Foreground="#DDD" FontSize="12" FontFamily="Consolas, Monospace"/>
+                                            <Border Background="#252525" CornerRadius="4" Padding="10,6" Margin="0,0,0,4">
+                                                <TextBlock Text="{Binding}" Foreground="#E0E0E0" FontSize="12" FontFamily="Consolas, monospace"/>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsRepeater.ItemTemplate>
-                                </ItemsRepeater>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </ScrollViewer>
                         </Grid>
                     </Border>
@@ -202,22 +199,19 @@
                         <Grid RowDefinitions="Auto,*">
                             <TextBlock Grid.Row="0" Text="RESILIENCE LOG" FontSize="11" FontWeight="Bold" Foreground="#606060" LetterSpacing="1" Margin="0,0,0,12"/>
                             
-                            <ScrollViewer Grid.Row="1" MaxHeight="250">
-                                <ItemsRepeater ItemsSource="{Binding ResilienceLog}">
-                                    <ItemsRepeater.Layout>
-                                        <StackLayout Orientation="Vertical" Spacing="4"/>
-                                    </ItemsRepeater.Layout>
-                                    <ItemsRepeater.ItemTemplate>
+                            <ScrollViewer Grid.Row="1" MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding ResilienceLog}">
+                                    <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#0D00FF00" CornerRadius="4" Padding="8,6" BorderBrush="#00FF00" BorderThickness="0,0,0,0">
+                                            <Border Background="#0D00FF00" CornerRadius="4" Padding="10,6" Margin="0,0,0,4">
                                                 <Grid ColumnDefinitions="Auto,*">
                                                     <TextBlock Text="🛡️" FontSize="10" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#808080" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsRepeater.ItemTemplate>
-                                </ItemsRepeater>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </ScrollViewer>
                         </Grid>
                     </Border>
@@ -240,16 +234,45 @@
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="vm:PlaylistCardViewModel">
                                     <Button Command="{Binding ((vm:HomeViewModel)DataContext).ViewPlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Background="Transparent" BorderThickness="0" Padding="0">
-                                        <controls:AlbumCard Width="200" MinHeight="280"/>
+                                        <Border Width="180" Height="240" Background="#1A1A1D" CornerRadius="12" ClipToBounds="True" BorderBrush="#2A2A2E" BorderThickness="1">
+                                            <StackPanel>
+                                                <!-- Cover Image -->
+                                                <Border Height="140" Background="#262629">
+                                                    <Grid>
+                                                        <PathIcon Data="{StaticResource icons_library}" Width="32" Height="32" Foreground="#333" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <Image Source="{Binding CoverImageUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
+                                                    </Grid>
+                                                </Border>
+                                                
+                                                <!-- Playlist Info -->
+                                                <StackPanel Margin="12" Spacing="4">
+                                                    <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding TrackCountText}" Foreground="#808080" FontSize="11"/>
+                                                    
+                                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                                        <Border Height="2" Background="{Binding MatchPercentage, Converter={StaticResource MatchToColorConverter}}" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding MatchText}" Foreground="{Binding MatchPercentage, Converter={StaticResource MatchToColorConverter}}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0"/>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
                                     </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                    
+                    <!-- Empty State Placeholder -->
+                    <Border IsVisible="{Binding !RecentPlaylists.Count}" HorizontalAlignment="Center" Margin="0,20" Padding="40" Background="#0DFFFFFF" CornerRadius="12">
+                        <StackPanel Spacing="10" HorizontalAlignment="Center">
+                            <TextBlock Text="No recent playlists" Foreground="#606060" FontSize="14" HorizontalAlignment="Center"/>
+                            <Button Content="Go to Search" Command="{Binding NavigateToSearchCommand}" Padding="15,8" Background="#1DB954" CornerRadius="6"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
                 
                 <!-- Third Row: Spotify Recommendations -->

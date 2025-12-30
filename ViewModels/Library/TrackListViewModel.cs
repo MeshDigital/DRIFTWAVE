@@ -72,11 +72,15 @@ public class TrackListViewModel : ReactiveObject
                 this.RaiseAndSetIfChanged(ref _isFilterAll, value);
                 if (value)
                 {
-                    IsFilterDownloaded = false;
-                    IsFilterPending = false;
+                    _isFilterDownloaded = false;
+                    this.RaisePropertyChanged(nameof(IsFilterDownloaded));
+                    
+                    _isFilterPending = false;
+                    this.RaisePropertyChanged(nameof(IsFilterPending));
                 }
                 else if (!IsFilterDownloaded && !IsFilterPending)
                 {
+                    // If everything is unselected, force All back on
                     _isFilterAll = true;
                     this.RaisePropertyChanged(nameof(IsFilterAll));
                 }
@@ -98,12 +102,17 @@ public class TrackListViewModel : ReactiveObject
                 this.RaiseAndSetIfChanged(ref _isFilterDownloaded, value);
                 if (value)
                 {
-                    IsFilterAll = false;
-                    IsFilterPending = false;
+                    _isFilterAll = false;
+                    this.RaisePropertyChanged(nameof(IsFilterAll));
+                    
+                    _isFilterPending = false;
+                    this.RaisePropertyChanged(nameof(IsFilterPending));
                 }
                 else if (!IsFilterPending)
                 {
-                    IsFilterAll = true;
+                    // If everything is unselected, force All back on
+                    _isFilterAll = true;
+                    this.RaisePropertyChanged(nameof(IsFilterAll));
                 }
             }
             finally { _updatingFilters = false; }
@@ -123,12 +132,17 @@ public class TrackListViewModel : ReactiveObject
                 this.RaiseAndSetIfChanged(ref _isFilterPending, value);
                 if (value)
                 {
-                    IsFilterAll = false;
-                    IsFilterDownloaded = false;
+                    _isFilterAll = false;
+                    this.RaisePropertyChanged(nameof(IsFilterAll));
+                    
+                    _isFilterDownloaded = false;
+                    this.RaisePropertyChanged(nameof(IsFilterDownloaded));
                 }
                 else if (!IsFilterDownloaded)
                 {
-                    IsFilterAll = true;
+                    // If everything is unselected, force All back on
+                    _isFilterAll = true;
+                    this.RaisePropertyChanged(nameof(IsFilterAll));
                 }
             }
             finally { _updatingFilters = false; }
