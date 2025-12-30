@@ -110,6 +110,9 @@ public class ConfigManager
                 IsFfmpegAvailable = bool.TryParse(config["Dependencies:IsFfmpegAvailable"], out var ifa) && ifa,
                 FfmpegVersion = config["Dependencies:FfmpegVersion"] ?? "",
                 
+                // [Analysis]
+                MaxConcurrentAnalyses = int.TryParse(config["Analysis:MaxConcurrentAnalyses"], out var mca) ? mca : 0,
+                
                 // [Window]
                 WindowWidth = double.TryParse(config["Window:Width"], out var ww) ? ww : 1400,
                 WindowHeight = double.TryParse(config["Window:Height"], out var wh) ? wh : 900,
@@ -200,6 +203,10 @@ public class ConfigManager
         iniContent.AppendLine("[Dependencies]");
         iniContent.AppendLine($"IsFfmpegAvailable = {config.IsFfmpegAvailable}");
         iniContent.AppendLine($"FfmpegVersion = {config.FfmpegVersion}");
+
+        iniContent.AppendLine();
+        iniContent.AppendLine("[Analysis]");
+        iniContent.AppendLine($"MaxConcurrentAnalyses = {config.MaxConcurrentAnalyses}");
 
         iniContent.AppendLine();
         iniContent.AppendLine("[Window]");

@@ -172,6 +172,8 @@ public class AnalysisWorker : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisWorker> _logger;
+    private readonly int _maxConcurrentAnalyses;
+    private readonly SemaphoreSlim _concurrencyLimiter;
     
     // Batching & Throttling State
     private DateTime _lastProgressReport = DateTime.MinValue;
@@ -180,17 +182,42 @@ public class AnalysisWorker : BackgroundService
     private const int BatchSize = 10;
     private readonly TimeSpan BatchTimeout = TimeSpan.FromSeconds(5);
 
-    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger)
+    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger, Configuration.AppConfig config)
     {
         _queue = queue;
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
         _logger = logger;
+        
+        // Determine optimal parallelism
+        int configuredValue = config.MaxConcurrentAnalyses;
+        if (configuredValue == 0)
+        {
+            _maxConcurrentAnalyses = SystemInfoHelper.GetOptimalParallelism();
+            _logger.LogInformation("🧠 Analysis parallelism: AUTO-DETECTED {Threads} threads ({SystemInfo})",
+                _maxConcurrentAnalyses, SystemInfoHelper.GetSystemDescription());
+        }
+        else if (configuredValue < 0)
+        {
+            _maxConcurrentAnalyses = 1;
+            _logger.LogWarning("Invalid MaxConcurrentAnalyses: {Value}. Defaulting to 1.", configuredValue);
+        }
+        else
+        {
+            _maxConcurrentAnalyses = Math.Min(configuredValue, Environment.ProcessorCount * 2);
+            _logger.LogInformation("🧠 Analysis parallelism: CONFIGURED {Threads} threads", _maxConcurrentAnalyses);
+        }
+        
+        _concurrencyLimiter = new SemaphoreSlim(_maxConcurrentAnalyses, _maxConcurrentAnalyses);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("🧠 Musical Brain (AnalysisWorker) started.");
+        _logger.LogInformation("🧠 Musical Brain (AnalysisWorker) started with {Threads} parallel threads.", _maxConcurrentAnalyses);
+        
+        // Track batch metrics
+        int processedInBatch = 0;
+        var batchStartTime = DateTime.UtcNow;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -203,23 +230,42 @@ public class AnalysisWorker : BackgroundService
                 await FlushBatchAsync(stoppingToken);
             }
 
-            // 2. Wait for next item (with timeout to ensure we flush batch even if no new items come)
-            AnalysisRequest? request = null;
-            try 
+            // 2. Collect batch of requests (up to parallelism limit)
+            var batch = new List<AnalysisRequest>();
+            try
             {
-                // Wait up to 1 second for new item, otherwise loop to check batch timeout
+                // Try to read up to _maxConcurrentAnalyses items without blocking too long
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-                cts.CancelAfter(1000);
-                request = await _queue.Reader.ReadAsync(cts.Token);
+                cts.CancelAfter(1000); // 1 second timeout
+                
+                while (batch.Count < _maxConcurrentAnalyses && _queue.Reader.TryRead(out var request))
+                {
+                    batch.Add(request);
+                }
+                
+                // If no items ready, wait for at least one
+                if (batch.Count == 0)
+                {
+                    try
+                    {
+                        var request = await _queue.Reader.ReadAsync(cts.Token);
+                        batch.Add(request);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Timeout or stop - just loop
+                        if (stoppingToken.IsCancellationRequested) break;
+                        continue;
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
-                // Timeout or Stop - just loop
                 if (stoppingToken.IsCancellationRequested) break;
                 continue;
             }
 
-            if (request == null) continue;
+            if (batch.Count == 0) continue;
 
             // Check pause state
             while (_queue.IsPaused && !stoppingToken.IsCancellationRequested)
@@ -227,11 +273,48 @@ public class AnalysisWorker : BackgroundService
                 await Task.Delay(500, stoppingToken);
             }
 
-            await ProcessRequestAsync(request, stoppingToken);
+            // 3. Process batch in parallel
+            var processingTasks = batch.Select(async request =>
+            {
+                await _concurrencyLimiter.WaitAsync(stoppingToken);
+                try
+                {
+                    await ProcessRequestAsync(request, stoppingToken);
+                    Interlocked.Increment(ref processedInBatch);
+                    
+                    // Log progress every 10 tracks
+                    if (processedInBatch % 10 == 0)
+                    {
+                        LogBatchProgress(processedInBatch, batchStartTime);
+                    }
+                }
+                finally
+                {
+                    _concurrencyLimiter.Release();
+                }
+            }).ToList();
+
+            await Task.WhenAll(processingTasks);
         }
 
         // Final Flush
         if (_pendingResults.Any()) await FlushBatchAsync(CancellationToken.None);
+        
+        _logger.LogInformation("🧠 Musical Brain (AnalysisWorker) stopped. Processed {Total} tracks.", processedInBatch);
+    }
+    
+    private void LogBatchProgress(int processed, DateTime startTime)
+    {
+        var elapsed = DateTime.UtcNow - startTime;
+        var tracksPerMinute = elapsed.TotalMinutes > 0 ? processed / elapsed.TotalMinutes : 0;
+        
+        _logger.LogInformation(
+            "📈 Analysis progress: {Processed} tracks in {Elapsed} ({Rate:F1}/min) - {Threads} threads active",
+            processed,
+            elapsed.ToString(@"hh\:mm\:ss"),
+            tracksPerMinute,
+            _maxConcurrentAnalyses
+        );
     }
 
     private async Task ProcessRequestAsync(AnalysisRequest request, CancellationToken stoppingToken)

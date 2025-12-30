@@ -84,6 +84,9 @@ public class AppConfig
     public bool IsFfmpegAvailable { get; set; } = false; // Updated on startup and manual checks
     public string FfmpegVersion { get; set; } = ""; // Detected version (e.g., "6.0.1")
 
+    // Audio Analysis Parallelism
+    public int MaxConcurrentAnalyses { get; set; } = 0; // 0 = auto-detect based on CPU/RAM, 1 = sequential, >1 = parallel
+
     public override string ToString()
     {
         return $"AppConfig(User={Username}, Port={ListenPort}, Downloads={DownloadDirectory})";
