@@ -25,6 +25,7 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
     private readonly INavigationService _navigationService;
     private readonly ConnectionViewModel _connectionViewModel;
     private readonly DatabaseService _databaseService;
+    private readonly LibraryViewModel _libraryViewModel;
     private readonly SpotifyAuthService _spotifyAuth;
     private readonly SpotifyEnrichmentService _spotifyEnrichment;
     private readonly DownloadManager _downloadManager;
@@ -107,6 +108,8 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
     public ICommand NavigateToSearchCommand { get; }
     public ICommand QuickSearchCommand { get; }
     public ICommand ClearDeadLettersCommand { get; } // Phase 3B
+    public ICommand NavigateLibraryCommand { get; }
+    public ICommand ViewPlaylistCommand { get; }
 
     private readonly MissionControlService _missionControl;
     private DashboardSnapshot _currentSnapshot = new();
@@ -143,7 +146,8 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         CrashRecoveryJournal crashJournal,
         INotificationService notificationService,
         IEventBus eventBus,
-        MissionControlService missionControl)
+        MissionControlService missionControl,
+        LibraryViewModel libraryViewModel)
     {
         _logger = logger;
         _dashboardService = dashboardService;
@@ -158,6 +162,7 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         _notificationService = notificationService;
         _eventBus = eventBus;
         _missionControl = missionControl;
+        _libraryViewModel = libraryViewModel;
 
         // Subscribe to Mission Control Updates (Smart Throttled)
         _eventSubscription = _eventBus.GetEvent<DashboardSnapshot>().Subscribe(snapshot =>
@@ -184,6 +189,8 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         // Initialize other commands
         RefreshDashboardCommand = new AsyncRelayCommand(RefreshDashboardAsync);
         NavigateToSearchCommand = new RelayCommand(() => _navigationService.NavigateTo("Search"));
+        NavigateLibraryCommand = new RelayCommand(() => _navigationService.NavigateTo("Library"));
+        ViewPlaylistCommand = new RelayCommand<PlaylistJob>(ExecuteViewPlaylist);
         QuickSearchCommand = new AsyncRelayCommand<SpotifyTrackViewModel>(ExecuteQuickSearchAsync);
         ClearDeadLettersCommand = new AsyncRelayCommand(ClearDeadLettersAsync);
 
@@ -336,14 +343,6 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
                 {
                     track.InLibrary = await _databaseService.FindLibraryEntryAsync(track.ISRC) != null;
                 }
-                
-                if (!track.InLibrary && !string.IsNullOrEmpty(track.Artist) && !string.IsNullOrEmpty(track.Title))
-                {
-                    // Fallback: check by a hash if ISRC not found or missing
-                    var hash = $"{track.Artist.ToLower()}|{track.Title.ToLower()}";
-                    // This is a bit simplified, but DatabaseService uses TrackUniqueHash usually.
-                    // Let's assume we check library entries.
-                }
             }
 
             Dispatcher.UIThread.Post(() =>
@@ -358,8 +357,15 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
-            IsLoadingSpotify = false;
+            Dispatcher.UIThread.Post(() => IsLoadingSpotify = false);
         }
+    }
+
+    private void ExecuteViewPlaylist(PlaylistJob? playlist)
+    {
+        if (playlist == null) return;
+        _libraryViewModel.SelectedProject = playlist;
+        _navigationService.NavigateTo("Library");
     }
 
     private async Task ExecuteQuickSearchAsync(SpotifyTrackViewModel? track)

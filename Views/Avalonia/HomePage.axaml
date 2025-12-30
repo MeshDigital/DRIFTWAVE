@@ -10,6 +10,10 @@
              x:DataType="vm:HomeViewModel"
              Background="#0A0A0B">
     
+    <UserControl.Resources>
+        <conv:MatchToColorConverter x:Key="MatchToColorConverter"/>
+    </UserControl.Resources>
+    
     <UserControl.Styles>
         <Style Selector="Border.glass">
             <Setter Property="Background" Value="#1A1A1D"/>
@@ -176,7 +180,7 @@
                                 </StackPanel>
                             </Grid>
                             
-                            <ScrollViewer Grid.Row="1" Height="200">
+                            <ScrollViewer Grid.Row="1" MaxHeight="250">
                                 <ItemsRepeater ItemsSource="{Binding ActiveOperations}">
                                     <ItemsRepeater.Layout>
                                         <StackLayout Orientation="Vertical" Spacing="4"/>
@@ -198,7 +202,7 @@
                         <Grid RowDefinitions="Auto,*">
                             <TextBlock Grid.Row="0" Text="RESILIENCE LOG" FontSize="11" FontWeight="Bold" Foreground="#606060" LetterSpacing="1" Margin="0,0,0,12"/>
                             
-                            <ScrollViewer Grid.Row="1" Height="200">
+                            <ScrollViewer Grid.Row="1" MaxHeight="250">
                                 <ItemsRepeater ItemsSource="{Binding ResilienceLog}">
                                     <ItemsRepeater.Layout>
                                         <StackLayout Orientation="Vertical" Spacing="4"/>
@@ -228,19 +232,24 @@
                         </Button>
                     </Grid>
                     
-                    <ItemsControl ItemsSource="{Binding RecentPlaylists}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="16"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <!-- Using a specialized card for dashboard -->
-                                <controls:AlbumCard HorizontalAlignment="Left" Width="200" MinHeight="300"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding RecentPlaylists}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="16"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding ((vm:HomeViewModel)DataContext).ViewPlaylistCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Background="Transparent" BorderThickness="0" Padding="0">
+                                        <controls:AlbumCard Width="200" MinHeight="280"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </StackPanel>
                 
                 <!-- Third Row: Spotify Recommendations -->
@@ -267,6 +276,8 @@
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="{Binding Artist}" FontSize="11" Foreground="#808080" TextTrimming="CharacterEllipsis"/>
+                                            <Border Height="2" Background="{Binding MatchPercentage, Converter={StaticResource MatchToColorConverter}}" 
+                                                    VerticalAlignment="Bottom" Margin="0,4,0,0"/>
                                         </StackPanel>
                                         
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4">
