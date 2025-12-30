@@ -237,6 +237,7 @@ public class TrackListViewModel : ReactiveObject
                 var track = CurrentProjectTracks.FirstOrDefault(t => t.GlobalId == evt.TrackGlobalId);
                 if (track != null)
                 {
+                    if (track is IDisposable disposable) disposable.Dispose();
                     CurrentProjectTracks.Remove(track);
                     RefreshFilteredTracks();
                 }
@@ -264,6 +265,11 @@ public class TrackListViewModel : ReactiveObject
     {
         if (job == null)
         {
+            // Dispose existing tracks
+            foreach (var track in CurrentProjectTracks)
+            {
+               if (track is IDisposable disposable) disposable.Dispose();
+            }
             CurrentProjectTracks.Clear();
             return;
         }
@@ -271,6 +277,21 @@ public class TrackListViewModel : ReactiveObject
         try
         {
             _logger.LogInformation("Loading tracks for project: {Name}", job.SourceTitle);
+            
+            // Note: We create a new collection, but we should dispose the old one's items if we are replacing the reference.
+            // The setter for CurrentProjectTracks replaces the reference.
+            // However, we can't easily access the *old* value inside the method creating the new one easily unless we do it before assignment.
+            // But we are assigning to specific property.
+            
+            // Better strategy: Clean up before reassignment in Setter or here?
+            // Since we assign a *new* ObservableCollection in this method, the old one is lost.
+            
+            // Dispose currently loaded tracks
+            foreach (var track in CurrentProjectTracks)
+            {
+               if (track is IDisposable disposable) disposable.Dispose();
+            }
+            
             var tracks = new ObservableCollection<PlaylistTrackViewModel>();
 
             if (job.Id == Guid.Empty) // All Tracks
@@ -297,7 +318,9 @@ public class TrackListViewModel : ReactiveObject
                             ResolvedFilePath = entry.FilePath,
                             Format = entry.Format
                         },
-                        _eventBus
+                        _eventBus,
+                        _libraryService,
+                        _artworkCache
                     );
                     
                     tracks.Add(vm);
@@ -311,7 +334,7 @@ public class TrackListViewModel : ReactiveObject
                 foreach (var track in freshTracks.OrderBy(t => t.TrackNumber))
                 {
                     // Create Smart VM with EventBus subscription
-                    var vm = new PlaylistTrackViewModel(track, _eventBus);
+                    var vm = new PlaylistTrackViewModel(track, _eventBus, _libraryService, _artworkCache);
 
                     // Sync with live MainViewModel state to get initial values
                     // Note: This is still useful for initial state (e.g. if download is 50% done when validation opens)
@@ -331,7 +354,7 @@ public class TrackListViewModel : ReactiveObject
                     tracks.Add(vm);
 
                     // Phase 0: Load album artwork asynchronously
-                    _ = vm.LoadAlbumArtworkAsync(_artworkCache);
+                    _ = vm.LoadAlbumArtworkAsync();
                 }
             }
 

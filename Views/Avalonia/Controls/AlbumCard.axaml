@@ -19,13 +19,12 @@
         <!-- Use Auto rows to prevent compression -->
         <Grid RowDefinitions="220,Auto,Auto">
             <!-- Top: Cover Art (Fixed Height) -->
-            <Border Grid.Row="0" Width="240" Height="220" Background="#1E1E1E">
-                <Panel>
-                    <PathIcon Data="{StaticResource icons_library}" 
-                             Width="64" Height="64" 
-                             Foreground="#333"
-                             HorizontalAlignment="Center" 
-                             VerticalAlignment="Center"/>
+            <Border Grid.Row="0" CornerRadius="8" ClipToBounds="True" Background="#222">
+                <Grid>
+                    <!-- Fallback Icon -->
+                    <PathIcon Data="{StaticResource icons_library}" Width="64" Height="64" Foreground="#333" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <!-- Album Art -->
+                    <Image Source="{Binding AlbumArtUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
                     
                     <!-- Stats Overlay -->
                     <Border Background="#CC000000" VerticalAlignment="Bottom" Padding="8,4">
@@ -42,15 +41,12 @@
                                       IsVisible="{Binding MatchConfidence, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                         </Grid>
                     </Border>
-                </Panel>
+                </Grid>
             </Border>
             
             <!-- Middle: Details (Auto Height with Min/Max constraints) -->
-            <StackPanel Grid.Row="1" 
-                       Margin="12,12,12,8"
-                       MinHeight="80"
-                       MaxHeight="120">
-                <TextBlock Text="{Binding AlbumTitle}" 
+            <StackPanel Grid.Row="1" Margin="12,12,12,8" MinHeight="80" MaxHeight="120">
+                <TextBlock Text="{Binding SourceTitle}" 
                           FontWeight="Bold" 
                           FontSize="14" 
                           Foreground="White"

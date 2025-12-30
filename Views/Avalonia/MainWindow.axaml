@@ -244,7 +244,7 @@
                     <!-- Analysis Queue Dashboard -->
                     <Button Classes="nav" 
                             Command="{Binding NavigateInspectorCommand}"
-                            Classes.selected="{Binding CurrentPageType, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static models:PageType.Inspector}}">
+                            Classes.selected="{Binding CurrentPageType, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static models:PageType.AnalysisQueue}}">
                         <Grid ColumnDefinitions="Auto,*">
                             <Border Grid.ColumnSpan="2" CornerRadius="4" IsVisible="False"/>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
@@ -379,7 +379,7 @@
              <Grid>
                  <!-- Bottom Layout usually needs a more horizontal PlayerControl, 
                       but for now we'll host the same control or a variant. -->
-                 <views:PlayerControl DataContext="{Binding PlayerViewModel}"/>
+                 <views:HorizontalPlayerControl DataContext="{Binding PlayerViewModel}"/>
              </Grid>
         </Border>
     </Grid>

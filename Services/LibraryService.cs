@@ -433,25 +433,46 @@ public class LibraryService : ILibraryService
             _cache.InvalidateProject(playlistId);
             _logger.LogInformation("Deleted playlist job: {Id}, cache invalidated", playlistId);
 
-            // REACTIVE: Auto-remove from observable collection - REMOVED: Managed by ProjectListViewModel via EventBus
-            /*
-            Dispatcher.UIThread.Post(() =>
-            {
-                var jobToRemove = Playlists.FirstOrDefault(p => p.Id == playlistId);
-                if (jobToRemove != null)
-                {
-                    Playlists.Remove(jobToRemove);
-                    _logger.LogInformation("Removed playlist '{Title}' from reactive collection", jobToRemove.SourceTitle);
-                }
-            });
-            */
-
             // Emit the event so subscribers (like LibraryViewModel) can react.
             _eventBus.Publish(new ProjectDeletedEvent(playlistId));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to delete playlist job");
+            throw;
+        }
+    }
+
+    public async Task<List<PlaylistJob>> LoadDeletedPlaylistJobsAsync()
+    {
+        try
+        {
+            var entities = await _databaseService.LoadDeletedPlaylistJobsAsync().ConfigureAwait(false);
+            return entities.Select(EntityToPlaylistJob).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load deleted playlist jobs");
+            return new List<PlaylistJob>();
+        }
+    }
+
+    public async Task RestorePlaylistJobAsync(Guid playlistId)
+    {
+        try
+        {
+            await _databaseService.RestorePlaylistJobAsync(playlistId).ConfigureAwait(false);
+            
+            // Invalidate cache
+            _cache.InvalidateProject(playlistId);
+            
+            // Notify listeners that a project was added (restored)
+            _eventBus.Publish(new ProjectAddedEvent(playlistId));
+            _logger.LogInformation("Restored playlist job: {Id}", playlistId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restore playlist job {Id}", playlistId);
             throw;
         }
     }
@@ -639,7 +660,9 @@ public class LibraryService : ILibraryService
             // Phase 2.5
             IsUserPaused = entity.IsUserPaused,
             DateStarted = entity.DateStarted,
-            DateUpdated = entity.DateUpdated
+            DateUpdated = entity.DateUpdated,
+            IsDeleted = entity.IsDeleted,
+            DeletedAt = entity.DeletedAt
         };
 
         job.MissingCount = entity.TotalTracks - entity.SuccessfulCount - entity.FailedCount;

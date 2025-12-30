@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
              xmlns:conv="clr-namespace:SLSKDONET.Converters"
+             xmlns:controls="clr-namespace:SLSKDONET.Views.Avalonia.Controls"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="1000"
              x:Class="SLSKDONET.Views.Avalonia.HomePage"
              x:DataType="vm:HomeViewModel"
@@ -235,16 +236,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <!-- Using a compact card for dashboard -->
-                                <Border Width="180" Background="#121214" CornerRadius="12" Padding="12" BorderBrush="#1F1F23" BorderThickness="1">
-                                    <StackPanel Spacing="8">
-                                        <Border CornerRadius="8" ClipToBounds="True" Background="#262629">
-                                            <Rectangle Fill="#1A1A1D" Height="156"/>
-                                        </Border>
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding SuccessfulCount, StringFormat='{}{0} tracks'}" FontSize="11" Foreground="#808080"/>
-                                    </StackPanel>
-                                </Border>
+                                <!-- Using a specialized card for dashboard -->
+                                <controls:AlbumCard HorizontalAlignment="Left" Width="200" MinHeight="300"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -265,8 +258,10 @@
                                 <Border Grid.ColumnSpan="1" Margin="0,0,16,16" Background="#121214" CornerRadius="12" Padding="12" BorderBrush="#1F1F23" BorderThickness="1">
                                     <Grid ColumnDefinitions="48,*,Auto">
                                         <Border Grid.Column="0" CornerRadius="6" ClipToBounds="True" Width="48" Height="48">
-                                            <!-- We would ideally use an AsyncImage control here, for now placeholder -->
-                                            <Rectangle Fill="#262629"/>
+                                            <Grid>
+                                                <Rectangle Fill="#262629"/>
+                                                <Image Source="{Binding ImageUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
+                                            </Grid>
                                         </Border>
                                         
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">

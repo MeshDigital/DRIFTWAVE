@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows.Input; // For ICommand
 using SLSKDONET.Models;
 using SLSKDONET.Services;
@@ -23,6 +25,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     private string _currentSpeed = string.Empty;
     private string? _errorMessage;
     private string? _coverArtUrl;
+    private Avalonia.Media.Imaging.Bitmap? _artworkBitmap;
 
     private int _sortOrder;
     public DateTime AddedAt { get; } = DateTime.Now;
@@ -92,8 +95,6 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         _ => "Not Analyzed"
     };
 
-    // Audio Analysis Properties (Placeholder defaults for UI testing)
-    private double _energy = 0.0; 
     public double Energy
     {
         get => Model.Energy ?? 0.0;
@@ -104,7 +105,6 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         }
     }
 
-    private double _danceability = 0.0;
     public double Danceability
     {
         get => Model.Danceability ?? 0.0;
@@ -115,7 +115,6 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         }
     }
 
-    private double _valence = 0.0;
     public double Valence
     {
         get => Model.Valence ?? 0.0;
@@ -236,10 +235,22 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     public ICommand FindNewVersionCommand { get; }
 
     private readonly IEventBus? _eventBus;
+    private readonly ILibraryService? _libraryService;
+    private readonly ArtworkCacheService? _artworkCacheService;
 
-    public PlaylistTrackViewModel(PlaylistTrack track, IEventBus? eventBus = null)
+    // Disposal
+    private readonly System.Reactive.Disposables.CompositeDisposable _disposables = new();
+    private bool _isDisposed;
+
+    public PlaylistTrackViewModel(
+        PlaylistTrack track, 
+        IEventBus? eventBus = null,
+        ILibraryService? libraryService = null,
+        ArtworkCacheService? artworkCacheService = null)
     {
         _eventBus = eventBus;
+        _libraryService = libraryService;
+        _artworkCacheService = artworkCacheService;
         Model = track;
         SourceId = track.PlaylistId;
         GlobalId = track.TrackUniqueHash;
@@ -263,22 +274,66 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         // Smart Subscription
         if (_eventBus != null)
         {
-            _eventBus.GetEvent<TrackStateChangedEvent>().Subscribe(OnStateChanged);
-            _eventBus.GetEvent<TrackProgressChangedEvent>().Subscribe(OnProgressChanged);
-            _eventBus.GetEvent<Models.TrackMetadataUpdatedEvent>().Subscribe(OnMetadataUpdated);
+            _disposables.Add(_eventBus.GetEvent<TrackStateChangedEvent>().Subscribe(OnStateChanged));
+            _disposables.Add(_eventBus.GetEvent<TrackProgressChangedEvent>().Subscribe(OnProgressChanged));
+            _disposables.Add(_eventBus.GetEvent<Models.TrackMetadataUpdatedEvent>().Subscribe(OnMetadataUpdated));
         }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_isDisposed) return;
+
+        if (disposing)
+        {
+            _disposables.Dispose();
+            CancellationTokenSource?.Cancel();
+            CancellationTokenSource?.Dispose();
+        }
+
+        _isDisposed = true;
     }
     
     private void OnMetadataUpdated(Models.TrackMetadataUpdatedEvent evt)
     {
         if (evt.TrackGlobalId != GlobalId) return;
         
-        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
+             // Reload track data from database to get updated metadata
+             if (_libraryService != null)
+             {
+                 var tracks = await _libraryService.LoadPlaylistTracksAsync(Model.PlaylistId);
+                 var updatedTrack = tracks.FirstOrDefault(t => t.TrackUniqueHash == GlobalId);
+                 
+                 if (updatedTrack != null)
+                 {
+                     // Update model with fresh data
+                     Model.AlbumArtUrl = updatedTrack.AlbumArtUrl;
+                     Model.SpotifyTrackId = updatedTrack.SpotifyTrackId;
+                     Model.SpotifyAlbumId = updatedTrack.SpotifyAlbumId;
+                     Model.IsEnriched = updatedTrack.IsEnriched;
+                     Model.Album = updatedTrack.Album;
+                     
+                     // Load artwork if URL is available
+                     if (!string.IsNullOrWhiteSpace(updatedTrack.AlbumArtUrl))
+                     {
+                         await LoadAlbumArtworkAsync();
+                     }
+                 }
+             }
+             
              OnPropertyChanged(nameof(Artist));
              OnPropertyChanged(nameof(Title));
              OnPropertyChanged(nameof(Album));
              OnPropertyChanged(nameof(CoverArtUrl));
+             OnPropertyChanged(nameof(ArtworkBitmap));
              OnPropertyChanged(nameof(SpotifyTrackId));
              OnPropertyChanged(nameof(IsEnriched));
              OnPropertyChanged(nameof(MetadataStatus));
@@ -551,25 +606,6 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     
     public string KeyDisplay => !string.IsNullOrWhiteSpace(Model.Tonality) ? Model.Tonality : "Unknown";
 
-    /// <summary>
-    /// Loads the album artwork from cache or downloads it.
-    /// Should be called by the ViewModel after construction.
-    /// </summary>
-    public async System.Threading.Tasks.Task LoadAlbumArtworkAsync(Services.ArtworkCacheService artworkCache)
-    {
-        if (string.IsNullOrWhiteSpace(AlbumArtUrl) || string.IsNullOrWhiteSpace(SpotifyAlbumId))
-            return;
-
-        try
-        {
-            AlbumArtPath = await artworkCache.GetArtworkPathAsync(AlbumArtUrl, SpotifyAlbumId);
-        }
-        catch
-        {
-            // Silently fail - artwork is optional
-            AlbumArtPath = null;
-        }
-    }
 
     public bool IsActive => State == PlaylistTrackState.Searching || 
                            State == PlaylistTrackState.Downloading || 
@@ -676,6 +712,52 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         Progress = 0;
         CurrentSpeed = "";
         ErrorMessage = null;
+    }
+
+    /// <summary>
+    /// Bitmap image loaded from artwork cache (for direct UI binding).
+    /// </summary>
+    public Avalonia.Media.Imaging.Bitmap? ArtworkBitmap
+    {
+        get => _artworkBitmap;
+        private set
+        {
+            if (_artworkBitmap != value)
+            {
+                _artworkBitmap = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads album artwork from cache into Bitmap for UI display.
+    /// </summary>
+    public async Task LoadAlbumArtworkAsync()
+    {
+        if (_artworkCacheService == null) return;
+        if (string.IsNullOrWhiteSpace(Model.AlbumArtUrl)) return;
+        if (string.IsNullOrWhiteSpace(Model.SpotifyAlbumId)) return;
+
+        try
+        {
+            // Get local path (downloads artwork if not cached)
+            var localPath = await _artworkCacheService.GetArtworkPathAsync(
+                Model.AlbumArtUrl,
+                Model.SpotifyAlbumId);
+
+            if (System.IO.File.Exists(localPath))
+            {
+                // Load bitmap from local file
+                using var stream = System.IO.File.OpenRead(localPath);
+                ArtworkBitmap = new Avalonia.Media.Imaging.Bitmap(stream);
+            }
+        }
+        catch (Exception)
+        {
+            // Log error silently - artwork loading is non-critical
+            System.Diagnostics.Debug.WriteLine($"Failed to load artwork for {GlobalId}");
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

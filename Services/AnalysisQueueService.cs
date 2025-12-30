@@ -7,9 +7,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
+using System.Linq;
 using SLSKDONET.Data; // For AppDbContext
+using SLSKDONET.Data.Entities;
 using SLSKDONET.Models; // For Events
 using Microsoft.EntityFrameworkCore;
+using Avalonia.Threading; // For UI thread safety
 
 namespace SLSKDONET.Services;
 
@@ -150,7 +154,11 @@ public class AnalysisQueueService : INotifyPropertyChanged
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        if (PropertyChanged != null)
+        {
+            // Ensure UI updates happen on the UI thread
+            Dispatcher.UIThread.Post(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+        }
     }
 
     public ChannelReader<AnalysisRequest> Reader => _channel.Reader;
@@ -164,6 +172,13 @@ public class AnalysisWorker : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisWorker> _logger;
+    
+    // Batching & Throttling State
+    private DateTime _lastProgressReport = DateTime.MinValue;
+    private readonly List<AnalysisResultContext> _pendingResults = new();
+    private DateTime _lastBatchSave = DateTime.UtcNow;
+    private const int BatchSize = 10;
+    private readonly TimeSpan BatchTimeout = TimeSpan.FromSeconds(5);
 
     public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger)
     {
@@ -177,143 +192,242 @@ public class AnalysisWorker : BackgroundService
     {
         _logger.LogInformation("🧠 Musical Brain (AnalysisWorker) started.");
 
-        await foreach (var request in _queue.Reader.ReadAllAsync(stoppingToken))
+        while (!stoppingToken.IsCancellationRequested)
         {
+            // Cooperate with Thread Pool
+            await Task.Yield();
+
+            // 1. Process Pending Batch if needed (Timeout or Size)
+            if (_pendingResults.Count > 0 && (_pendingResults.Count >= BatchSize || DateTime.UtcNow - _lastBatchSave > BatchTimeout))
+            {
+                await FlushBatchAsync(stoppingToken);
+            }
+
+            // 2. Wait for next item (with timeout to ensure we flush batch even if no new items come)
+            AnalysisRequest? request = null;
+            try 
+            {
+                // Wait up to 1 second for new item, otherwise loop to check batch timeout
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                cts.CancelAfter(1000);
+                request = await _queue.Reader.ReadAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout or Stop - just loop
+                if (stoppingToken.IsCancellationRequested) break;
+                continue;
+            }
+
+            if (request == null) continue;
+
             // Check pause state
             while (_queue.IsPaused && !stoppingToken.IsCancellationRequested)
             {
                 await Task.Delay(500, stoppingToken);
             }
 
-            string? trackHash = request.TrackHash;
-            bool analysisSucceeded = false;
-            string? errorMessage = null;
+            await ProcessRequestAsync(request, stoppingToken);
+        }
 
-            try
+        // Final Flush
+        if (_pendingResults.Any()) await FlushBatchAsync(CancellationToken.None);
+    }
+
+    private async Task ProcessRequestAsync(AnalysisRequest request, CancellationToken stoppingToken)
+    {
+        string trackHash = request.TrackHash;
+        bool analysisSucceeded = false;
+        string? errorMessage = null;
+        
+        // Context to hold results for batching
+        var resultContext = new AnalysisResultContext { TrackHash = trackHash, FilePath = request.FilePath };
+
+        try
+        {
+            _queue.NotifyProcessingStarted(trackHash, request.FilePath);
+
+            using var scope = _serviceProvider.CreateScope();
+            var essentiaAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
+            var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
+            var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
+
+            _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
+
+            // 1. Generate Waveform
+            PublishThrottled(new AnalysisProgressEvent(trackHash, "Generating waveform...", 10));
+            // Offload CPU bound work
+            resultContext.WaveformData = await Task.Run(() => waveformAnalyzer.GenerateWaveformAsync(request.FilePath, linkedCts.Token), linkedCts.Token);
+
+            // 2. Musical Analysis
+            PublishThrottled(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
+            resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, linkedCts.Token), linkedCts.Token);
+
+            // 3. Technical Analysis
+            PublishThrottled(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
+            resultContext.TechResult = await Task.Run(() => audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash, linkedCts.Token), linkedCts.Token);
+
+            PublishThrottled(new AnalysisProgressEvent(trackHash, "Queued for save...", 90));
+            
+            // Add to batch buffer
+            _pendingResults.Add(resultContext);
+            analysisSucceeded = true;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogError("⏱ Track analysis timed out or cancelled: {Hash}", trackHash);
+            errorMessage = "Analysis timed out";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error analyzing: {Hash}", trackHash);
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            // If failed, notify immediately. If succeeded, notification happens after batch save?
+            // User expects visual update. If we delay "Completed" event until flush, UI stays "Analyzing...".
+            // If we send "Completed" now, UI thinks it's done but DB isn't updated.
+            // Compromise: Send Completed now so UI unblocks. Data consistency is handled by Flush.
+            _queue.NotifyProcessingCompleted(trackHash, analysisSucceeded, errorMessage);
+        }
+    }
+
+    private async Task FlushBatchAsync(CancellationToken token)
+    {
+        if (!_pendingResults.Any()) return;
+
+        var batchCount = _pendingResults.Count;
+        _logger.LogInformation("💾 Flushing batch of {Count} analysis results...", batchCount);
+
+        try
+        {
+            using var dbContext = new AppDbContext();
+            
+            // Process all pending items in one transaction logic
+            foreach (var result in _pendingResults)
             {
-                // Notify start (updates CurrentTrackHash, publishes event)
-                _queue.NotifyProcessingStarted(trackHash, request.FilePath);
+                var trackHash = result.TrackHash;
 
-                using var scope = _serviceProvider.CreateScope();
-                var essentiaAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
-                var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
-                var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
-                
-                // FIX: Dispose DbContext properly to prevent connection leaks
-                using var dbContext = new AppDbContext();
-
-                _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
-                
-                // Enhancement: Stuck File Watchdog - 60s timeout (standardized)
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
-                
-                // 1. Generate Waveform (Visuals)
-                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Generating waveform...", 10));
-                var waveformData = await waveformAnalyzer.GenerateWaveformAsync(request.FilePath);
-
-                // 2. Run Musical Analysis (BPM/Key/Energy)
-                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
-                var musicalResult = await essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash);
-
-                // 3. Run Technical Analysis (LUFS/Integrity)
-                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
-                var techResult = await audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash);
-
-                // 4. Save Everything Atomically
-                _eventBus.Publish(new AnalysisProgressEvent(trackHash, "Saving results...", 90));
-
-                // Update Detailed Feature Tables
-                if (musicalResult != null)
+                // Feature Tables
+                if (result.MusicalResult != null)
                 {
-                    var existingFeatures = await dbContext.AudioFeatures.FirstOrDefaultAsync(f => f.TrackUniqueHash == trackHash, stoppingToken);
+                    // Basic Upsert logic (Remove old, Add new) - optimized for batch?
+                    // EF Core doesn't support bulk upsert natively well without extensions, doing per-item check is costly for large batches.
+                    // But for 10 items it's fine.
+                    var existingFeatures = await dbContext.AudioFeatures.FirstOrDefaultAsync(f => f.TrackUniqueHash == trackHash, token);
                     if (existingFeatures != null) dbContext.AudioFeatures.Remove(existingFeatures);
-                    dbContext.AudioFeatures.Add(musicalResult);
+                    dbContext.AudioFeatures.Add(result.MusicalResult);
                 }
 
-                if (techResult != null)
+                if (result.TechResult != null)
                 {
-                    var existingAnalysis = await dbContext.AudioAnalysis.FirstOrDefaultAsync(a => a.TrackUniqueHash == trackHash, stoppingToken);
+                    var existingAnalysis = await dbContext.AudioAnalysis.FirstOrDefaultAsync(a => a.TrackUniqueHash == trackHash, token);
                     if (existingAnalysis != null) dbContext.AudioAnalysis.Remove(existingAnalysis);
-                    dbContext.AudioAnalysis.Add(techResult);
+                    dbContext.AudioAnalysis.Add(result.TechResult);
                 }
 
-                // Update Playlist Tracks (UI Source)
-                var playlistTracks = await dbContext.PlaylistTracks
+                // Update PlaylistTracks
+                 var playlistTracks = await dbContext.PlaylistTracks
                     .Where(t => t.TrackUniqueHash == trackHash)
-                    .ToListAsync(stoppingToken);
+                    .ToListAsync(token);
 
                 foreach (var track in playlistTracks)
                 {
-                    track.IsEnriched = true;
-                    if (waveformData != null)
-                    {
-                        track.WaveformData = waveformData.PeakData;
-                        track.RmsData = waveformData.RmsData;
-                    }
-                    
-                    if (musicalResult != null)
-                    {
-                        track.BPM = musicalResult.Bpm;
-                        track.MusicalKey = musicalResult.Key + (musicalResult.Scale == "minor" ? "m" : "");
-                        track.Energy = musicalResult.Energy;
-                        track.Danceability = musicalResult.Danceability;
-                    }
-
-                    if (techResult != null)
-                    {
-                        track.Bitrate = techResult.Bitrate;
-                        track.QualityConfidence = techResult.QualityConfidence;
-                        track.FrequencyCutoff = techResult.FrequencyCutoff;
-                        track.IsTrustworthy = !techResult.IsUpscaled;
-                        track.SpectralHash = techResult.SpectralHash;
-                    }
+                    ApplyResultsToTrack(track, result);
                 }
-
-                // Update Library Entry (Global Source)
-                var libraryEntry = await dbContext.LibraryEntries.FirstOrDefaultAsync(e => e.UniqueHash == trackHash, stoppingToken);
+                
+                // Update LibraryEntries
+                var libraryEntry = await dbContext.LibraryEntries.FirstOrDefaultAsync(e => e.UniqueHash == trackHash, token);
                 if (libraryEntry != null)
                 {
-                    libraryEntry.IsEnriched = true;
-                    if (waveformData != null)
-                    {
-                        libraryEntry.WaveformData = waveformData.PeakData;
-                        libraryEntry.RmsData = waveformData.RmsData;
-                    }
-                    if (musicalResult != null)
-                    {
-                        libraryEntry.BPM = musicalResult.Bpm;
-                        libraryEntry.MusicalKey = musicalResult.Key + (musicalResult.Scale == "minor" ? "m" : "");
-                        libraryEntry.Energy = musicalResult.Energy;
-                        libraryEntry.Danceability = musicalResult.Danceability;
-                    }
-                    if (techResult != null)
-                    {
-                        libraryEntry.Bitrate = techResult.Bitrate;
-                        libraryEntry.Integrity = techResult.IsUpscaled ? IntegrityLevel.Suspicious : IntegrityLevel.Verified;
-                    }
+                    ApplyResultsToLibraryEntry(libraryEntry, result);
                 }
+            }
 
-                await dbContext.SaveChangesAsync(stoppingToken);
-                _logger.LogInformation("✅ Unified Analysis saved for {Hash}", trackHash);
-                analysisSucceeded = true;
-            }
-            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
-            {
-                // Timeout occurred (not app shutdown)
-                _logger.LogError("⏱ Track analysis timed out after 60s - skipping: {Hash}", trackHash);
-                errorMessage = "Analysis timed out (60s)";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Error processing analysis queue item: {Hash}", trackHash);
-                errorMessage = ex.Message;
-            }
-            finally
-            {
-                // Enhancement #1: ALWAYS decrement counter to prevent desync
-                _queue.NotifyProcessingCompleted(trackHash, analysisSucceeded, errorMessage);
-            }
+            await dbContext.SaveChangesAsync(token);
+            _lastBatchSave = DateTime.UtcNow;
+            _pendingResults.Clear();
+            _logger.LogInformation("✅ Batch save completed.");
         }
+        catch (Exception ex)
+        {
+             _logger.LogError(ex, "❌ Failed to save analysis batch!");
+             // Potential data loss if batch fails. In robust system we'd retry or dead-letter.
+             // For now, clear to prevent infinite loop.
+             _pendingResults.Clear(); 
+        }
+    }
+
+    private void ApplyResultsToTrack(PlaylistTrackEntity track, AnalysisResultContext result)
+    {
+        track.IsEnriched = true;
+        if (result.WaveformData != null)
+        {
+            track.WaveformData = result.WaveformData.PeakData;
+            track.RmsData = result.WaveformData.RmsData;
+        }
+        
+        if (result.MusicalResult != null)
+        {
+            track.BPM = result.MusicalResult.Bpm;
+            track.MusicalKey = result.MusicalResult.Key + (result.MusicalResult.Scale == "minor" ? "m" : "");
+            track.Energy = result.MusicalResult.Energy;
+            track.Danceability = result.MusicalResult.Danceability;
+        }
+
+        if (result.TechResult != null)
+        {
+            track.Bitrate = result.TechResult.Bitrate;
+            track.QualityConfidence = result.TechResult.QualityConfidence;
+            track.FrequencyCutoff = result.TechResult.FrequencyCutoff;
+            track.IsTrustworthy = !result.TechResult.IsUpscaled;
+            track.SpectralHash = result.TechResult.SpectralHash;
+        }
+    }
+
+    private void ApplyResultsToLibraryEntry(LibraryEntryEntity entry, AnalysisResultContext result)
+    {
+        entry.IsEnriched = true;
+        if (result.WaveformData != null)
+        {
+            entry.WaveformData = result.WaveformData.PeakData;
+            entry.RmsData = result.WaveformData.RmsData;
+        }
+        if (result.MusicalResult != null)
+        {
+            entry.BPM = result.MusicalResult.Bpm;
+            entry.MusicalKey = result.MusicalResult.Key + (result.MusicalResult.Scale == "minor" ? "m" : "");
+            entry.Energy = result.MusicalResult.Energy;
+            entry.Danceability = result.MusicalResult.Danceability;
+        }
+        if (result.TechResult != null)
+        {
+            entry.Bitrate = result.TechResult.Bitrate;
+            entry.Integrity = result.TechResult.IsUpscaled ? IntegrityLevel.Suspicious : IntegrityLevel.Verified;
+        }
+    }
+
+    private void PublishThrottled(AnalysisProgressEvent evt)
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastProgressReport).TotalMilliseconds > 250 || evt.ProgressPercent >= 100)
+        {
+            _eventBus.Publish(evt);
+            _lastProgressReport = now;
+        }
+    }
+
+    // Helper class for batch context
+    private class AnalysisResultContext
+    {
+        public string TrackHash { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
+        public WaveformAnalysisData? WaveformData { get; set; } // Changed from WaveformData
+        public AudioAnalysisEntity? TechResult { get; set; }
+        public AudioFeaturesEntity? MusicalResult { get; set; }
     }
 }

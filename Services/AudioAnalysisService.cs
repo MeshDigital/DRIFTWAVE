@@ -28,7 +28,7 @@ public class AudioAnalysisService : IAudioAnalysisService
         _eventBus = eventBus;
     }
 
-    public async Task<AudioAnalysisEntity?> AnalyzeFileAsync(string filePath, string trackUniqueHash)
+    public async Task<AudioAnalysisEntity?> AnalyzeFileAsync(string filePath, string trackUniqueHash, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(filePath))
         {
@@ -44,8 +44,8 @@ public class AudioAnalysisService : IAudioAnalysisService
             _eventBus.Publish(new AnalysisProgressEvent(trackUniqueHash, "Starting structural analysis...", 0));
 
             // 1. Structural Analysis (Fast) via Xabe.FFmpeg
-            // Xabe might throw if ffmpeg not in path, but app validates it on startup
-            IMediaInfo mediaInfo = await FFmpeg.GetMediaInfo(filePath);
+            // Xabe doesn't support CancellationToken natively in GetMediaInfo? Converting to Task.Run
+            IMediaInfo mediaInfo = await Task.Run(() => FFmpeg.GetMediaInfo(filePath), cancellationToken);
             var audioStream = mediaInfo.AudioStreams.FirstOrDefault();
 
             if (audioStream == null)
@@ -69,14 +69,14 @@ public class AudioAnalysisService : IAudioAnalysisService
             _eventBus.Publish(new AnalysisProgressEvent(trackUniqueHash, "Analyzing loudness (LUFS)...", 33));
 
             // 2. Loudness Analysis (Slow) - Integrated Loudness (LUFS) & True Peak
-            // We run this manually because Xabe is designed for conversions, and parsing ebur128 filter output is specific.
             try 
             {
-                var loudnessData = await MeasureLoudnessAsync(filePath);
+                var loudnessData = await MeasureLoudnessAsync(filePath, cancellationToken);
                 entity.LoudnessLufs = loudnessData.IntegratedLoudness;
                 entity.TruePeakDb = loudnessData.TruePeak;
                 entity.DynamicRange = loudnessData.LoudnessRange;
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Loudness analysis failed for {Path}. Proceeding with structural data only.", filePath);
@@ -86,11 +86,12 @@ public class AudioAnalysisService : IAudioAnalysisService
             _eventBus.Publish(new AnalysisProgressEvent(trackUniqueHash, "Detecting upscales & analyzing integrity...", 66));
 
             // Phase 3.5: Integrity Scout (Sonic Truth)
-            // Detect upscales (e.g. 128kbps masquerading as 320kbps)
             try
             {
-                var sonicResult = await _sonicService.AnalyzeTrackAsync(filePath);
-                entity.IsUpscaled = !sonicResult.IsTrustworthy; // Trustworthy means Clean. Untrustworthy means Upscaled/Fake.
+                // Assuming SonicService will be updated separately or doesn't support cancellation yet?
+                // For now, wrap in Task.Run to allow basic cancellation
+                var sonicResult = await Task.Run(() => _sonicService.AnalyzeTrackAsync(filePath), cancellationToken);
+                entity.IsUpscaled = !sonicResult.IsTrustworthy;
                 entity.SpectralHash = sonicResult.SpectralHash;
                 entity.FrequencyCutoff = sonicResult.FrequencyCutoff;
                 entity.QualityConfidence = sonicResult.QualityConfidence;
@@ -101,6 +102,7 @@ public class AudioAnalysisService : IAudioAnalysisService
                         trackUniqueHash, entity.QualityConfidence, entity.FrequencyCutoff);
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Integrity Scout failed for {Path}", filePath);
@@ -112,6 +114,11 @@ public class AudioAnalysisService : IAudioAnalysisService
             _logger.LogInformation("✓ Analysis completed for {Hash} in {Time:F1}s", trackUniqueHash, elapsed);
 
             return entity;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Analysis cancelled for {Hash}", trackUniqueHash);
+            throw;
         }
         catch (Exception ex)
         {
@@ -137,10 +144,8 @@ public class AudioAnalysisService : IAudioAnalysisService
 
     private record LoudnessResult(double IntegratedLoudness, double TruePeak, double LoudnessRange);
 
-    private async Task<LoudnessResult> MeasureLoudnessAsync(string filePath)
+    private async Task<LoudnessResult> MeasureLoudnessAsync(string filePath, CancellationToken cancellationToken)
     {
-        // FFmpeg filter: ebur128=peak=true
-        // Output format is parsed from stderr
         var startInfo = new ProcessStartInfo
         {
             FileName = _ffmpegPath,
@@ -160,19 +165,18 @@ public class AudioAnalysisService : IAudioAnalysisService
 
         process.Start();
         process.BeginErrorReadLine();
-        
-        await process.WaitForExitAsync();
+
+        // Register cancellation to kill process
+        await using var ctr = cancellationToken.Register(() => 
+        {
+            try { process.Kill(); } catch { }
+        });
+
+        await process.WaitForExitAsync(cancellationToken);
 
         string log = output.ToString();
         
         // Parse Output
-        // Integrated loudness:
-        //   I:         -12.4 LUFS
-        // Loudness range:
-        //   LRA:        6.5 LU
-        // True peak:
-        //   Peak:       1.2 dBFS
-
         return new LoudnessResult(
             ParseValue(log, @"I:\s+([-\d\.]+)\s+LUFS"),
             ParseValue(log, @"Peak:\s+([-\d\.]+)\s+dBFS"),

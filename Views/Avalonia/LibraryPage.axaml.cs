@@ -34,6 +34,14 @@ public partial class LibraryPage : UserControl
         AddHandler(DragDrop.DropEvent, OnPlaylistDrop);
     }
 
+    private void CloseRemovalHistory_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel vm)
+        {
+            vm.IsRemovalHistoryVisible = false;
+        }
+    }
+
     protected override async void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);

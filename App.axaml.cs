@@ -601,6 +601,7 @@ public partial class App : Application
         services.AddTransient<Views.Avalonia.ImportPreviewPage>();
         services.AddTransient<Views.Avalonia.UpgradeScoutView>();
         services.AddTransient<Views.Avalonia.InspectorPage>();
+        services.AddTransient<Views.Avalonia.AnalysisQueuePage>();
         
         // Singleton ViewModels
         services.AddSingleton<ViewModels.TrackInspectorViewModel>();

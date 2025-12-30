@@ -28,6 +28,17 @@ public class PlaylistJob : INotifyPropertyChanged
     /// </summary>
     public string SourceTitle { get; set; } = "Untitled Playlist";
 
+    // UI Compatibility Aliases
+    public string Name => SourceTitle;
+    public string AlbumTitle => SourceTitle;
+    public int TrackCount => TotalTracks;
+    public string Artist => string.IsNullOrEmpty(SourceUrl) ? "Various Artists" : (SourceType == "Spotify" ? "Spotify Playlist" : "Local Import");
+    
+    public double TotalSizeMb => PlaylistTracks.Sum(t => (t.Bitrate ?? 0) * (t.CanonicalDuration ?? 0) / 8.0) / 1024.0 / 1024.0;
+    
+    public string QualitySummary => SuccessfulCount > 0 ? $"{SuccessfulCount} tracks downloaded" : "Pending Analysis";
+    public int? MatchConfidence => TotalTracks > 0 ? (int)((double)SuccessfulCount / TotalTracks * 100) : null;
+
     /// <summary>
     /// Type of source (e.g., "Spotify", "CSV", "YouTube").
     /// </summary>
@@ -158,6 +169,9 @@ public class PlaylistJob : INotifyPropertyChanged
     /// Last time the download orchestrator touched this job.
     /// </summary>
     public DateTime DateUpdated { get; set; } = DateTime.UtcNow;
+
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
 
     /// <summary>
     /// Overall progress percentage for this job (0-100).

@@ -288,7 +288,14 @@ public class MainViewModel : INotifyPropertyChanged
     public bool IsPlayerSidebarVisible
     {
         get => _isPlayerSidebarVisible;
-        set => SetProperty(ref _isPlayerSidebarVisible, value);
+        set
+        {
+            if (SetProperty(ref _isPlayerSidebarVisible, value))
+            {
+                OnPropertyChanged(nameof(IsPlayerInSidebar));
+                OnPropertyChanged(nameof(IsPlayerAtBottomVisible));
+            }
+        }
     }
 
     private bool _isPlayerAtBottom;
@@ -300,6 +307,7 @@ public class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _isPlayerAtBottom, value))
             {
                 OnPropertyChanged(nameof(IsPlayerInSidebar));
+                OnPropertyChanged(nameof(IsPlayerAtBottomVisible));
             }
         }
     }
@@ -526,6 +534,7 @@ public class MainViewModel : INotifyPropertyChanged
                 "ImportPreviewPage" => PageType.Import, // Map preview to Import category
                 "UpgradeScoutView" => PageType.UpgradeScout,
                 "InspectorPage" => PageType.Inspector,
+                "AnalysisQueuePage" => PageType.AnalysisQueue,
                 _ => CurrentPageType
             };
             

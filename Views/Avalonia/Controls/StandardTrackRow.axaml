@@ -108,9 +108,9 @@
                     CornerRadius="4" ClipToBounds="True" Background="#111">
                 <Panel>
                     <!-- Actual Image -->
-                    <Image Source="{Binding AlbumArtUrl, TargetNullValue={x:Null}}" 
+                    <Image Source="{Binding ArtworkBitmap}" 
                            Stretch="UniformToFill"
-                           IsVisible="{Binding AlbumArtUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                           IsVisible="{Binding ArtworkBitmap, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                            
                     <!-- Placeholder/Status Overlay if no art or if downloading -->
                     <PathIcon Data="{StaticResource music_regular}" 

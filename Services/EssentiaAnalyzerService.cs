@@ -12,7 +12,7 @@ namespace SLSKDONET.Services;
 
 public interface IAudioIntelligenceService
 {
-    Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, bool generateCues = false);
+    Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, CancellationToken cancellationToken = default, bool generateCues = false);
     bool IsEssentiaAvailable();
 }
 
@@ -95,7 +95,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
         return false;
     }
 
-    public async Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, bool generateCues = false)
+    public async Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, CancellationToken cancellationToken = default, bool generateCues = false)
     {
         // Phase 4.1: Graceful degradation - skip if binary missing
         if (!IsEssentiaAvailable())
@@ -173,11 +173,17 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 _logger.LogWarning(ex, "Failed to set process priority (non-fatal)");
             }
 
-            await process.WaitForExitAsync();
+            // Register cancellation to kill process
+            await using var ctr = cancellationToken.Register(() => 
+            {
+                try { if (!process.HasExited) process.Kill(); } catch { }
+            });
+
+            await process.WaitForExitAsync(cancellationToken);
 
             if (process.ExitCode != 0)
             {
-                var stderr = await process.StandardError.ReadToEndAsync();
+                var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
                 _logger.LogWarning("Essentia analysis failed for {File}. Exit Code: {Code}, Error: {Err}", 
                     Path.GetFileName(filePath), process.ExitCode, stderr);
                 return null;
@@ -190,7 +196,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 return null;
             }
 
-            var jsonContent = await File.ReadAllTextAsync(tempJsonPath);
+            var jsonContent = await File.ReadAllTextAsync(tempJsonPath, cancellationToken);
             
             // Phase 4.1: JSON resiliency with AllowNamedFloatingPointLiterals
             var options = new JsonSerializerOptions
@@ -276,6 +282,11 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 trackUniqueHash, entity.Bpm, entity.Key, entity.Scale);
 
             return entity;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Essentia analysis cancelled for {Hash}", trackUniqueHash);
+            throw;
         }
         catch (Exception ex)
         {

@@ -9,5 +9,6 @@ public enum PageType
     Settings,
     Import,
     UpgradeScout,
-    Inspector
+    Inspector,
+    AnalysisQueue
 }

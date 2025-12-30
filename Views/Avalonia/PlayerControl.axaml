@@ -41,9 +41,9 @@
                                 Height="{Binding VuLeft, Converter={StaticResource VuHeightConverter}, ConverterParameter=250}"/>
                                 
                         <!-- Dynamic Album Artwork -->
-                        <Image Grid.Column="1" Source="{Binding AlbumArtUrl}" 
+                        <Image Grid.Column="1" Source="{Binding CurrentTrack.ArtworkBitmap}" 
                                Stretch="UniformToFill"
-                               IsVisible="{Binding AlbumArtUrl, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                               IsVisible="{Binding CurrentTrack.ArtworkBitmap, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                                
                         <!-- VU Meter Right -->
                         <Border Grid.Column="2" VerticalAlignment="Bottom" 
@@ -58,7 +58,7 @@
                           Width="80" Height="80"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
-                          IsVisible="{Binding AlbumArtUrl, Converter={x:Static ObjectConverters.IsNull}}"/>
+                          IsVisible="{Binding CurrentTrack.ArtworkBitmap, Converter={x:Static ObjectConverters.IsNull}}"/>
                 </Panel>
             </Border>
 

@@ -166,27 +166,28 @@ public class DatabaseService
             if (!existingColumns.Contains("PreviousBitrate"))
                 columnsToAdd.Add(("PreviousBitrate", "PreviousBitrate INTEGER DEFAULT 0"));
             
-            // Phase 3C: Advanced Queue Orchestration
-            if (!existingColumns.Contains("Priority"))
-                columnsToAdd.Add(("Priority", "Priority INTEGER DEFAULT 1"));
-            if (!existingColumns.Contains("SourcePlaylistId"))
-                columnsToAdd.Add(("SourcePlaylistId", "SourcePlaylistId TEXT NULL"));
-            if (!existingColumns.Contains("SourcePlaylistName"))
-                columnsToAdd.Add(("SourcePlaylistName", "SourcePlaylistName TEXT NULL"));
-            
-            // Phase 3C: Advanced Queue Orchestration
-            if (!existingColumns.Contains("Priority"))
-                columnsToAdd.Add(("Priority", "Priority INTEGER DEFAULT 1"));
-            if (!existingColumns.Contains("SourcePlaylistId"))
-                columnsToAdd.Add(("SourcePlaylistId", "SourcePlaylistId TEXT NULL"));
-            if (!existingColumns.Contains("SourcePlaylistName"))
-                columnsToAdd.Add(("SourcePlaylistName", "SourcePlaylistName TEXT NULL"));
             if (!existingColumns.Contains("Energy"))
                 columnsToAdd.Add(("Energy", "Energy REAL NULL"));
             if (!existingColumns.Contains("Danceability"))
                 columnsToAdd.Add(("Danceability", "Danceability REAL NULL"));
             if (!existingColumns.Contains("Valence"))
                 columnsToAdd.Add(("Valence", "Valence REAL NULL"));
+
+            // Phase 8: Sonic Integrity
+            if (!existingColumns.Contains("WaveformData"))
+                columnsToAdd.Add(("WaveformData", "WaveformData BLOB NULL"));
+            if (!existingColumns.Contains("RmsData"))
+                columnsToAdd.Add(("RmsData", "RmsData BLOB NULL"));
+            if (!existingColumns.Contains("SpectralHash"))
+                columnsToAdd.Add(("SpectralHash", "SpectralHash TEXT NULL"));
+            if (!existingColumns.Contains("QualityConfidence"))
+                columnsToAdd.Add(("QualityConfidence", "QualityConfidence REAL NULL"));
+            if (!existingColumns.Contains("FrequencyCutoff"))
+                columnsToAdd.Add(("FrequencyCutoff", "FrequencyCutoff INTEGER NULL"));
+            if (!existingColumns.Contains("IsTrustworthy"))
+                columnsToAdd.Add(("IsTrustworthy", "IsTrustworthy INTEGER NULL"));
+            if (!existingColumns.Contains("QualityDetails"))
+                columnsToAdd.Add(("QualityDetails", "QualityDetails TEXT NULL"));
             
             foreach (var (name, definition) in columnsToAdd)
             {
@@ -272,6 +273,61 @@ public class DatabaseService
                 _logger.LogWarning("Schema Patch: Adding missing column 'PreviousBitrate' to LibraryEntries");
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN PreviousBitrate INTEGER DEFAULT 0");
             }
+            if (!existingColumns.Contains("WaveformData"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'WaveformData' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN WaveformData BLOB NULL");
+            }
+            if (!existingColumns.Contains("RmsData"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'RmsData' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN RmsData BLOB NULL");
+            }
+            if (!existingColumns.Contains("SpectralHash"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'SpectralHash' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN SpectralHash TEXT NULL");
+            }
+            if (!existingColumns.Contains("QualityConfidence"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'QualityConfidence' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN QualityConfidence REAL NULL");
+            }
+            if (!existingColumns.Contains("FrequencyCutoff"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'FrequencyCutoff' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN FrequencyCutoff INTEGER NULL");
+            }
+            if (!existingColumns.Contains("IsTrustworthy"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'IsTrustworthy' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN IsTrustworthy INTEGER NULL");
+            }
+            if (!existingColumns.Contains("QualityDetails"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'QualityDetails' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN QualityDetails TEXT NULL");
+            }
+            if (!existingColumns.Contains("Energy"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'Energy' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN Energy REAL NULL");
+            }
+            if (!existingColumns.Contains("Danceability"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'Danceability' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN Danceability REAL NULL");
+            }
+            if (!existingColumns.Contains("Valence"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'Valence' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN Valence REAL NULL");
+            }
+            if (!existingColumns.Contains("AudioFingerprint"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'AudioFingerprint' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN AudioFingerprint TEXT NULL");
+            }
 
             // Check Tracks table
             cmdSchema.CommandText = "PRAGMA table_info(Tracks)";
@@ -293,6 +349,42 @@ public class DatabaseService
                 _logger.LogWarning("Schema Patch: Adding missing column 'NextRetryTime' to Tracks");
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN NextRetryTime TEXT NULL");
             }
+            
+            // Phase 8: Sonic Integrity for Tracks
+            if (!existingColumns.Contains("SpectralHash"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN SpectralHash TEXT NULL");
+            if (!existingColumns.Contains("QualityConfidence"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN QualityConfidence REAL NULL");
+            if (!existingColumns.Contains("FrequencyCutoff"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN FrequencyCutoff INTEGER NULL");
+            if (!existingColumns.Contains("IsTrustworthy"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN IsTrustworthy INTEGER NULL");
+            if (!existingColumns.Contains("QualityDetails"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN QualityDetails TEXT NULL");
+            
+            // Phase 4: Musical Intelligence for Tracks
+            if (!existingColumns.Contains("Energy"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN Energy REAL NULL");
+            if (!existingColumns.Contains("Danceability"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN Danceability REAL NULL");
+            if (!existingColumns.Contains("Valence"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN Valence REAL NULL");
+            if (!existingColumns.Contains("AudioFingerprint"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN AudioFingerprint TEXT NULL");
+            if (!existingColumns.Contains("BitrateScore"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN BitrateScore INTEGER NULL");
+            if (!existingColumns.Contains("AnalysisOffset"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN AnalysisOffset REAL NULL");
+            if (!existingColumns.Contains("SpotifyBPM"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN SpotifyBPM REAL NULL");
+            if (!existingColumns.Contains("SpotifyKey"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN SpotifyKey TEXT NULL");
+            if (!existingColumns.Contains("ManualBPM"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN ManualBPM REAL NULL");
+            if (!existingColumns.Contains("ManualKey"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN ManualKey TEXT NULL");
+            if (!existingColumns.Contains("IsEnriched"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN IsEnriched INTEGER DEFAULT 0");
 
             // Check LibraryHealth table
             cmdSchema.CommandText = "PRAGMA table_info(LibraryHealth)";
@@ -1340,6 +1432,31 @@ public class DatabaseService
             job.DeletedAt = DateTime.UtcNow;
             await context.SaveChangesAsync();
             _logger.LogInformation("Soft-deleted PlaylistJob: {Id}", jobId);
+        }
+    }
+
+    public async Task<List<PlaylistJobEntity>> LoadDeletedPlaylistJobsAsync()
+    {
+        using var context = new AppDbContext();
+        return await context.Projects
+            .AsNoTracking()
+            .IgnoreQueryFilters() // Must ignore filter to see deleted items
+            .Where(j => j.IsDeleted)
+            .Include(j => j.Tracks)
+            .OrderByDescending(j => j.DeletedAt)
+            .ToListAsync();
+    }
+
+    public async Task RestorePlaylistJobAsync(Guid jobId)
+    {
+        using var context = new AppDbContext();
+        var job = await context.Projects.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == jobId);
+        if (job != null)
+        {
+            job.IsDeleted = false;
+            job.DeletedAt = null;
+            await context.SaveChangesAsync();
+            _logger.LogInformation("Restored PlaylistJob: {Id}", jobId);
         }
     }
 

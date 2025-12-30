@@ -32,6 +32,7 @@ namespace SLSKDONET.ViewModels
         private readonly DatabaseService _databaseService;
         private readonly Services.Rekordbox.AnlzFileParser _anlzParser;
         private readonly WaveformAnalysisService _waveformService;
+        private readonly ArtworkCacheService _artworkCacheService;
 
         
         private string _trackTitle = "No Track Playing";
@@ -236,12 +237,13 @@ namespace SLSKDONET.ViewModels
         // Phase 5C: UI Throttling
         private DateTime _lastTimeUpdate = DateTime.MinValue;
 
-        public PlayerViewModel(IAudioPlayerService playerService, DatabaseService databaseService, IEventBus eventBus, Services.Rekordbox.AnlzFileParser anlzParser, WaveformAnalysisService waveformService)
+        public PlayerViewModel(IAudioPlayerService playerService, DatabaseService databaseService, IEventBus eventBus, Services.Rekordbox.AnlzFileParser anlzParser, WaveformAnalysisService waveformService, ArtworkCacheService artworkCacheService)
         {
             _playerService = playerService;
             _databaseService = databaseService;
             _anlzParser = anlzParser;
             _waveformService = waveformService;
+            _artworkCacheService = artworkCacheService;
             
             // Phase 6B: Subscribe to playback requests
             eventBus.GetEvent<PlayTrackRequestEvent>().Subscribe(evt => 
@@ -268,7 +270,7 @@ namespace SLSKDONET.ViewModels
                         // Only add tracks with valid file paths
                         if (!string.IsNullOrEmpty(track.ResolvedFilePath))
                         {
-                            var vm = new PlaylistTrackViewModel(track);
+                            var vm = new PlaylistTrackViewModel(track, eventBus, null, _artworkCacheService);
                             Queue.Add(vm);
                         }
                     }
@@ -556,10 +558,16 @@ namespace SLSKDONET.ViewModels
             var filePath = track.Model?.ResolvedFilePath;
             
             // Phase 9.2 & 9.3: Set album artwork and like status
-            Dispatcher.UIThread.Post(() =>
+            Dispatcher.UIThread.Post(async () =>
             {
                 AlbumArtUrl = track.Model?.AlbumArtUrl;
                 IsCurrentTrackLiked = track.Model?.IsLiked ?? false;
+                
+                // Ensure bitmap is loaded for UI
+                if (track.ArtworkBitmap == null)
+                {
+                    await track.LoadAlbumArtworkAsync();
+                }
             });
 
             if (!string.IsNullOrEmpty(filePath))

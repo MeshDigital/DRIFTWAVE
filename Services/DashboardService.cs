@@ -163,6 +163,8 @@ public class DashboardService
             SuccessfulCount = entity.SuccessfulCount,
             FailedCount = entity.FailedCount,
             MissingCount = entity.MissingCount,
+            AlbumArtUrl = entity.AlbumArtUrl,
+            SourceUrl = entity.SourceUrl,
             PlaylistTracks = new List<PlaylistTrack>() // Empty list for dashboard display
         };
     }

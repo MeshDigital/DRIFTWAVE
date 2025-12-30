@@ -107,10 +107,13 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
     public ICommand ClearFailedCommand { get; }
     public ICommand RetryAllFailedCommand { get; }
     
-    public DownloadCenterViewModel(DownloadManager downloadManager, IEventBus eventBus)
+    private readonly ArtworkCacheService _artworkCache;
+    
+    public DownloadCenterViewModel(DownloadManager downloadManager, IEventBus eventBus, ArtworkCacheService artworkCache)
     {
         _downloadManager = downloadManager;
         _eventBus = eventBus;
+        _artworkCache = artworkCache;
         
         // Initialize commands (ReactiveCommand)
         PauseAllCommand = ReactiveCommand.Create(PauseAll, 
@@ -255,7 +258,7 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
             var track = e.TrackModel;
             
             // Phase 2.5: Create Smart View Model
-            var viewModel = new UnifiedTrackViewModel(track, _downloadManager, _eventBus);
+            var viewModel = new UnifiedTrackViewModel(track, _downloadManager, _eventBus, _artworkCache);
             
             // Set initial state override if needed
             if (e.InitialState.HasValue)

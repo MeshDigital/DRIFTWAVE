@@ -896,5 +896,73 @@
             <views:TrackInspectorView DataContext="{Binding TrackInspector}"/>
         </Border>
 
+        <!-- REMOVAL HISTORY OVERLAY -->
+        <Border Grid.ColumnSpan="7" 
+                Background="#CC000000" 
+                IsVisible="{Binding IsRemovalHistoryVisible}"
+                ZIndex="100">
+            <Border Background="#252526" 
+                    Width="600" 
+                    Height="500" 
+                    CornerRadius="12" 
+                    BorderBrush="#3E3E3E" 
+                    BorderThickness="1"
+                    HorizontalAlignment="Center" 
+                    VerticalAlignment="Center">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <!-- Header -->
+                    <Grid Grid.Row="0" Margin="20,16" ColumnDefinitions="*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="🗑️" FontSize="20" VerticalAlignment="Center"/>
+                            <TextBlock Text="Removal History" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" 
+                                Command="{Binding RelayCommand}" 
+                                CommandParameter="{Binding $parent[UserControl].DataContext}"
+                                Click="CloseRemovalHistory_Click"
+                                Background="Transparent" Padding="8">
+                            <TextBlock Text="✕" FontSize="16"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Content -->
+                    <ScrollViewer Grid.Row="1" Margin="20,0">
+                        <ItemsControl ItemsSource="{Binding DeletedProjects}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#2D2D2E" Margin="0,0,0,8" Padding="12" CornerRadius="8">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Border Width="40" Height="40" CornerRadius="4" Background="#3E3E3F" Margin="0,0,12,0">
+                                                <TextBlock Text="📀" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding SourceTitle}" FontWeight="Medium" FontSize="14"/>
+                                                <TextBlock Text="{Binding DeletedAt, StringFormat='Deleted on {0:MMM dd, yyyy}'}" FontSize="12" Foreground="#888"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="2" 
+                                                    Classes="primary" 
+                                                    Command="{Binding $parent[UserControl].DataContext.RestoreProjectCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="12,6">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="⏪"/>
+                                                    <TextBlock Text="Restore"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- Footer -->
+                    <Border Grid.Row="2" Background="#2D2D2E" Padding="20,12" CornerRadius="0,0,12,12">
+                        <TextBlock Text="Restoring an album will preserve all its tracks and metadata." 
+                                   FontSize="12" Foreground="#888" HorizontalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

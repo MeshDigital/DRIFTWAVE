@@ -28,7 +28,7 @@
         </Grid.ContextMenu>
         <!-- Tiny Album Art -->
         <Border Grid.Column="0" Grid.RowSpan="2" Width="48" Height="48" CornerRadius="4" ClipToBounds="True" Background="#333">
-            <Image Source="{Binding AlbumArtPath, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
+            <Image Source="{Binding AlbumArtUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
         </Border>
 
         <!-- Text Info -->

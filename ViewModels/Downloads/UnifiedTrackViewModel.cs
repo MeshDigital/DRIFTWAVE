@@ -18,6 +18,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
 {
     private readonly DownloadManager _downloadManager;
     private readonly IEventBus _eventBus;
+    private readonly ArtworkCacheService _artworkCache;
     private readonly CompositeDisposable _disposables = new();
 
     // Core Data
@@ -34,11 +35,13 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public UnifiedTrackViewModel(
         PlaylistTrack model, 
         DownloadManager downloadManager, 
-        IEventBus eventBus)
+        IEventBus eventBus,
+        ArtworkCacheService artworkCache)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         _downloadManager = downloadManager ?? throw new ArgumentNullException(nameof(downloadManager));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _artworkCache = artworkCache ?? throw new ArgumentNullException(nameof(artworkCache));
 
         // Initialize State from Model
         _state = (PlaylistTrackState)model.Status; // Best effort mapping if simple cast works, otherwise logic needed
@@ -106,6 +109,9 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
             
          // Initialize sliding window for speed
          _lastProgressTime = DateTime.MinValue;
+
+         // Phase 0: Load artwork
+         _ = LoadAlbumArtworkAsync();
     }
 
     // IDisplayableTrack Implementation
@@ -114,6 +120,13 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public string TrackTitle => Model.Title ?? "Unknown Title";
     public string AlbumName => Model.Album ?? "Unknown Album";
     public string? AlbumArtUrl => Model.AlbumArtUrl;
+
+    private Avalonia.Media.Imaging.Bitmap? _artworkBitmap;
+    public Avalonia.Media.Imaging.Bitmap? ArtworkBitmap
+    {
+        get => _artworkBitmap;
+        private set => this.RaiseAndSetIfChanged(ref _artworkBitmap, value);
+    }
 
     private PlaylistTrackState _state;
     public PlaylistTrackState State
@@ -290,6 +303,29 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
         this.RaisePropertyChanged(nameof(BpmDisplay));
         this.RaisePropertyChanged(nameof(KeyDisplay));
         this.RaisePropertyChanged(nameof(IntegrityScore));
+        
+        // Trigger artwork reload
+        _ = LoadAlbumArtworkAsync();
+    }
+
+    private async System.Threading.Tasks.Task LoadAlbumArtworkAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Model.AlbumArtUrl) || string.IsNullOrWhiteSpace(Model.SpotifyAlbumId))
+            return;
+
+        try
+        {
+            var localPath = await _artworkCache.GetArtworkPathAsync(Model.AlbumArtUrl, Model.SpotifyAlbumId);
+            if (System.IO.File.Exists(localPath))
+            {
+                using var stream = System.IO.File.OpenRead(localPath);
+                ArtworkBitmap = new Avalonia.Media.Imaging.Bitmap(stream);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to load artwork for {GlobalId}: {ex.Message}");
+        }
     }
     
     private void PlayTrack()

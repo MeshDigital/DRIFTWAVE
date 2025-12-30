@@ -11,92 +11,42 @@
     
     <DockPanel>
         
-        <!-- ZONE A: The Initiator (Top Bar) -->
-        <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1" Padding="16">
-            <StackPanel Spacing="16">
-                <!-- Search Input Row -->
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                    <!-- Search Box -->
-                    <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="8" BorderBrush="#333" BorderThickness="1" Height="40">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="12,0,8,0" Foreground="#888"/>
-                            <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     Watermark="Search for tracks, artists..."
-                                     Background="Transparent" BorderThickness="0"
-                                     FontSize="14" VerticalContentAlignment="Center" Margin="0" Padding="0"/>
-                            <Button Command="{Binding ClearSearchCommand}" Background="Transparent" BorderThickness="0" 
-                                    IsVisible="{Binding CanSearch}" Margin="0,0,4,0" Padding="8">
-                                <TextBlock Text="✕" Foreground="#888" VerticalAlignment="Center"/>
-                            </Button>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- CSV/Paste Buttons -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0" Spacing="8">
-                        <Button Command="{Binding BrowseCsvCommand}" Classes="secondary hover-bright" Height="40" ToolTip.Tip="Import CSV">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="📂"/>
-                                <TextBlock Text="CSV"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding PasteTracklistCommand}" Classes="secondary hover-bright" Height="40" ToolTip.Tip="Paste Tracklist">
-                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="📋"/>
-                                <TextBlock Text="Paste"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                    
-                    <!-- Search Button -->
-                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="secondary accent" Margin="12,0,0,0" Padding="24,0" Height="40">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Text="SEARCH" FontWeight="SemiBold"/>
-                            <TextBlock Text="➡️"/>
-                        </StackPanel>
-                    </Button>
-                </Grid>
-                
-                <!-- Presets Row -->
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                    <TextBlock Text="Presets:" VerticalAlignment="Center" Foreground="#888" FontWeight="SemiBold"/>
-                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Deep Dive" Classes="pill" Content="🌊 Deep Dive" ToolTip.Tip="Match Priority, low bitrate threshold"/>
-                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Quick Grab" Classes="pill" Content="⚡ Quick Grab" ToolTip.Tip="Reliability &amp; Speed Priority"/>
-                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="High Fidelity" Classes="pill" Content="💎 High Fidelity" ToolTip.Tip="Strict Quality, FLAC only"/>
-                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Balanced" Classes="pill" Content="⚖️ Balanced" ToolTip.Tip="Reset to defaults"/>
-                </StackPanel>
-            </StackPanel>
-        </Border>
-        
         <!-- ZONE B: The Brain (Sidebar) -->
         <Border DockPanel.Dock="Left" Width="280" Background="#222" BorderBrush="#3E3E3E" BorderThickness="0,0,1,0" Padding="16">
             <StackPanel Spacing="24">
                 <TextBlock Text="Ranking Logic" FontSize="18" FontWeight="Bold" Foreground="#DDD"/>
                 
                 <!-- Bitrate Weight -->
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="12">
                      <Grid ColumnDefinitions="*,Auto">
-                         <TextBlock Text="Bitrate (Quality)" Foreground="#AAA"/>
-                         <TextBlock Text="{Binding BitrateWeight, StringFormat='x{0:F1}'}" Foreground="#4EC9B0"/>
+                         <TextBlock Grid.Column="0" Text="Bitrate (Quality)" Foreground="#999" FontSize="11" VerticalAlignment="Bottom"/>
+                         <Border Grid.Column="1" Background="#1AFFD700" CornerRadius="4" Padding="6,2">
+                             <TextBlock Text="{Binding BitrateWeight, StringFormat='x{0:F1}'}" Foreground="#FFD700" FontWeight="SemiBold" FontSize="11"/>
+                         </Border>
                      </Grid>
-                     <Slider Value="{Binding BitrateWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                     <Slider Value="{Binding BitrateWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="0,-4,0,0"/>
                 </StackPanel>
                 
                 <!-- Reliability Weight -->
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="12" Margin="0,4,0,0">
                      <Grid ColumnDefinitions="*,Auto">
-                         <TextBlock Text="Reliability (Slots)" Foreground="#AAA"/>
-                         <TextBlock Text="{Binding ReliabilityWeight, StringFormat='x{0:F1}'}" Foreground="#007ACC"/>
+                         <TextBlock Grid.Column="0" Text="Reliability (Slots)" Foreground="#999" FontSize="11" VerticalAlignment="Bottom"/>
+                         <Border Grid.Column="1" Background="#1A007ACC" CornerRadius="4" Padding="6,2">
+                             <TextBlock Text="{Binding ReliabilityWeight, StringFormat='x{0:F1}'}" Foreground="#007ACC" FontWeight="SemiBold" FontSize="11"/>
+                         </Border>
                      </Grid>
-                     <Slider Value="{Binding ReliabilityWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                     <Slider Value="{Binding ReliabilityWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="0,-4,0,0"/>
                 </StackPanel>
                 
                 <!-- Match Weight -->
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="12" Margin="0,4,0,0">
                      <Grid ColumnDefinitions="*,Auto">
-                         <TextBlock Text="Match Accuracy" Foreground="#AAA"/>
-                         <TextBlock Text="{Binding MatchWeight, StringFormat='x{0:F1}'}" Foreground="#DCDCAA"/>
+                         <TextBlock Grid.Column="0" Text="Match Accuracy" Foreground="#999" FontSize="11" VerticalAlignment="Bottom"/>
+                         <Border Grid.Column="1" Background="#1ADCDCAA" CornerRadius="4" Padding="6,2">
+                             <TextBlock Text="{Binding MatchWeight, StringFormat='x{0:F1}'}" Foreground="#DCDCAA" FontWeight="SemiBold" FontSize="11"/>
+                         </Border>
                      </Grid>
-                     <Slider Value="{Binding MatchWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True"/>
+                     <Slider Value="{Binding MatchWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="0,-4,0,0"/>
                 </StackPanel>
                 
                 <Separator Background="#333" Height="1"/>
@@ -109,6 +59,62 @@
                     <TextBlock Text="{Binding HiddenResultsCount, StringFormat='Hidden: {0}'}" Foreground="#666" FontSize="11"/>
                 </StackPanel>
                 
+            </StackPanel>
+        </Border>
+
+        <!-- ZONE A: The Initiator (Top Bar) -->
+        <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1" Padding="24,20" VerticalAlignment="Top">
+            <StackPanel Spacing="20">
+                <!-- Search Input Row -->
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <!-- Search Box -->
+                    <Border Grid.Column="0" Background="#1E1E1E" CornerRadius="14" BorderBrush="#333" BorderThickness="1" Height="56" MaxWidth="800" HorizontalAlignment="Stretch">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="20,0,8,0" Foreground="#888" FontSize="18"/>
+                            <TextBox Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Watermark="Search for tracks, artists..."
+                                     Background="Transparent" BorderThickness="0"
+                                     FontSize="16" VerticalContentAlignment="Center" Margin="4,0" Padding="12,0"/>
+                            <Button Command="{Binding ClearSearchCommand}" Background="Transparent" BorderThickness="0" 
+                                    IsVisible="{Binding CanSearch}" Margin="0,0,12,0" Padding="8">
+                                <TextBlock Text="✕" Foreground="#888" VerticalAlignment="Center" FontSize="16"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- CSV/Paste Buttons -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0" Spacing="10">
+                        <Button Command="{Binding BrowseCsvCommand}" Classes="secondary hover-bright" Height="56" CornerRadius="12" Padding="16,0" ToolTip.Tip="Import CSV">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="📂" FontSize="16"/>
+                                <TextBlock Text="CSV" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding PasteTracklistCommand}" Classes="secondary hover-bright" Height="56" CornerRadius="12" Padding="16,0" ToolTip.Tip="Paste Tracklist">
+                             <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="📋" FontSize="16"/>
+                                <TextBlock Text="Paste" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    
+                    <!-- Search Button -->
+                    <Button Grid.Column="2" Command="{Binding UnifiedSearchCommand}" Classes="secondary accent" Margin="16,0,0,0" Padding="32,0" Height="56" CornerRadius="12">
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <TextBlock Text="SEARCH" FontWeight="Bold" FontSize="14" LetterSpacing="1.5"/>
+                            <TextBlock Text="➡️" FontSize="16"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                
+                <!-- Presets Row -->
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <TextBlock Text="Presets:" VerticalAlignment="Center" Foreground="#888" FontWeight="SemiBold" FontSize="13"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Deep Dive" Classes="pill" Content="🌊 Deep Dive" ToolTip.Tip="Match Priority, low bitrate threshold"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Quick Grab" Classes="pill" Content="⚡ Quick Grab" ToolTip.Tip="Reliability &amp; Speed Priority"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="High Fidelity" Classes="pill" Content="💎 High Fidelity" ToolTip.Tip="Strict Quality, FLAC only"/>
+                    <Button Command="{Binding ApplyPresetCommand}" CommandParameter="Balanced" Classes="pill" Content="⚖️ Balanced" ToolTip.Tip="Reset to defaults"/>
+                </StackPanel>
             </StackPanel>
         </Border>
         

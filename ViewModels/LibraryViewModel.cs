@@ -145,19 +145,21 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand CloseInspectorCommand { get; } // NEW
     public System.Windows.Input.ICommand AnalyzeAlbumCommand { get; } // Queue album for analysis
     public System.Windows.Input.ICommand ExportPlaylistCommand { get; } // Export to Rekordbox XML
+    public System.Windows.Input.ICommand LoadDeletedProjectsCommand { get; } // NEW
+    public System.Windows.Input.ICommand RestoreProjectCommand { get; } // NEW
 
-    private bool _isInspectorOpen;
-    public bool IsInspectorOpen
+    private bool _isRemovalHistoryVisible;
+    public bool IsRemovalHistoryVisible
     {
-        get => _isInspectorOpen;
-        set 
-        {
-            if (_isInspectorOpen != value)
-            {
-                _isInspectorOpen = value;
-                OnPropertyChanged();
-            }
-        }
+        get => _isRemovalHistoryVisible;
+        set { _isRemovalHistoryVisible = value; OnPropertyChanged(); }
+    }
+
+    private System.Collections.ObjectModel.ObservableCollection<PlaylistJob> _deletedProjects = new();
+    public System.Collections.ObjectModel.ObservableCollection<PlaylistJob> DeletedProjects
+    {
+        get => _deletedProjects;
+        set { _deletedProjects = value; OnPropertyChanged(); }
     }
 
     public LibraryViewModel(
@@ -210,12 +212,15 @@ public class LibraryViewModel : INotifyPropertyChanged
         // Session 1: Critical bug fixes
         PlayTrackCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecutePlayTrackAsync);
         RefreshLibraryCommand = new AsyncRelayCommand(ExecuteRefreshLibraryAsync);
-        DeleteProjectCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteDeleteProjectAsync);
+        DeleteProjectCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteDeleteProjectAsync, p => p != null || SelectedProject != null);
         PlayAlbumCommand = new AsyncRelayCommand<PlaylistJob>(ExecutePlayAlbumAsync);
         DownloadAlbumCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteDownloadAlbumAsync);
         ExportMonthlyDropCommand = new AsyncRelayCommand(ExecuteExportMonthlyDropAsync);
         FindHarmonicMatchesCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteFindHarmonicMatchesAsync);
         ToggleMixHelperCommand = new RelayCommand<object>(_ => IsMixHelperVisible = !IsMixHelperVisible);
+        
+        LoadDeletedProjectsCommand = new AsyncRelayCommand(ExecuteLoadDeletedProjectsAsync);
+        RestoreProjectCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteRestoreProjectAsync);
         ToggleInspectorCommand = new RelayCommand<object>(param => 
         {
             if (param is PlaylistTrackViewModel track)
@@ -315,7 +320,6 @@ public class LibraryViewModel : INotifyPropertyChanged
         if (lastSelected is PlaylistTrackViewModel trackVm)
         {
             TrackInspector.Track = trackVm.Model;
-            IsInspectorOpen = true; // Auto-open slide-in panel
             
             // Handle row expansion (Accordion style - collapse others)
             foreach (var t in Tracks.CurrentProjectTracks)
@@ -519,7 +523,10 @@ public class LibraryViewModel : INotifyPropertyChanged
     /// </summary>
     private async Task ExecuteDeleteProjectAsync(PlaylistJob? project)
     {
-        if (project == null)
+        // Use either the passed project or the selected one
+        var target = project ?? SelectedProject;
+        
+        if (target == null)
         {
             _logger.LogWarning("DeleteProject called with null project");
             return;
@@ -527,27 +534,82 @@ public class LibraryViewModel : INotifyPropertyChanged
         
         try
         {
-            _logger.LogInformation("Deleting project: {Title}", project.SourceTitle);
+            _logger.LogInformation("Deleting project: {Title}", target.SourceTitle);
             
             // TODO: Add confirmation dialog in Phase 6 redesign
             // For now, delete directly
-            await _libraryService.DeletePlaylistJobAsync(project.Id);
+            await _libraryService.DeletePlaylistJobAsync(target.Id);
             
             // Reload projects list
             await Projects.LoadProjectsAsync();
             
             // Clear selected project if it was deleted
-            if (SelectedProject?.Id == project.Id)
+            if (SelectedProject?.Id == target.Id)
             {
                 SelectedProject = null;
                 Tracks.CurrentProjectTracks.Clear();
             }
             
-            _logger.LogInformation("Project deleted successfully: {Title}", project.SourceTitle);
+            _logger.LogInformation("Project deleted successfully: {Title}", target.SourceTitle);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete project: {Title}", project.SourceTitle);
+            _logger.LogError(ex, "Failed to delete project: {Title}", target.SourceTitle);
+        }
+    }
+
+    private async Task ExecuteLoadDeletedProjectsAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            IsRemovalHistoryVisible = true;
+            var deleted = await _libraryService.LoadDeletedPlaylistJobsAsync();
+            
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                DeletedProjects.Clear();
+                foreach (var p in deleted)
+                {
+                    DeletedProjects.Add(p);
+                }
+            });
+            
+            _logger.LogInformation("Loaded {Count} deleted projects", deleted.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load deleted projects");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task ExecuteRestoreProjectAsync(PlaylistJob? project)
+    {
+        if (project == null) return;
+        
+        try
+        {
+            _logger.LogInformation("Restoring project: {Title}", project.SourceTitle);
+            await _libraryService.RestorePlaylistJobAsync(project.Id);
+            
+            // Remove from current deleted list
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                DeletedProjects.Remove(project);
+            });
+            
+            // Reload main list
+            await Projects.LoadProjectsAsync();
+            
+            _logger.LogInformation("Project restored successfully: {Title}", project.SourceTitle);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restore project: {Title}", project.SourceTitle);
         }
     }
 
@@ -865,7 +927,7 @@ public class LibraryViewModel : INotifyPropertyChanged
             _notificationService.Show("Analysis Queued", $"Queued {count} tracks from '{albumName}' for analysis", NotificationType.Success);
             _logger.LogInformation("Queued {Count} tracks from album '{Album}' for priority analysis", count, albumName);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await _dialogService.ShowAlertAsync("Error", "Failed to queue album for analysis");
         }

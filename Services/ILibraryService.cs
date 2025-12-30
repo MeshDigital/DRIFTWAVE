@@ -103,6 +103,8 @@ public interface ILibraryService
     /// Deletes a playlist job and its related PlaylistTrack entries.
     /// </summary>
     Task DeletePlaylistJobAsync(Guid playlistId);
+    Task<List<PlaylistJob>> LoadDeletedPlaylistJobsAsync();
+    Task RestorePlaylistJobAsync(Guid playlistId);
     Task DeletePlaylistTracksAsync(Guid jobId);
     Task DeletePlaylistTrackAsync(Guid playlistTrackId);
 
