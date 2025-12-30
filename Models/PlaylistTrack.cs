@@ -126,6 +126,7 @@ public class PlaylistTrack
     public int? FrequencyCutoff { get; set; }
     public bool? IsTrustworthy { get; set; }
     public string? QualityDetails { get; set; }
+    public SLSKDONET.Data.IntegrityLevel Integrity { get; set; } = SLSKDONET.Data.IntegrityLevel.None;
     
     // Phase 3C: Advanced Queue Orchestration
     /// <summary>

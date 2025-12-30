@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
+             xmlns:conv="clr-namespace:SLSKDONET.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="1000"
              x:Class="SLSKDONET.Views.Avalonia.HomePage"
              x:DataType="vm:HomeViewModel"
@@ -113,16 +114,39 @@
                         <Grid RowDefinitions="Auto,*,Auto">
                             <TextBlock Grid.Row="0" Text="SYSTEM HEALTH" FontSize="11" FontWeight="Bold" Foreground="#606060" LetterSpacing="1"/>
                             
-                            <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="8">
-                                <TextBlock Text="❤️" FontSize="32" HorizontalAlignment="Center" 
-                                           IsVisible="{Binding LibraryHealth.IssuesCount, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=0}"/>
-                                <TextBlock Text="⚠️" FontSize="32" HorizontalAlignment="Center" Foreground="#FF5252"
-                                           IsVisible="{Binding LibraryHealth.IssuesCount, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter=0}"/>
+                            <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="16" HorizontalAlignment="Center">
+                                <!-- Blinking LED Indicator -->
+                                <Border Width="32" Height="32" CornerRadius="16" Background="{Binding HealthColor, Converter={x:Static conv:StringToBrushConverter.Instance}}">
+                                    <Border.Styles>
+                                        <Style Selector="Border">
+                                            <Style.Animations>
+                                                <Animation Duration="0:0:2" IterationCount="Infinite">
+                                                    <KeyFrame Cue="0%">
+                                                        <Setter Property="Opacity" Value="0.6"/>
+                                                        <Setter Property="BoxShadow" Value="0 0 10 2 #40FFFFFF"/>
+                                                    </KeyFrame>
+                                                    <KeyFrame Cue="50%">
+                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                        <Setter Property="BoxShadow" Value="0 0 20 5 #80FFFFFF"/>
+                                                    </KeyFrame>
+                                                    <KeyFrame Cue="100%">
+                                                        <Setter Property="Opacity" Value="0.6"/>
+                                                        <Setter Property="BoxShadow" Value="0 0 10 2 #40FFFFFF"/>
+                                                    </KeyFrame>
+                                                </Animation>
+                                            </Style.Animations>
+                                        </Style>
+                                    </Border.Styles>
+                                    <!-- Inner Core -->
+                                    <Border Width="12" Height="12" CornerRadius="6" Background="White" Opacity="0.8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
                                 
-                                <TextBlock Text="All Systems Nominal" FontSize="14" FontWeight="SemiBold" Foreground="#4CAF50" HorizontalAlignment="Center"
-                                           IsVisible="{Binding LibraryHealth.IssuesCount, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=0}"/>
-                                <TextBlock Text="{Binding LibraryHealth.IssuesCount, StringFormat='{}{0} Stuck Items'}" FontSize="14" FontWeight="Bold" Foreground="#FF5252" HorizontalAlignment="Center"
-                                           IsVisible="{Binding LibraryHealth.IssuesCount, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter=0}"/>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding LibraryHealth.HealthStatus}" FontSize="14" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding CurrentSnapshot.ZombieProcessCount, StringFormat='{}Zombie Processes: {0}'}" 
+                                               FontSize="10" Foreground="#808080" HorizontalAlignment="Center"
+                                               IsVisible="{Binding CurrentSnapshot.ZombieProcessCount, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter=0}"/>
+                                </StackPanel>
                             </StackPanel>
                             
                             <Button Grid.Row="2" Command="{Binding ClearDeadLettersCommand}" 

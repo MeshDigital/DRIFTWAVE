@@ -8,11 +8,13 @@
              xmlns:views="clr-namespace:SLSKDONET.Views.Avalonia"
              xmlns:conv="clr-namespace:SLSKDONET.Views.Avalonia.Converters"
              xmlns:tree="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.TreeDataGrid"
+             xmlns:rootConv="clr-namespace:SLSKDONET.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="SLSKDONET.Views.Avalonia.LibraryPage"
              Background="#1E1E1E" Foreground="White">
 
     <UserControl.Resources>
+        <rootConv:StringToBrushConverter x:Key="StringToBrushConverter"/>
         <conv:RankColorConverter x:Key="RankColorConverter"/>
         <conv:BooleanToRedBrushConverter x:Key="BooleanToRedBrushConverter"/>
         <conv:UpgradeStatusToVisibleConverter x:Key="UpgradeStatusToVisibleConverter"/>
@@ -139,7 +141,28 @@
                             </ListBox.Styles>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <controls:CompactPlaylistTemplate DataContext="{Binding}"/>
+                                    <Border Background="Transparent">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Export to Rekordbox XML" 
+                                                          Command="{Binding $parent[UserControl].DataContext.ExportPlaylistCommand}" 
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon>
+                                                        <TextBlock Text="📀"/>
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Delete Playlist" 
+                                                          Command="{Binding $parent[UserControl].DataContext.DeleteProjectCommand}" 
+                                                          CommandParameter="{Binding}"
+                                                          InputGesture="Delete">
+                                                    <MenuItem.Icon>
+                                                        <TextBlock Text="🗑️"/>
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <controls:CompactPlaylistTemplate DataContext="{Binding}"/>
+                                    </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -452,12 +475,9 @@
                                             <TextBlock Text="{Binding Title}" FontSize="14" Foreground="#DDD"/>
                                             
                                             <!-- Integrity Badge -->
-                                            <Border Background="#203E3E3E" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
-                                                    IsVisible="{Binding IntegrityLevel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <TextBlock Text="🛡️" FontSize="10"/>
-                                                    <TextBlock Text="{Binding IntegrityLevel}" FontSize="10" Foreground="#AAA"/>
-                                                </StackPanel>
+                                            <Border Background="Transparent" Margin="6,0,0,0" ToolTip.Tip="{Binding IntegrityTooltip}"
+                                                    IsVisible="{Binding IntegrityBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                <TextBlock Text="{Binding IntegrityBadge}" FontSize="14"/>
                                             </Border>
                                         </StackPanel>
 

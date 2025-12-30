@@ -189,6 +189,7 @@ public class PlaylistTrackEntity
     public double? QualityConfidence { get; set; }
     public int? FrequencyCutoff { get; set; }
     public bool? IsTrustworthy { get; set; }
+    public IntegrityLevel Integrity { get; set; } = IntegrityLevel.None; // NEW
     public string? QualityDetails { get; set; }
     
     // Queue Orchestration

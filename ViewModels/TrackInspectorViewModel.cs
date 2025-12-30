@@ -387,7 +387,17 @@ namespace SLSKDONET.ViewModels
             }
         }
 
-        public string SpectralCutoffLabel => _analysis != null ? $"{_analysis.FrequencyCutoff / 1000.0:F1} kHz" : "--";
+        public string SpectralCutoffLabel 
+        {
+            get
+            {
+                if (_analysis == null || _analysis.FrequencyCutoff <= 0) return "--";
+                var opacity = _analysis.FrequencyCutoff >= 20000 ? "(Native)" : "(Upscaled)";
+                if (_analysis.FrequencyCutoff >= 22000) opacity = "(Hi-Res)";
+                return $"{_analysis.FrequencyCutoff / 1000.0:F1} kHz {opacity}";
+            }
+        }
+        
         public string QualityConfidenceLabel => _analysis != null ? $"{_analysis.QualityConfidence:P0}" : "--";
 
         // Phase 2: Analysis Status Properties
@@ -426,7 +436,15 @@ namespace SLSKDONET.ViewModels
         public string AudioGuardColor => GetAudioGuardColor();
         public string AudioGuardIcon => GetAudioGuardIcon();
 
-        public string FrequencyCutoffLabel => Track?.FrequencyCutoff > 0 ? $"{Track.FrequencyCutoff / 1000.0:F1} kHz" : "Analysing...";
+        public string FrequencyCutoffLabel 
+        {
+            get
+            {
+                if (Track == null || Track.FrequencyCutoff <= 0) return "Analysing...";
+                var suffix = Track.FrequencyCutoff >= 20000 ? "(Native)" : "(Upscaled)";
+                return $"{Track.FrequencyCutoff / 1000.0:F1} kHz {suffix}";
+            }
+        }
         public string ConfidenceLabel => Track?.QualityConfidence >= 0 ? $"{Track.QualityConfidence:P0}" : "??%";
         public bool IsTrustworthy => Track?.IsTrustworthy ?? true;
         public string Details => Track?.QualityDetails ?? "Analysis pending or no data available.";

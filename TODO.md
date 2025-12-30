@@ -97,6 +97,16 @@
   - ✅ **Group Controls**: Pause/Resume/Cancel All support.
   - ✅ **Visuals**: Aggregate progress bars and speed indicators.
 
+### Recent Updates (December 30, 2025) - Code Polish & Integrity
+- ✅ **Audio Integrity Badges**:
+  - ✅ **Visualization**: Gold (🥇), Verified (🛡️), Suspicious (📉) badges in Library Grid.
+  - ✅ **Data Model**: `IntegrityLevel` persisted in database.
+  - ✅ **Inspector**: Frequency Cutoff display with "Native/Upscaled" context.
+- ✅ **Rekordbox Integration (Phase 4 Complete)**:
+  - ✅ **Export**: One-click "Export to Rekordbox XML" for playlists.
+  - ✅ **Monthly Drop**: Automated "Last 30 Days" export.
+- ✅ **Code Cleanup**: Removed unused `CloseInspector` residuals and hardened ViewModel commands.
+
 ---
 
 ## 🎯 ORBIT v1.0: 8-Week Stabilization Focus (STRATEGIC PRIORITY)

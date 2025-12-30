@@ -6,6 +6,7 @@ using System.Windows.Input; // For ICommand
 using SLSKDONET.Models;
 using SLSKDONET.Services;
 using SLSKDONET.Views; // For RelayCommand
+using SLSKDONET.Data; // For IntegrityLevel
 
 namespace SLSKDONET.ViewModels;
 
@@ -50,13 +51,46 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         set => SetProperty(ref _isExpanded, value);
     }
 
-    // Integrity Level (Placeholder for now, future logic will populate this)
-    private string? _integrityLevel;
-    public string? IntegrityLevel
+    // Integrity Level
+    public IntegrityLevel IntegrityLevel
     {
-        get => _integrityLevel;
-        set => SetProperty(ref _integrityLevel, value);
+        get => Model.Integrity;
+        set
+        {
+            if (Model.Integrity != value)
+            {
+                Model.Integrity = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IntegrityBadge));
+                OnPropertyChanged(nameof(IntegrityColor));
+                OnPropertyChanged(nameof(IntegrityTooltip));
+            }
+        }
     }
+
+    public string IntegrityBadge => Model.Integrity switch
+    {
+        Data.IntegrityLevel.Gold => "🥇",
+        Data.IntegrityLevel.Verified => "🛡️",
+        Data.IntegrityLevel.Suspicious => "📉",
+        _ => ""
+    };
+
+    public string IntegrityColor => Model.Integrity switch
+    {
+        Data.IntegrityLevel.Gold => "#FFD700",      // Gold
+        Data.IntegrityLevel.Verified => "#32CD32",  // LimeGreen
+        Data.IntegrityLevel.Suspicious => "#FFA500",// Orange
+        _ => "Transparent"
+    };
+
+    public string IntegrityTooltip => Model.Integrity switch
+    {
+        Data.IntegrityLevel.Gold => "Perfect Match (Gold)",
+        Data.IntegrityLevel.Verified => "Verified Log/Hash",
+        Data.IntegrityLevel.Suspicious => "Suspicious (Upscale/Transcode)",
+        _ => "Not Analyzed"
+    };
 
     // Audio Analysis Properties (Placeholder defaults for UI testing)
     private double _energy = 0.0; 

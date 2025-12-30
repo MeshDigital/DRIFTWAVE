@@ -71,3 +71,7 @@
   * Fixed `AnalysisProgressEvent` type conversion errors.
   * Fixed missing fields in `AnalysisWorker` (`_queue`) and `DownloadDiscoveryService` (`_logger`).
 * **Search Diagnostics**: Added `SearchScore` to `SearchAttemptLog` for better debugging.
+
+### Cleanup
+* **Dependency Removal**: Removed unused `LibVLC` packages (`LibVLCSharp`, `LibVLCSharp.Avalonia`, `VideoLAN.LibVLC.Windows`) to reduce build size and complexity.
+* **Code Cleanup**: Removed legacy LibVLC initialization checks in `App.axaml.cs`.

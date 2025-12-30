@@ -1,8 +1,8 @@
 # ORBIT (formerly SLSKDONET): v1.0 Stabilization Roadmap
 
-**Last Updated**: December 25, 2025  
+**Last Updated**: December 30, 2025  
 **Repository**: https://github.com/MeshDigital/ORBIT  
-> **Current Phase**: Phase 1 (Playback Polish & Queue Persistence) - Partially Complete (Waveform Deferred)
+> **Current Phase**: Phase 5 Stabilization & Code Polish
 
 > [!IMPORTANT]
 > **Status Update**: Phase 4 "Rekordbox Integration" is COMPLETE. ORBIT now features professional DJ export tools including playlist export and Monthly Drop functionality. Focus shifts to **Phase 5: Self-Healing Library**.
@@ -160,6 +160,7 @@
 - ✅ **Multi-Line Templates**: Dense metadata display (Artist - Title / Technical Details)
 - ✅ **Bi-Directional Sync**: Search tokens match Filter HUD state automatically
 - ✅ **Downloads Transparency**: Failure reasons visible in UI, Force Retry support
+- ✅ **Forensic Inspector**: Frequency Cutoff display with "Native vs Upscaled" detection.
 
 ### High-Fidelity Infrastructure
 - **NAudio Backend**: Replaced LibVLC for better control over audio buffers and threading

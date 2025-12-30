@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using System;
+using System.Globalization;
 
 namespace SLSKDONET.Views.Avalonia;
 
@@ -18,3 +20,4 @@ public partial class HomePage : UserControl
         DataContext = viewModel;
     }
 }
+

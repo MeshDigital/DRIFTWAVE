@@ -144,6 +144,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand ToggleInspectorCommand { get; } // Slide-in Inspector
     public System.Windows.Input.ICommand CloseInspectorCommand { get; } // NEW
     public System.Windows.Input.ICommand AnalyzeAlbumCommand { get; } // Queue album for analysis
+    public System.Windows.Input.ICommand ExportPlaylistCommand { get; } // Export to Rekordbox XML
 
     private bool _isInspectorOpen;
     public bool IsInspectorOpen
@@ -234,7 +235,9 @@ public class LibraryViewModel : INotifyPropertyChanged
             }
         });
         CloseInspectorCommand = new RelayCommand<object>(_ => IsInspectorOpen = false); // NEW
+        IsInspectorOpen = false; // NEW
         AnalyzeAlbumCommand = new AsyncRelayCommand<string>(ExecuteAnalyzeAlbumAsync);
+        ExportPlaylistCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportPlaylistAsync);
         
         
         // Wire up events between child ViewModels
@@ -864,8 +867,47 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to queue album for analysis");
             await _dialogService.ShowAlertAsync("Error", "Failed to queue album for analysis");
+        }
+    }
+
+    private async Task ExecuteExportPlaylistAsync(PlaylistJob? playlist)
+    {
+        if (playlist == null) return;
+
+        try
+        {
+            var defaultName = $"{playlist.SourceTitle}_Rekordbox.xml";
+            var savePath = await _dialogService.SaveFileAsync("Export Playlist to Rekordbox", defaultName, "xml");
+
+            if (string.IsNullOrEmpty(savePath)) return;
+
+            _logger.LogInformation("Exporting playlist {Playlist} to {Path}", playlist.SourceTitle, savePath);
+
+            var count = await _rekordboxService.ExportPlaylistAsync(playlist, savePath);
+
+            if (count > 0)
+            {
+                _notificationService.Show(
+                    "Export Complete",
+                    $"Successfully exported {count} tracks from '{playlist.SourceTitle}' to Rekordbox XML.",
+                    NotificationType.Success);
+            }
+            else
+            {
+                 _notificationService.Show(
+                    "Export Warning",
+                    "No valid tracks found to export in this playlist.",
+                    NotificationType.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export playlist {Playlist}", playlist.SourceTitle);
+            _notificationService.Show(
+                "Export Failed",
+                $"Error exporting playlist: {ex.Message}",
+                NotificationType.Error);
         }
     }
 }

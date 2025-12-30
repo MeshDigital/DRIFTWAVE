@@ -121,6 +121,15 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
     public ObservableCollection<string> ActiveOperations { get; } = new();
     public ObservableCollection<string> ResilienceLog { get; } = new();
 
+    public string HealthColor => CurrentSnapshot.SystemHealth switch
+    {
+        SystemHealth.Excellent => "#00FF00", // Bright Green
+        SystemHealth.Good => "#4CAF50",      // Standard Green
+        SystemHealth.Warning => "#FFCA28",   // Amber/Yellow
+        SystemHealth.Critical => "#FF5252",  // Red
+        _ => "#808080"
+    };
+
     public HomeViewModel(
         ILogger<HomeViewModel> logger,
         DashboardService dashboardService,
@@ -166,6 +175,9 @@ public class HomeViewModel : INotifyPropertyChanged, IDisposable
                 if (LibraryHealth == null) LibraryHealth = new LibraryHealthEntity();
                 LibraryHealth.HealthStatus = snapshot.SystemHealth.ToString();
                 LibraryHealth.IssuesCount = snapshot.DeadLetterCount;
+                
+                // Trigger HealthColor update
+                OnPropertyChanged(nameof(HealthColor));
             });
         });
 

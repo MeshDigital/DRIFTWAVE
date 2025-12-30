@@ -699,7 +699,14 @@ public class LibraryService : ILibraryService
             ManualBPM = entity.ManualBPM,
             ManualKey = entity.ManualKey,
             
-            IsEnriched = entity.IsEnriched
+            IsEnriched = entity.IsEnriched,
+            
+            // Sonic Integrity
+            Integrity = entity.Integrity,
+            IsTrustworthy = entity.IsTrustworthy,
+            QualityConfidence = entity.QualityConfidence,
+            FrequencyCutoff = entity.FrequencyCutoff,
+            QualityDetails = entity.QualityDetails
         };
     }
 
@@ -754,7 +761,14 @@ public class LibraryService : ILibraryService
             ManualBPM = track.ManualBPM,
             ManualKey = track.ManualKey,
             
-            IsEnriched = track.IsEnriched
+            IsEnriched = track.IsEnriched,
+            
+            // Sonic Integrity
+            Integrity = track.Integrity,
+            IsTrustworthy = track.IsTrustworthy,
+            QualityConfidence = track.QualityConfidence,
+            FrequencyCutoff = track.FrequencyCutoff,
+            QualityDetails = track.QualityDetails
         };
     }
 
