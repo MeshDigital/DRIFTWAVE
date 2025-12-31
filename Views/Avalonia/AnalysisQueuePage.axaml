@@ -3,22 +3,78 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
+             xmlns:conv="clr-namespace:SLSKDONET.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="SLSKDONET.Views.Avalonia.AnalysisQueuePage"
              Background="#1E1E1E" Foreground="White">
 
-    <Grid RowDefinitions="Auto,*,Auto,*,Auto,200">
+    <UserControl.Resources>
+        <conv:StatusToColorConverter x:Key="StatusColorConverter"/>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*,Auto,200">
         
         <!-- Header -->
         <Border Grid.Row="0" Margin="32,32,32,16">
             <StackPanel Spacing="8">
-                <TextBlock Text="Analysis Queue" FontSize="28" FontWeight="Bold"/>
-                <TextBlock Text="Real-time monitoring of local music intelligence processing" Foreground="#888"/>
+                <TextBlock Text="Analysis Queue - Mission Control" FontSize="28" FontWeight="Bold"/>
+                <TextBlock Text="Real-time monitoring of parallel audio analysis processing" Foreground="#888"/>
             </StackPanel>
         </Border>
 
+        <!-- Mission Control: Thread Activity Grid -->
+        <Grid Grid.Row="1" Margin="32,0,32,16" RowDefinitions="Auto,Auto">
+            <TextBlock Grid.Row="0" Text="🧵 THREAD ACTIVITY" FontSize="12" FontWeight="Bold" Foreground="#00D9FF" Margin="0,0,0,8"/>
+            <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveThreads}" AutoGenerateColumns="False" 
+                      CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8" MaxHeight="200">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Thread" Binding="{Binding ThreadId}" Width="80"/>
+                    <DataGridTemplateColumn Header="Status" Width="120">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Status}" 
+                                          Foreground="{Binding Status, Converter={StaticResource StatusColorConverter}}"
+                                          FontWeight="Bold"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Track" Binding="{Binding CurrentTrack}" Width="*"/>
+                    <DataGridTemplateColumn Header="Progress" Width="150">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ProgressBar Value="{Binding Progress}" Maximum="100" Height="20" 
+                                            Foreground="#00D9FF" Background="#333"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Duration" Binding="{Binding ElapsedTime}" Width="80"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <!-- Mission Control: Metrics Footer -->
+        <Border Grid.Row="2" Background="#252526" Padding="16,12" Margin="32,0" CornerRadius="8">
+            <Grid ColumnDefinitions="*,*,*">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="📊 Throughput:" FontWeight="Bold" Foreground="#888"/>
+                    <TextBlock Text="{Binding TracksPerMinute, StringFormat='{}{0:F1} tracks/min'}" 
+                              FontSize="14" FontWeight="Bold" Foreground="#00D9FF"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <TextBlock Text="✅ Processed:" FontWeight="Bold" Foreground="#888"/>
+                    <TextBlock Text="{Binding TotalProcessed}" 
+                              FontSize="14" FontWeight="Bold" Foreground="#1DB954"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                    <TextBlock Text="⏱️ ETA:" FontWeight="Bold" Foreground="#888"/>
+                    <TextBlock Text="{Binding EstimatedCompletion}" 
+                              FontSize="14" FontWeight="Bold" Foreground="#FFA500"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Active Jobs -->
-        <Grid Grid.Row="1" Margin="32,0,32,16" RowDefinitions="Auto,*">
+        <Grid Grid.Row="3" Margin="32,16,32,16" RowDefinitions="Auto,*">
             <TextBlock Grid.Row="0" Text="ACTIVE PROCESSING" FontSize="12" FontWeight="Bold" Foreground="#4EC9B0" Margin="0,0,0,8"/>
             <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveJobs}" AutoGenerateColumns="False" CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8">
                 <DataGrid.Columns>
@@ -37,10 +93,10 @@
         </Grid>
 
         <!-- Splitter -->
-        <GridSplitter Grid.Row="2" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
+        <GridSplitter Grid.Row="4" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
 
         <!-- Completed Jobs -->
-        <Grid Grid.Row="3" Margin="32,16,32,16" RowDefinitions="Auto,*">
+        <Grid Grid.Row="5" Margin="32,16,32,16" RowDefinitions="Auto,*">
             <TextBlock Grid.Row="0" Text="RECENTLY COMPLETED" FontSize="12" FontWeight="Bold" Foreground="#1DB954" Margin="0,0,0,8"/>
             <DataGrid Grid.Row="1" ItemsSource="{Binding CompletedJobs}" AutoGenerateColumns="False" CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8">
                 <DataGrid.Columns>
@@ -63,10 +119,10 @@
         </Grid>
         
         <!-- Splitter -->
-        <GridSplitter Grid.Row="4" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
+        <GridSplitter Grid.Row="6" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
 
         <!-- Failed Jobs -->
-        <Grid Grid.Row="5" Margin="32,16,32,32" RowDefinitions="Auto,*">
+        <Grid Grid.Row="7" Margin="32,16,32,32" RowDefinitions="Auto,*">
              <TextBlock Grid.Row="0" Text="FAILED / ERRORS" FontSize="12" FontWeight="Bold" Foreground="#F44336" Margin="0,0,0,8"/>
              <DataGrid Grid.Row="1" ItemsSource="{Binding FailedJobs}" AutoGenerateColumns="False" CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8">
                 <DataGrid.Columns>

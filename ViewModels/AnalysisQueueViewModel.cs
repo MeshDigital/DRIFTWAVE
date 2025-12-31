@@ -62,10 +62,36 @@ public class AnalysisQueueViewModel : ReactiveObject
     private readonly IEventBus _eventBus;
     private readonly INavigationService _navigationService;
     private readonly LibraryViewModel _libraryViewModel;
+    private readonly AnalysisQueueService _queueService;
 
     public ObservableCollection<AnalysisJobViewModel> ActiveJobs { get; } = new();
     public ObservableCollection<AnalysisJobViewModel> CompletedJobs { get; } = new();
     public ObservableCollection<AnalysisJobViewModel> FailedJobs { get; } = new();
+    
+    // Mission Control: Thread Activity Tracking
+    public ObservableCollection<ActiveThreadInfo> ActiveThreads => _queueService.ActiveThreads;
+    
+    // Mission Control: Metrics
+    private double _tracksPerMinute;
+    public double TracksPerMinute
+    {
+        get => _tracksPerMinute;
+        set => this.RaiseAndSetIfChanged(ref _tracksPerMinute, value);
+    }
+    
+    private int _totalProcessed;
+    public int TotalProcessed
+    {
+        get => _totalProcessed;
+        set => this.RaiseAndSetIfChanged(ref _totalProcessed, value);
+    }
+    
+    private string _estimatedCompletion = "N/A";
+    public string EstimatedCompletion
+    {
+        get => _estimatedCompletion;
+        set => this.RaiseAndSetIfChanged(ref _estimatedCompletion, value);
+    }
     
     // We keep a history limit?
     private const int MaxHistory = 50;
@@ -76,12 +102,14 @@ public class AnalysisQueueViewModel : ReactiveObject
         ILogger<AnalysisQueueViewModel> logger,
         IEventBus eventBus,
         INavigationService navigationService,
-        LibraryViewModel libraryViewModel)
+        LibraryViewModel libraryViewModel,
+        AnalysisQueueService queueService)
     {
         _logger = logger;
         _eventBus = eventBus;
         _navigationService = navigationService;
         _libraryViewModel = libraryViewModel;
+        _queueService = queueService;
 
         InspectTrackCommand = ReactiveCommand.Create<AnalysisJobViewModel>(InspectTrack);
 
