@@ -93,6 +93,10 @@ public class AnalysisQueueViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _estimatedCompletion, value);
     }
     
+    // Metrics tracking
+    private DateTime _sessionStartTime = DateTime.UtcNow;
+    private readonly List<DateTime> _completionTimestamps = new();
+    
     // We keep a history limit?
     private const int MaxHistory = 50;
 
@@ -185,6 +189,9 @@ public class AnalysisQueueViewModel : ReactiveObject
                 job.Timestamp = DateTime.Now;
                 CompletedJobs.Insert(0, job);
                 if (CompletedJobs.Count > MaxHistory) CompletedJobs.RemoveAt(CompletedJobs.Count - 1);
+                
+                // Update Mission Control metrics
+                UpdateMetrics();
             }
             else
             {
@@ -195,6 +202,46 @@ public class AnalysisQueueViewModel : ReactiveObject
                 // Or handle both.
                 // Let's rely on Failed event for Failed list insertion to avoid duplication.
             }
+        }
+    }
+    
+    /// <summary>
+    /// Update Mission Control metrics: throughput, total processed, and ETA.
+    /// </summary>
+    private void UpdateMetrics()
+    {
+        // Track completion time
+        _completionTimestamps.Add(DateTime.UtcNow);
+        TotalProcessed++;
+        
+        // Keep only last 60 minutes of timestamps for accurate rate calculation
+        var cutoff = DateTime.UtcNow.AddMinutes(-60);
+        _completionTimestamps.RemoveAll(t => t < cutoff);
+        
+        // Calculate throughput (tracks per minute)
+        var elapsed = (DateTime.UtcNow - _sessionStartTime).TotalMinutes;
+        if (elapsed > 0)
+        {
+            TracksPerMinute = TotalProcessed / elapsed;
+        }
+        
+        // Calculate ETA based on queue size and current rate
+        int remainingInQueue = _queueService.QueuedCount - _queueService.ProcessedCount;
+        if (remainingInQueue > 0 && TracksPerMinute > 0)
+        {
+            double minutesRemaining = remainingInQueue / TracksPerMinute;
+            var eta = TimeSpan.FromMinutes(minutesRemaining);
+            
+            if (eta.TotalHours >= 1)
+                EstimatedCompletion = $"{(int)eta.TotalHours}h {eta.Minutes}m";
+            else if (eta.TotalMinutes >= 1)
+                EstimatedCompletion = $"{(int)eta.TotalMinutes}m {eta.Seconds}s";
+            else
+                EstimatedCompletion = $"{eta.Seconds}s";
+        }
+        else
+        {
+            EstimatedCompletion = "N/A";
         }
     }
 
