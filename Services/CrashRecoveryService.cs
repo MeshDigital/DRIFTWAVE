@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using SLSKDONET.Services.IO;
 
 namespace SLSKDONET.Services;
 
@@ -185,7 +186,7 @@ public class CrashRecoveryService
                     _logger.LogInformation("Download appears complete ({Size}/{Expected}), verifying...", 
                         partSize, state.ExpectedSize);
                     
-                    var isValid = await SLSKDONET.Services.IO.FileVerificationHelper.VerifyAudioFormatAsync(state.PartFilePath);
+                    var isValid = await FileVerificationHelper.VerifyAudioFormatAsync(state.PartFilePath);
                     
                     if (isValid)
                     {

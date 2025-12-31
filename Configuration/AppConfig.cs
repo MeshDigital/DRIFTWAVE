@@ -1,3 +1,5 @@
+using SLSKDONET.Models;
+
 namespace SLSKDONET.Configuration;
 
 
@@ -50,14 +52,19 @@ public class AppConfig
     public int MaxSearchAttempts { get; set; } = 3; // Max progressive search attempts per track
     public bool AutoRetryFailedDownloads { get; set; } = true;
     public int MaxDownloadRetries { get; set; } = 2;
-    public ScoringWeights CustomWeights { get; set; } = ScoringWeights.Balanced;
-    public string RankingProfile { get; set; } = "Balanced";
-    
     // Brain 2.0 & Quality Guard
+    public SearchPolicy SearchPolicy { get; set; } = SearchPolicy.QualityFirst(); // [NEW] The "Biggers App" Search Policy
+
     public bool EnableFuzzyNormalization { get; set; } = true; // Strip special chars, normalize feat.
     public bool EnableRelaxationStrategy { get; set; } = true; // Progressive threshold widening
     public bool EnableVbrFraudDetection { get; set; } = true; // Upscale protection
     public int RelaxationTimeoutSeconds { get; set; } = 10; // Optimized: was 30s, reduced for faster fallback
+    
+    // Phase 10: Profile Persistence
+    public string? RankingProfile { get; set; } = "Balanced"; // Persists "Quality First", "DJ Mode", etc.
+
+    [Obsolete("Use SearchPolicy instead. Kept for migration stability.")]
+    public ScoringWeights CustomWeights { get; set; } = ScoringWeights.Balanced; // DEPRECATED
     
     // Window state persistence
     public double WindowWidth { get; set; } = 1400;
@@ -70,6 +77,9 @@ public class AppConfig
     public List<string> LibraryRootPaths { get; set; } = new(); // Root directories to scan for music files
     public bool EnableFilePathResolution { get; set; } = true; // Enable automatic resolution of moved files
     public double FuzzyMatchThreshold { get; set; } = 0.70; // Minimum similarity score (0.0-1.0) for fuzzy matching
+    
+    // Gatekeeper
+    public List<string> BlacklistedUsers { get; set; } = new(); // Users to strictly ignore (e.g. ad-bots, fakes)
     
     // Library UI - Column Order Persistence
     public string LibraryColumnOrder { get; set; } = ""; // Comma-separated column IDs (empty = use default)

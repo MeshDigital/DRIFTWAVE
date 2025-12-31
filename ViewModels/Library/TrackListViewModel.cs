@@ -188,7 +188,8 @@ public class TrackListViewModel : ReactiveObject
         ArtworkCacheService artworkCache,
         IEventBus eventBus,
         AppConfig config,
-        MetadataEnrichmentOrchestrator enrichmentOrchestrator)
+        MetadataEnrichmentOrchestrator enrichmentOrchestrator,
+        AnalysisQueueService analysisQueueService)
     {
         _logger = logger;
         _libraryService = libraryService;
@@ -198,7 +199,7 @@ public class TrackListViewModel : ReactiveObject
         _enrichmentOrchestrator = enrichmentOrchestrator;
         _config = config;
 
-        Hierarchical = new HierarchicalLibraryViewModel(config, downloadManager);
+        Hierarchical = new HierarchicalLibraryViewModel(config, downloadManager, analysisQueueService);
         
         SelectAllTracksCommand = ReactiveCommand.Create(() => 
         {

@@ -181,6 +181,24 @@ public partial class App : Application
                 Serilog.Log.Information("Loaded ranking strategy: {Strategy}", config.RankingPreset ?? "Balanced");
                 */
                 
+                // Phase 10: Biggers App Refactoring - Config Migration
+                // Detect legacy weights and migrate to SearchPolicy
+                try {
+                     var configManager = Services.GetRequiredService<ConfigManager>();
+                     var migrationConfig = configManager.Load(); // Reload to be sure
+                     var migrationService = Services.GetRequiredService<ConfigMigrationService>();
+                     
+                     if (migrationService.Migrate(migrationConfig))
+                     {
+                         configManager.Save(migrationConfig);
+                         Serilog.Log.Information("✅ Configuration migrated to 'Biggers App' Search Policy");
+                     }
+                }
+                catch (Exception profEx)
+                {
+                    Serilog.Log.Warning(profEx, "Config migration failed (non-critical)");
+                }
+
                 // Phase 7: Load ranking strategy and weights from config
                 var configDispatcher = Services.GetRequiredService<ConfigManager>();
                 var config = configDispatcher.GetCurrent() ?? new AppConfig();
@@ -404,6 +422,7 @@ public partial class App : Application
         });
 
         // Configuration
+        services.AddSingleton<ConfigMigrationService>(); // [NEW] Biggers App Migration
         services.AddSingleton<ConfigManager>();
         services.AddSingleton(provider =>
         {
@@ -583,7 +602,19 @@ public partial class App : Application
         
         // Phase 0: ViewModel Refactoring - Library child ViewModels
         services.AddTransient<ViewModels.Library.ProjectListViewModel>();
-        services.AddTransient<ViewModels.Library.TrackListViewModel>();
+        services.AddTransient<ViewModels.Library.TrackListViewModel>(sp => 
+        {
+            return new ViewModels.Library.TrackListViewModel(
+                sp.GetRequiredService<ILogger<ViewModels.Library.TrackListViewModel>>(),
+                sp.GetRequiredService<ILibraryService>(),
+                sp.GetRequiredService<DownloadManager>(),
+                sp.GetRequiredService<ArtworkCacheService>(),
+                sp.GetRequiredService<IEventBus>(),
+                sp.GetRequiredService<AppConfig>(),
+                sp.GetRequiredService<MetadataEnrichmentOrchestrator>(),
+                sp.GetRequiredService<AnalysisQueueService>()
+            );
+        });
         services.AddTransient<ViewModels.Library.TrackOperationsViewModel>();
         services.AddTransient<ViewModels.Library.SmartPlaylistViewModel>();
         
@@ -594,6 +625,9 @@ public partial class App : Application
 
         // Utilities
         services.AddSingleton<SearchQueryNormalizer>();
+        
+        // Gatekeeper Service
+        services.AddSingleton<ISafetyFilterService, SafetyFilterService>();
         
         // Views - Register all page controls for NavigationService
         services.AddTransient<Views.Avalonia.HomePage>();

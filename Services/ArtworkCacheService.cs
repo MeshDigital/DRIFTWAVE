@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using SLSKDONET.Services.IO; // Added using
 
 namespace SLSKDONET.Services;
 
@@ -17,11 +18,11 @@ public class ArtworkCacheService
     private readonly string _cacheDirectory;
     private readonly string _placeholderPath;
 
-    private readonly SLSKDONET.Services.IO.IFileWriteService _fileWriteService;
+    private readonly IFileWriteService _fileWriteService;
 
     public ArtworkCacheService(
         ILogger<ArtworkCacheService> logger,
-        SLSKDONET.Services.IO.IFileWriteService fileWriteService)
+        IFileWriteService fileWriteService)
     {
         _logger = logger;
         _fileWriteService = fileWriteService;

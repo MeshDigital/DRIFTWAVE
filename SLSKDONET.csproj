@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <Compile Remove="External\**" />
+    <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="External\**" />
     <None Remove="External\**" />
     <AdditionalFiles Remove="External\**" />

@@ -74,4 +74,23 @@
 
 ### Cleanup
 * **Dependency Removal**: Removed unused `LibVLC` packages (`LibVLCSharp`, `LibVLCSharp.Avalonia`, `VideoLAN.LibVLC.Windows`) to reduce build size and complexity.
-* **Code Cleanup**: Removed legacy LibVLC initialization checks in `App.axaml.cs`.
+## [0.1.0-alpha.7] - Intelligence & Context Mastery
+
+### New Features
+* **Analysis Context Menus**:
+  * **"Analyze Track"**: Right-click any track in the Library (flat list) to queue it for immediate priority analysis.
+  * **"Analyze Album"**: Right-click any Album Card in the Library (hierarchical view) to queue the entire album for analysis.
+* **Musical Brain Test Mode**: Added a diagnostic utility to the Analysis Queue page to validate the entire processing pipeline (FFmpeg, Essentia, concurrent execution).
+
+### Fixes & Stability
+* **Startup Stability**: Fixed a critical `InvalidOperationException` (DI Resolution) that prevented application startup due to missing `AppDbContext` registration in `MusicalBrainTestService`.
+* **LINQ Translation**: Fixed a runtime crash in track selection where `File.Exists` was used inside a database query.
+* **Build Fixes**:
+  * Resolved ambiguous `NotificationType` references.
+  * Fixed nullability mismatches in `SettingsViewModel` (Selection commands).
+  * Added mandatory `ILogger` injection to `AnalysisQueueService`.
+  * Added missing `QueueTrackWithPriority` method to `AnalysisQueueService`.
+  * Added null safety check to `SafetyFilterService` for blacklisted users.
+
+### Infrastructure
+* **Database Access**: Refactored `MusicalBrainTestService` to use the "New Context per Unit of Work" pattern, ensuring database connection health in singleton services.

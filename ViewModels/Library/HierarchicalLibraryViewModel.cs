@@ -28,10 +28,13 @@ public class HierarchicalLibraryViewModel
     public HierarchicalTreeDataGridSource<ILibraryNode> Source { get; }
     public ITreeDataGridRowSelectionModel<ILibraryNode>? Selection => Source.RowSelection;
 
-    public HierarchicalLibraryViewModel(AppConfig config, DownloadManager downloadManager)
+    private readonly AnalysisQueueService _analysisQueueService;
+
+    public HierarchicalLibraryViewModel(AppConfig config, DownloadManager downloadManager, AnalysisQueueService analysisQueueService)
     {
         _config = config;
         _downloadManager = downloadManager;
+        _analysisQueueService = analysisQueueService;
         Source = new HierarchicalTreeDataGridSource<ILibraryNode>(_albums);
         Source.RowSelection!.SingleSelect = false;
 
@@ -250,7 +253,7 @@ public class HierarchicalLibraryViewModel
             else
             {
                 var firstTrack = group.First();
-                var albumNode = new AlbumNode(group.Key, firstTrack.Artist)
+                var albumNode = new AlbumNode(group.Key, firstTrack.Artist, _downloadManager, _analysisQueueService)
                 {
                     AlbumArtPath = firstTrack.AlbumArtPath
                 };

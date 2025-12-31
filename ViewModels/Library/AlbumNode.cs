@@ -17,6 +17,8 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
 {
     private readonly DownloadManager? _downloadManager;
     
+    private readonly AnalysisQueueService? _analysisQueueService;
+    
     public string? AlbumTitle { get; set; }
     public string? Artist { get; set; }
     public string? Title => AlbumTitle;
@@ -57,7 +59,8 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
     public ObservableCollection<PlaylistTrackViewModel> Tracks { get; } = new();
     
     public ICommand DownloadAlbumCommand { get; }
-    public ICommand PlayAlbumCommand { get; } // New Command
+    public ICommand PlayAlbumCommand { get; } 
+    public ICommand AnalyzeAlbumCommand { get; }
 
     // UI State
     private bool _isLoading = false;
@@ -96,14 +99,16 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         return new SolidColorBrush(Color.FromRgb(r, g, b));
     }
 
-    public AlbumNode(string? albumTitle, string? artist, DownloadManager? downloadManager = null)
+    public AlbumNode(string? albumTitle, string? artist, DownloadManager? downloadManager = null, AnalysisQueueService? analysisQueueService = null)
     {
         AlbumTitle = albumTitle;
         Artist = artist;
         _downloadManager = downloadManager;
+        _analysisQueueService = analysisQueueService;
         
         DownloadAlbumCommand = new RelayCommand<object>(_ => DownloadAlbum());
         PlayAlbumCommand = new RelayCommand<object>(_ => PlayAlbum());
+        AnalyzeAlbumCommand = new RelayCommand<object>(_ => AnalyzeAlbum());
         
         // Use async loading for bitmap if path exists
         if (!string.IsNullOrEmpty(AlbumArtPath))
@@ -133,6 +138,21 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         
         var tracksToDownload = Tracks.Select(t => t.Model).ToList();
         _downloadManager.QueueTracks(tracksToDownload);
+    }
+
+    private void AnalyzeAlbum()
+    {
+        if (_analysisQueueService == null || !Tracks.Any()) return;
+        
+        var tracksToAnalyze = Tracks
+            .Where(t => t.Model.Status == TrackStatus.Downloaded)
+            .Select(t => t.Model)
+            .ToList();
+            
+        if (tracksToAnalyze.Any())
+        {
+            _analysisQueueService.QueueAlbumWithPriority(tracksToAnalyze);
+        }
     }
 
     private void PlayAlbum()

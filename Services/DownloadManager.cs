@@ -20,6 +20,7 @@ using SLSKDONET.Utils;
 using SLSKDONET.Services.Models;
 using Microsoft.EntityFrameworkCore;
 using SLSKDONET.Services.Repositories; // [NEW] Namespace
+using SLSKDONET.Services.IO; // Added explicit using
 
 
 namespace SLSKDONET.Services;
@@ -46,7 +47,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     private readonly DownloadDiscoveryService _discoveryService;
     private readonly MetadataEnrichmentOrchestrator _enrichmentOrchestrator;
     private readonly PathProviderService _pathProvider;
-    private readonly SLSKDONET.Services.IO.IFileWriteService _fileWriteService; // Phase 1A
+    private readonly IFileWriteService _fileWriteService; // Phase 1A
     private readonly CrashRecoveryJournal _crashJournal; // Phase 2A
     private readonly IEnrichmentTaskRepository _enrichmentTaskRepository; // [NEW]
     private readonly IAudioAnalysisService _audioAnalysisService; // Phase 3: Local Audio Analysis
@@ -86,7 +87,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         DownloadDiscoveryService discoveryService,
         MetadataEnrichmentOrchestrator enrichmentOrchestrator, // Keeping this for legacy calls if any
         PathProviderService pathProvider,
-        SLSKDONET.Services.IO.IFileWriteService fileWriteService,
+        IFileWriteService fileWriteService,
         CrashRecoveryJournal crashJournal,
         IEnrichmentTaskRepository enrichmentTaskRepository,
         IAudioAnalysisService audioAnalysisService,

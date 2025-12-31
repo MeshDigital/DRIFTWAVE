@@ -11,7 +11,10 @@ using SLSKDONET.Services.Ranking;
 using SLSKDONET.Views; // For AsyncRelayCommand
 using Avalonia.Threading;
 
+using System.Collections.ObjectModel; // Added
+using SLSKDONET.Models; // For SearchPolicy
 namespace SLSKDONET.ViewModels;
+
 
 public enum SpotifyAuthStatus
 {
@@ -321,154 +324,88 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
     }
     
-    // Phase 2.4: Ranking Strategy Selection
-    // NOTE: RankingPreset property doesn't exist in AppConfig - using CustomWeights directly
-    public string SelectedRankingMode
+    // Phase 2.4: Strategy Command Pattern
+    public ObservableCollection<RankingStrategyViewModel> Strategies { get; } = new();
+
+    private RankingStrategyViewModel? _selectedStrategy;
+    public RankingStrategyViewModel? SelectedStrategy
     {
-        get => _config.RankingProfile ?? "Balanced";
+        get => _selectedStrategy;
         set
         {
-            if (_config.RankingProfile != value)
+            if (SetProperty(ref _selectedStrategy, value) && value != null)
             {
-                _config.RankingProfile = value;
-                
-                // Sync weights and strategy when preset changes
-                if (value == "Balanced") CustomWeights = ScoringWeights.Balanced;
-                else if (value == "Quality First") CustomWeights = ScoringWeights.QualityFirst;
-                else if (value == "DJ Mode") CustomWeights = ScoringWeights.DjMode;
-                
-                ApplyRankingStrategy(value);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(RankingModeDescription));
-                UpdateLivePreview();
+                ApplyStrategy(value.Id);
             }
         }
     }
-    
-    public ScoringWeights CustomWeights
+
+    public ICommand SelectStrategyCommand { get; }
+
+    private void InitializeStrategies()
     {
-        get => _config.CustomWeights ?? ScoringWeights.Balanced;
-        set
+        Strategies.Add(new RankingStrategyViewModel
         {
-            _config.CustomWeights = value;
-            ResultSorter.SetWeights(value);
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(AvailabilityWeight));
-            OnPropertyChanged(nameof(QualityWeight));
-            OnPropertyChanged(nameof(MusicalWeight));
-            OnPropertyChanged(nameof(MetadataWeight));
-            OnPropertyChanged(nameof(StringWeight));
-            OnPropertyChanged(nameof(ConditionsWeight));
-            UpdateLivePreview();
-            SaveSettings();
-        }
-    }
+            Id = "Quality First",
+            Title = "Audiophile",
+            Description = "Prioritizes lossless, high-bitrate, and perfect rips. No compromises.",
+            Icon = "🎧",
+            IsSelected = _config.RankingProfile == "Quality First"
+        });
 
-    public double AvailabilityWeight
-    {
-        get => CustomWeights.AvailabilityWeight;
-        set { CustomWeights.AvailabilityWeight = value; ResultSorter.SetWeights(CustomWeights); UpdateLivePreview(); OnPropertyChanged(); SaveSettings(); }
-    }
-
-    public double QualityWeight
-    {
-        get => CustomWeights.QualityWeight;
-        set { CustomWeights.QualityWeight = value; ResultSorter.SetWeights(CustomWeights); UpdateLivePreview(); OnPropertyChanged(); SaveSettings(); }
-    }
-
-    public double MusicalWeight
-    {
-        get => CustomWeights.MusicalWeight;
-        set { CustomWeights.MusicalWeight = value; ResultSorter.SetWeights(CustomWeights); UpdateLivePreview(); OnPropertyChanged(); SaveSettings(); }
-    }
-
-    public double MetadataWeight
-    {
-        get => CustomWeights.MetadataWeight;
-        set { CustomWeights.MetadataWeight = value; ResultSorter.SetWeights(CustomWeights); UpdateLivePreview(); OnPropertyChanged(); SaveSettings(); }
-    }
-
-    public double StringWeight
-    {
-        get => CustomWeights.StringWeight;
-        set { CustomWeights.StringWeight = value; ResultSorter.SetWeights(CustomWeights); UpdateLivePreview(); OnPropertyChanged(); SaveSettings(); }
-    }
-
-    public double ConditionsWeight
-    {
-        get => CustomWeights.ConditionsWeight;
-        set { CustomWeights.ConditionsWeight = value; ResultSorter.SetWeights(CustomWeights); UpdateLivePreview(); OnPropertyChanged(); SaveSettings(); }
-    }
-
-    private List<SLSKDONET.Models.Track> _livePreviewTracks = new();
-    public List<SLSKDONET.Models.Track> LivePreviewTracks
-    {
-        get => _livePreviewTracks;
-        set => SetProperty(ref _livePreviewTracks, value);
-    }
-
-    private void UpdateLivePreview()
-    {
-        if (_livePreviewTracks == null || _livePreviewTracks.Count == 0)
+        Strategies.Add(new RankingStrategyViewModel
         {
-            InitializeLivePreview();
-            return;
-        }
+            Id = "Balanced",
+            Title = "Balanced",
+            Description = "The best mix of quality, speed, and metadata accuracy. Recommended.",
+            Icon = "⚖️",
+            IsSelected = _config.RankingProfile == "Balanced" || string.IsNullOrEmpty(_config.RankingProfile)
+        });
 
-        var searchTrack = new SLSKDONET.Models.Track 
-        { 
-            Artist = "Strobe", Title = "Strobe", 
-            Length = 600, // 10 minutes
-            BPM = 128 
-        };
-        
-        LivePreviewTracks = ResultSorter.OrderResults(_livePreviewTracks, searchTrack);
+        Strategies.Add(new RankingStrategyViewModel
+        {
+            Id = "DJ Mode",
+            Title = "DJ Ready",
+            Description = "Prioritizes BPM, Key, and mix-friendly files (Extended Mixes).",
+            Icon = "🎛️",
+            IsSelected = _config.RankingProfile == "DJ Mode"
+        });
+
+        // Set initial selection without triggering logic (already loaded from config)
+        _selectedStrategy = Strategies.FirstOrDefault(s => s.IsSelected);
     }
 
-    private void InitializeLivePreview()
+    private void ExecuteSelectStrategy(RankingStrategyViewModel? strategy)
     {
-        _livePreviewTracks = new List<SLSKDONET.Models.Track>
-        {
-            new() { Title = "Strobe (Club Mix)", Artist = "deadmau5", Bitrate = 320, Length = 600, Username = "AudiophileUser", BPM = 128 },
-            new() { Title = "Strobe (Radio Edit)", Artist = "deadmau5", Bitrate = 128, Length = 210, Username = "FastDownloader", BPM = 128 },
-            new() { Title = "Strobe (Extended Mix)", Artist = "deadmau5", Bitrate = 1011, Length = 620, Username = "LoverOfFLAC", Format = "FLAC", BPM = 128 },
-            new() { Title = "Strobe (Remix)", Artist = "OtherArtist", Bitrate = 256, Length = 450, Username = "RemixGuy", BPM = 130 }
-        };
-        UpdateLivePreview();
+        if (strategy == null) return;
+
+        foreach (var s in Strategies) s.IsSelected = false;
+        strategy.IsSelected = true;
+        SelectedStrategy = strategy; // Triggers ApplyStrategy
     }
-    
-    public List<string> RankingModes { get; } = new()
+
+    private void ApplyStrategy(string strategyId)
     {
-        "Balanced",
-        "Quality First",
-        "DJ Mode"
-    };
-    
-    public string RankingModeDescription
-    {
-        get
+        _config.RankingProfile = strategyId;
+        _logger.LogInformation("Applying Search Strategy: {Strategy}", strategyId);
+
+        // Map ID to SearchPolicy
+        if (strategyId == "Quality First") _config.SearchPolicy = SearchPolicy.QualityFirst();
+        else if (strategyId == "DJ Mode") _config.SearchPolicy = SearchPolicy.DjReady();
+        else 
         {
-            return SelectedRankingMode switch
-            {
-                "Quality First" => "Prioritizes bitrate and format quality. BPM/Key are minor tiebreakers.",
-                "DJ Mode" => "Prioritizes BPM and Key matching. Quality is secondary.",
-                _ => "Equal weight to quality and musical intelligence. Default mode."
+            // Balanced / Default
+            _config.SearchPolicy = new SearchPolicy 
+            { 
+                Priority = SearchPriority.QualityFirst, 
+                PreferredMinBitrate = 192,
+                RelaxationParams = new() // Moderate relaxation
             };
         }
+
+        SaveSettings();
     }
-    
-    private void ApplyRankingStrategy(string mode)
-    {
-        ISortingStrategy strategy = mode switch
-        {
-            "Quality First" => new QualityFirstStrategy(),
-            "DJ Mode" => new DJModeStrategy(),
-            _ => new BalancedStrategy()
-        };
-        
-        ResultSorter.SetStrategy(strategy);
-        _logger.LogInformation("Ranking strategy changed to: {Mode}", mode);
-    }
+
 
     // Unified State Management
     private SpotifyAuthStatus _spotifyState = SpotifyAuthStatus.Disconnected;
@@ -717,8 +654,10 @@ public class SettingsViewModel : INotifyPropertyChanged
         // Set initial display based on current auth state
         UpdateSpotifyUIState(_spotifyAuthService.IsAuthenticated);
 
+        SelectStrategyCommand = new RelayCommand<RankingStrategyViewModel?>(ExecuteSelectStrategy);
+        InitializeStrategies();
+        
         _ = CheckFfmpegAsync(); // Phase 8: Check FFmpeg on startup
-        UpdateLivePreview();
         
         // Force update of derived properties to ensure UI booleans are in sync with SpotifyState
         UpdateDerivedProperties(SpotifyState);

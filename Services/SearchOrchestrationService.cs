@@ -25,19 +25,22 @@ public class SearchOrchestrationService
     private readonly ISoulseekAdapter _soulseek;
     private readonly SearchQueryNormalizer _searchQueryNormalizer;
     private readonly SearchNormalizationService _searchNormalization; // Phase 4.6: Replaces broken parenthesis stripping
+    private readonly ISafetyFilterService _safetyFilter; // Week 2: Gatekeeper
     private readonly AppConfig _config;
     
     public SearchOrchestrationService(
         ILogger<SearchOrchestrationService> logger,
         ISoulseekAdapter soulseek,
         SearchQueryNormalizer searchQueryNormalizer,
-        SearchNormalizationService searchNormalization, // Phase 4.6
+        SearchNormalizationService searchNormalization,
+        ISafetyFilterService safetyFilter,
         AppConfig config)
     {
         _logger = logger;
         _soulseek = soulseek;
         _searchQueryNormalizer = searchQueryNormalizer;
         _searchNormalization = searchNormalization;
+        _safetyFilter = safetyFilter;
         _config = config;
     }
     
@@ -98,6 +101,14 @@ public class SearchOrchestrationService
             DownloadMode.Normal,
             cancellationToken))
         {
+            // GATEKEEPER CHECK (Week 2/4)
+            // Filter out unsafe/banned/irrelevant results before they even reach the ranking engine
+            if (!_safetyFilter.IsSafe(track, normalizedQuery))
+            {
+                // _logger.LogTrace("Gatekeeper rejected track: {Filename}", track.Filename);
+                continue;
+            }
+
             // Rank on-the-fly
             ResultSorter.CalculateRank(track, searchTrack, evaluator);
             yield return track;

@@ -18,18 +18,15 @@ public class MusicalBrainTestService
 {
     private readonly ILogger<MusicalBrainTestService> _logger;
     private readonly AnalysisQueueService _queueService;
-    private readonly AppDbContext _dbContext;
     private readonly SonicIntegrityService _sonicService;
     
     public MusicalBrainTestService(
         ILogger<MusicalBrainTestService> logger,
         AnalysisQueueService queueService,
-        AppDbContext dbContext,
         SonicIntegrityService sonicService)
     {
         _logger = logger;
         _queueService = queueService;
-        _dbContext = dbContext;
         _sonicService = sonicService;
     }
     
@@ -76,7 +73,8 @@ public class MusicalBrainTestService
         // Check 4: Database accessible
         try
         {
-            await _dbContext.Database.CanConnectAsync();
+            using var dbContext = new AppDbContext();
+            await dbContext.Database.CanConnectAsync();
             result.DatabaseAccessible = true;
             result.Checks.Add("✅ Database Accessible");
         }
@@ -99,10 +97,19 @@ public class MusicalBrainTestService
     /// </summary>
     public async Task<List<TestTrack>> SelectTestTracksAsync(int count = 10)
     {
-        var tracks = await _dbContext.LibraryEntries
-            .Where(t => !string.IsNullOrEmpty(t.FilePath) && System.IO.File.Exists(t.FilePath))
-            .OrderBy(t => Guid.NewGuid()) // Random selection
-            .Take(count)
+        using var dbContext = new AppDbContext();
+        
+        // Fetch a pool of candidates from DB
+        var totalCount = await dbContext.LibraryEntries.CountAsync(t => !string.IsNullOrEmpty(t.FilePath));
+        if (totalCount == 0) return new List<TestTrack>();
+
+        // Use a random skip to get a different set each time if possible
+        var randomSkip = Random.Shared.Next(0, Math.Max(0, totalCount - (count * 3)));
+
+        var candidates = await dbContext.LibraryEntries
+            .Where(t => !string.IsNullOrEmpty(t.FilePath))
+            .Skip(randomSkip)
+            .Take(count * 3) 
             .Select(t => new TestTrack
             {
                 GlobalId = t.UniqueHash,
@@ -112,6 +119,12 @@ public class MusicalBrainTestService
                 Title = t.Title ?? "Unknown"
             })
             .ToListAsync();
+
+        // Filter in-memory for actual file existence
+        var tracks = candidates
+            .Where(t => System.IO.File.Exists(t.FilePath))
+            .Take(count)
+            .ToList();
         
         _logger.LogInformation("Selected {Count} test tracks from library", tracks.Count);
         return tracks;

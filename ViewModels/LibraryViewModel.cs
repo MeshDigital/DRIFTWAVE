@@ -144,6 +144,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand ToggleInspectorCommand { get; } // Slide-in Inspector
     public System.Windows.Input.ICommand CloseInspectorCommand { get; } // NEW
     public System.Windows.Input.ICommand AnalyzeAlbumCommand { get; } // Queue album for analysis
+    public System.Windows.Input.ICommand AnalyzeTrackCommand { get; } // Queue track for analysis
     public System.Windows.Input.ICommand ExportPlaylistCommand { get; } // Export to Rekordbox XML
     public System.Windows.Input.ICommand LoadDeletedProjectsCommand { get; } // NEW
     public System.Windows.Input.ICommand RestoreProjectCommand { get; } // NEW
@@ -256,6 +257,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         CloseInspectorCommand = new RelayCommand<object>(_ => IsInspectorOpen = false); // NEW
         IsInspectorOpen = false; // NEW
         AnalyzeAlbumCommand = new AsyncRelayCommand<string>(ExecuteAnalyzeAlbumAsync);
+        AnalyzeTrackCommand = new SLSKDONET.Views.RelayCommand<PlaylistTrackViewModel>(ExecuteAnalyzeTrack);
         ExportPlaylistCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportPlaylistAsync);
         
         
@@ -916,6 +918,29 @@ public class LibraryViewModel : INotifyPropertyChanged
         }
     }
     
+    // Track Analysis Priority
+    private void ExecuteAnalyzeTrack(PlaylistTrackViewModel? track)
+    {
+        if (track?.Model == null || string.IsNullOrEmpty(track.Model.ResolvedFilePath)) 
+        {
+            _notificationService.Show("Analysis Failed", "Track must be downloaded and have a valid file path.", NotificationType.Warning);
+            return;
+        }
+
+        try 
+        {
+            // Use Priority Queue for manual triggers
+            _analysisQueueService.QueueTrackWithPriority(track.Model);
+            _notificationService.Show("Analysis Queued", $"Queued '{track.Title}' for priority analysis", SLSKDONET.Views.NotificationType.Success);
+            _logger.LogInformation("Queued track '{Title}' for priority analysis", track.Title);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to queue track for analysis");
+            _notificationService.Show("Error", "Failed to queue track for analysis", SLSKDONET.Views.NotificationType.Error);
+        }
+    }
+
     // Album Analysis Queue Priority
     private async Task ExecuteAnalyzeAlbumAsync(string? albumName)
     {
@@ -938,7 +963,7 @@ public class LibraryViewModel : INotifyPropertyChanged
             // Queue for analysis
             var count = _analysisQueueService.QueueAlbumWithPriority(albumTracks);
             
-            _notificationService.Show("Analysis Queued", $"Queued {count} tracks from '{albumName}' for analysis", NotificationType.Success);
+            _notificationService.Show("Analysis Queued", $"Queued {count} tracks from '{albumName}' for analysis", SLSKDONET.Views.NotificationType.Success);
             _logger.LogInformation("Queued {Count} tracks from album '{Album}' for priority analysis", count, albumName);
         }
         catch (Exception)
@@ -946,6 +971,7 @@ public class LibraryViewModel : INotifyPropertyChanged
             await _dialogService.ShowAlertAsync("Error", "Failed to queue album for analysis");
         }
     }
+
 
     private async Task ExecuteExportPlaylistAsync(PlaylistJob? playlist)
     {

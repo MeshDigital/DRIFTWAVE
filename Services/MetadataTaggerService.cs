@@ -9,6 +9,8 @@ using SLSKDONET.Models;
 using TagLib;
 using File = System.IO.File;
 
+using SLSKDONET.Services.IO; // Added explicit using
+
 namespace SLSKDONET.Services;
 
 /// <summary>
@@ -20,7 +22,7 @@ public class MetadataTaggerService : ITaggerService
 {
     private readonly ILogger<MetadataTaggerService> _logger;
     private readonly HttpClient _httpClient;
-    private readonly SLSKDONET.Services.IO.IFileWriteService _fileWriteService; // Phase 1A
+    private readonly IFileWriteService _fileWriteService; // Phase 1A
 
     // Supported audio formats
     private static readonly HashSet<string> SupportedFormats = new(StringComparer.OrdinalIgnoreCase)
@@ -30,7 +32,7 @@ public class MetadataTaggerService : ITaggerService
 
     public MetadataTaggerService(
         ILogger<MetadataTaggerService> logger,
-        SLSKDONET.Services.IO.IFileWriteService fileWriteService) // Phase 1A
+        IFileWriteService fileWriteService) // Phase 1A
     {
         _logger = logger;
         _httpClient = new HttpClient();

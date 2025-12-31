@@ -8,6 +8,20 @@
              x:DataType="vm:AlbumNode">
     
     <Border Width="180" Background="Transparent">
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Analyze Album" Command="{Binding AnalyzeAlbumCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🔬"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Download Album" Command="{Binding DownloadAlbumCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="⬇️"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+            </ContextMenu>
+        </Border.ContextMenu>
         <StackPanel Spacing="8">
             <!-- Cover Art Container -->
             <Border Width="180" Height="180" CornerRadius="8" ClipToBounds="True" Background="#1A1A1A">

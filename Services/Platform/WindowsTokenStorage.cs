@@ -15,6 +15,7 @@ public class WindowsTokenStorage : ISecureTokenStorage
 {
     private readonly ILogger<WindowsTokenStorage> _logger;
     private readonly string _tokenFilePath;
+    private static readonly System.Threading.SemaphoreSlim _fileLock = new(1, 1);
 
     public WindowsTokenStorage(ILogger<WindowsTokenStorage> logger)
     {
@@ -45,8 +46,18 @@ public class WindowsTokenStorage : ISecureTokenStorage
                     DataProtectionScope.CurrentUser
                 );
 
-                // Write to file
-                await File.WriteAllBytesAsync(_tokenFilePath, encryptedBytes);
+                // Write to file with thread safety
+                await _fileLock.WaitAsync();
+                try
+                {
+                    using var fs = new FileStream(_tokenFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    await fs.WriteAsync(encryptedBytes, 0, encryptedBytes.Length);
+                }
+                finally
+                {
+                    _fileLock.Release();
+                }
+                
                 _logger.LogInformation("Refresh token saved securely using DPAPI");
             }
             else
@@ -69,10 +80,19 @@ public class WindowsTokenStorage : ISecureTokenStorage
             return null;
         }
 
-        try
-        {
-            // Read encrypted data
-            var encryptedBytes = await File.ReadAllBytesAsync(_tokenFilePath);
+            // Read encrypted data with thread safety and shared access
+            byte[] encryptedBytes;
+            await _fileLock.WaitAsync();
+            try
+            {
+                using var fs = new FileStream(_tokenFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                encryptedBytes = new byte[fs.Length];
+                await fs.ReadAsync(encryptedBytes, 0, (int)fs.Length);
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
 
             string refreshToken;
             

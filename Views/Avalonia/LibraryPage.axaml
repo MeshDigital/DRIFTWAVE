@@ -402,6 +402,14 @@
                                                 <TextBlock Text="▶️"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
+
+                                        <MenuItem Header="Analyze Track" 
+                                                  Command="{Binding $parent[UserControl].DataContext.AnalyzeTrackCommand}" 
+                                                  CommandParameter="{Binding}">
+                                            <MenuItem.Icon>
+                                                <TextBlock Text="🔬"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                         
                                         <MenuItem Header="Open File Location" 
                                                   Command="{Binding $parent[UserControl].DataContext.Operations.OpenFolderCommand}" 
@@ -449,11 +457,19 @@
                                             </MenuItem.Icon>
                                         </MenuItem>
 
+                                        <MenuItem Header="Analyze Track" 
+                                                  Command="{Binding $parent[UserControl].DataContext.AnalyzeTrackCommand}" 
+                                                  CommandParameter="{Binding}">
+                                             <MenuItem.Icon>
+                                                <TextBlock Text="🔬"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+
                                         <MenuItem Header="Analyze Album" 
                                                   Command="{Binding $parent[UserControl].DataContext.AnalyzeAlbumCommand}" 
                                                   CommandParameter="{Binding Album}">
                                              <MenuItem.Icon>
-                                                <TextBlock Text="🔬"/>
+                                                <TextBlock Text="💿"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
                                     </ContextMenu>

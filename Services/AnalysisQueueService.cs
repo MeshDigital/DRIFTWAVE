@@ -23,6 +23,7 @@ public class AnalysisQueueService : INotifyPropertyChanged
 {
     private readonly Channel<AnalysisRequest> _channel;
     private readonly IEventBus _eventBus;
+    private readonly ILogger<AnalysisQueueService> _logger;
     private int _queuedCount = 0;
     private int _processedCount = 0;
     private string? _currentTrackHash = null;
@@ -90,9 +91,10 @@ public class AnalysisQueueService : INotifyPropertyChanged
         }
     }
 
-    public AnalysisQueueService(IEventBus eventBus)
+    public AnalysisQueueService(IEventBus eventBus, ILogger<AnalysisQueueService> logger)
     {
         _eventBus = eventBus;
+        _logger = logger;
         // Unbounded channel to prevent blocking producers (downloads)
         _channel = Channel.CreateUnbounded<AnalysisRequest>();
     }
@@ -132,7 +134,7 @@ public class AnalysisQueueService : INotifyPropertyChanged
     }
 
     // Album Priority: Queue entire album for immediate analysis
-    public int QueueAlbumWithPriority(System.Collections.Generic.List<SLSKDONET.Models.PlaylistTrack> tracks)
+    public int QueueAlbumWithPriority(List<PlaylistTrack> tracks)
     {
         var count = 0;
         foreach (var track in tracks)
@@ -146,6 +148,15 @@ public class AnalysisQueueService : INotifyPropertyChanged
         
         System.Diagnostics.Debug.WriteLine($"Queued {count} tracks from album for priority analysis");
         return count;
+    }
+
+    public void QueueTrackWithPriority(PlaylistTrack track)
+    {
+        if (!string.IsNullOrEmpty(track.ResolvedFilePath) && !string.IsNullOrEmpty(track.TrackUniqueHash))
+        {
+            QueueAnalysis(track.ResolvedFilePath, track.TrackUniqueHash);
+             _logger.LogInformation("Manual priority queue: {File}", track.Title);
+        }
     }
 
     private void PublishStatusEvent()
