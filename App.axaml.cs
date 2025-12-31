@@ -314,9 +314,8 @@ public partial class App : Application
                         var missionControl = Services.GetRequiredService<MissionControlService>();
                         missionControl.Start();
                         
-                        // Start Analysis Worker (Musical Brain)
-                        var analysisWorker = Services.GetRequiredService<AnalysisWorker>();
-                        _ = analysisWorker.StartAsync(CancellationToken.None);
+                        // AnalysisWorker auto-starts as a hosted service (registered in DI)
+                        //  No manual startup required - it begins processing automatically
                         
                         // Load projects into the LibraryViewModel that's bound to UI
                         // CRITICAL: Use mainVm.LibraryViewModel (the one shown in UI)
