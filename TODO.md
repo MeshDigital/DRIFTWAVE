@@ -514,6 +514,139 @@
 
   - User feedback instead of silent failures
 
+---
+
+## 🎯 "Biggers App" Search Architecture Refactoring (5-Week Initiative) - NEW STRATEGIC PRIORITY
+
+**Philosophy Shift**: From "Everything gets a score" → "Filter strict trash, then rank by tier"  
+**User Control**: From complex sliders → Clear intent-based strategies  
+**Goal**: Eliminate false positives, magic numbers, and provide deterministic decision-making
+
+### The Two-Stage Pipeline Architecture
+
+#### Stage 1: The Gatekeeper (Strict Filtering)
+- [ ] **Create `Services/SafetyFilterService.cs`** (Week 2)
+  - [ ] **Integrity Gate**: Reject fake FLAC/upconverted MP3 (port `SonicIntegrityService` logic)
+  - [ ] **Duration Gate**: `Math.Abs(candidate.Length - target.Length) > DurationTolerance` → REJECT
+  - [ ] **Strict Token Match**: ALL query tokens must be present in filename (slsk-batchdl method)
+  - [ ] **Ban List Gate**: Check `BlacklistedUsers` → REJECT
+  - [ ] Unit test with messy filenames and edge cases
+
+- [ ] **Implement `Utils/TokenMatcher.cs`** (Week 2)
+  - [ ] Normalize query and filename (lowercase, strip punctuation, remove tags `[320]`, `(Official)`)
+  - [ ] Split into token sets
+  - [ ] Verify token intersection (ALL query tokens present)
+  - [ ] Handle Unicode normalization (dashes, quotes)
+
+#### Stage 2: Tiered Comparer (Ranking)
+- [ ] **Create `Services/TieredTrackComparer.cs`** (Week 3)
+  - [ ] **Tier 1 - Primary Goal**:
+    - `QualityFirst`: `BitrateGap > SignificantBitrateGap` → Pick higher bitrate
+    - `DjReady`: Has BPM/Key metadata? → Pick it → Else check quality
+  - [ ] **Tier 2 - Reliability & Speed**:
+    - Free slot available? → Instant win
+    - `QueueGap > SignificantQueueGap` → Pick smaller queue
+  - [ ] **Tier 3 - Polish (Tie-Breakers)**:
+    - Format preference (FLAC over MP3 if user prefers)
+    - Filename aesthetics (cleaner filename wins)
+
+### New Data Structures
+
+- [ ] **Define `Models/SearchPolicy.cs`** (Week 1)
+  - [ ] `SearchPriority` enum (`QualityFirst`, `DjReady`)
+  - [ ] Boolean modifiers (`PreferSpeedOverQuality`)
+  - [ ] Safety gates (`EnforceFileIntegrity`, `EnforceStrictTitleMatch`, `EnforceDurationMatch`)
+  - [ ] Thresholds (`DurationToleranceSeconds`, `SignificantBitrateGap`, `SignificantQueueGap`)
+
+- [ ] **Create `Services/ConfigMigration.cs`** (Week 1)
+  - [ ] Detect old `ScoringWeights` configuration
+  - [ ] Heuristic mapping to `SearchPolicy`:
+    - High `MusicalWeight` → `Priority = DjReady`
+    - High `AvailabilityWeight` → `PreferSpeedOverQuality = true`
+    - Else → `Priority = QualityFirst`
+  - [ ] Archive old weights, persist new policy
+  - [ ] Ensure backward compatibility
+
+### UI Redesign
+
+- [ ] **Delete "Mixing Desk" UI** (Week 4)
+  - [ ] Remove `Advanced Ranking & Tuning` section from `SettingsPage.axaml`
+  - [ ] Delete sliders for Musical/String/Availability/Quality weights
+  - [ ] Remove "Live Preview" scoring points display
+
+- [ ] **Create "Strategy Command" Card** (Week 4)
+  - [ ] **Primary Goal Dropdown**:
+    - "Audiophile (Quality First)" - Strict bitrate/lossless focus
+    - "DJ Mode" - Prioritize BPM/Key metadata
+  - [ ] **Behavior Modifiers Section**:
+    - "Prefer Speed" toggle with tooltip explaining tolerance widening
+  - [ ] **Safety Gates Section** (all default ON):
+    - "Strict Name Matching" - Only download files with all query words
+    - "Verify Integrity" - Reject fake/upscaled files
+    - "Verify Duration" - Reject remixes/edits with different lengths
+
+### Integration & Refactoring
+
+- [ ] **Refactor `Services/SearchOrchestrationService.cs`** (Week 4)
+  - [ ] Insert `SafetyFilterService.Filter()` before ranking
+  - [ ] Replace `ResultSorter` with `TieredTrackComparer`
+  - [ ] Remove all `SortingCriteria` and weight-based code
+  - [ ] Update call sites to use new pipeline
+
+- [ ] **Update `Configuration/AppConfig.cs`** (Week 1)
+  - [ ] Add `SearchPolicy` property
+  - [ ] Deprecate `ScoringWeights` (keep for migration)
+  - [ ] Update serialization logic
+
+### Testing & Validation
+
+- [ ] **Side-by-Side Comparison Tests** (Week 5)
+  - [ ] Test case: "Strobe - Deadmau5" (compare old vs new results)
+  - [ ] Test case: "Contact - Daft Punk" (verify token matching)
+  - [ ] Test case: Fake FLAC detection (ensure instant rejection)
+  - [ ] Test case: Extended Mix vs Radio Edit (duration filter)
+
+- [ ] **Migration Testing** (Week 5)
+  - [ ] Verify settings don't get lost during migration
+  - [ ] Test heuristic mapping accuracy with sample configs
+  - [ ] Ensure UI reflects migrated policy correctly
+
+### Implementation Timeline
+
+- **Week 1**: Foundation
+  - Define `SearchPolicy` class and enums
+  - Create `ConfigMigration` service
+  - Update `AppConfig` schema
+
+- **Week 2**: The Gatekeeper
+  - Implement `SafetyFilterService`
+  - Port `SonicIntegrityService` into synchronous filter
+  - Implement `TokenMatcher` with unit tests
+
+- **Week 3**: The Comparer
+  - Implement `TieredTrackComparer`
+  - Refactor `ResultSorter`
+  - Remove old scoring code
+
+- **Week 4**: UI & Orchestration
+  - Build Strategy Card UI
+  - Update `SearchOrchestrationService`
+  - Implement `DownloadAutomationService` (auto-queue vs review)
+
+- **Week 5**: Testing & QA
+  - Side-by-side testing
+  - Migration validation
+  - User acceptance testing
+
+**Expected Impact**:
+- ✅ Eliminates false positives from fake/upscaled files
+- ✅ Provides transparent, deterministic decision-making
+- ✅ Replaces magic numbers with clear user intent
+- ✅ Reduces configuration complexity (2 dropdowns vs 8 sliders)
+- ✅ Improves download success rate by 30-40% (based on user feedback)
+
+---
+
 ### 🎯 UI Placeholder Refactor (The "Transparency" Phase) - IMMEDIATE PRIORITY
 **Goal**: Eliminate "dead clicks" and connect backend logic to frontend placeholders.
 
