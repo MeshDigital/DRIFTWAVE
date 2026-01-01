@@ -110,6 +110,8 @@ public class SpotifyEnrichmentService
             {
                 Success = true,
                 SpotifyId = track.Id,
+                SpotifyAlbumId = track.Album.Id,
+                SpotifyArtistId = track.Artists.FirstOrDefault()?.Id ?? string.Empty,
                 OfficialArtist = track.Artists.FirstOrDefault()?.Name ?? artist,
                 OfficialTitle = track.Name,
                 AlbumArtUrl = track.Album.Images.OrderByDescending(i => i.Width).FirstOrDefault()?.Url ?? "",

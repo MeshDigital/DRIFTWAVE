@@ -19,6 +19,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     private readonly DownloadManager _downloadManager;
     private readonly IEventBus _eventBus;
     private readonly ArtworkCacheService _artworkCache;
+    private readonly ILibraryService _libraryService;
     private readonly CompositeDisposable _disposables = new();
 
     // Core Data
@@ -36,12 +37,14 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
         PlaylistTrack model, 
         DownloadManager downloadManager, 
         IEventBus eventBus,
-        ArtworkCacheService artworkCache)
+        ArtworkCacheService artworkCache,
+        ILibraryService libraryService)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         _downloadManager = downloadManager ?? throw new ArgumentNullException(nameof(downloadManager));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _artworkCache = artworkCache ?? throw new ArgumentNullException(nameof(artworkCache));
+        _libraryService = libraryService ?? throw new ArgumentNullException(nameof(libraryService));
 
         // Initialize State from Model
         _state = (PlaylistTrackState)model.Status; // Best effort mapping if simple cast works, otherwise logic needed
@@ -202,6 +205,8 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
         }
     }
 
+    public string CompletedAtDisplay => Model.CompletedAt?.ToString("g") ?? Model.AddedAt.ToString("g");
+
     public string TechnicalSummary
     {
         get
@@ -216,8 +221,8 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
             if (_totalBytes > 0) 
                 parts.Add($"{_totalBytes / 1024.0 / 1024.0:F1} MB");
                 
-            if (IsCompleted)
-                parts.Add(DateTime.Now.ToShortTimeString()); // Placeholder for completion time if not tracked
+            if (IsCompleted || IsFailed)
+                parts.Add(CompletedAtDisplay); 
             else if (IsActive)
                 parts.Add(SpeedDisplay);
 
@@ -297,16 +302,36 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     {
         if (e.TrackGlobalId != GlobalId) return;
         
-        this.RaisePropertyChanged(nameof(ArtistName));
-        this.RaisePropertyChanged(nameof(TrackTitle));
-        this.RaisePropertyChanged(nameof(AlbumName));
-        this.RaisePropertyChanged(nameof(AlbumArtUrl));
-        this.RaisePropertyChanged(nameof(BpmDisplay));
-        this.RaisePropertyChanged(nameof(KeyDisplay));
-        this.RaisePropertyChanged(nameof(IntegrityScore));
-        
-        // Trigger artwork reload
-        _ = LoadAlbumArtworkAsync();
+        // Reload from DB to ensure Model has new IDs (SpotifyAlbumId etc.)
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var tracks = await _libraryService.LoadPlaylistTracksAsync(Model.PlaylistId);
+            var updatedTrack = tracks.FirstOrDefault(t => t.TrackUniqueHash == GlobalId);
+            
+            if (updatedTrack != null)
+            {
+                // Sync important fields back to Model instance
+                Model.AlbumArtUrl = updatedTrack.AlbumArtUrl;
+                Model.SpotifyAlbumId = updatedTrack.SpotifyAlbumId;
+                Model.SpotifyTrackId = updatedTrack.SpotifyTrackId;
+                Model.SpotifyArtistId = updatedTrack.SpotifyArtistId;
+                Model.BPM = updatedTrack.BPM;
+                Model.MusicalKey = updatedTrack.MusicalKey;
+                Model.IsEnriched = updatedTrack.IsEnriched;
+                
+                this.RaisePropertyChanged(nameof(ArtistName));
+                this.RaisePropertyChanged(nameof(TrackTitle));
+                this.RaisePropertyChanged(nameof(AlbumName));
+                this.RaisePropertyChanged(nameof(AlbumArtUrl));
+                this.RaisePropertyChanged(nameof(BpmDisplay));
+                this.RaisePropertyChanged(nameof(KeyDisplay));
+                this.RaisePropertyChanged(nameof(IntegrityScore));
+                this.RaisePropertyChanged(nameof(TechnicalSummary));
+                
+                // Trigger artwork reload now that we have the AlbumArtUrl and SpotifyAlbumId
+                await LoadAlbumArtworkAsync();
+            }
+        });
     }
 
     private async System.Threading.Tasks.Task LoadAlbumArtworkAsync()

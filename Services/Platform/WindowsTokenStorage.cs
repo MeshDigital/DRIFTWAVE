@@ -80,6 +80,8 @@ public class WindowsTokenStorage : ISecureTokenStorage
             return null;
         }
 
+        try
+        {
             // Read encrypted data with thread safety and shared access
             byte[] encryptedBytes;
             await _fileLock.WaitAsync();

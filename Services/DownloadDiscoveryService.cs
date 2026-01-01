@@ -136,6 +136,7 @@ public class DownloadDiscoveryService
                         score, searchTrack.Filename);
                     _forensicLogger.Info(track.TrackUniqueHash, Data.Entities.ForensicStage.Matching, 
                         $"Threshold Trigger (Gold): Approved {searchTrack.Username}'s file ({score:P0}). Bitrate: {searchTrack.Bitrate}kbps",
+                        track.TrackUniqueHash,
                         new { searchTrack.Filename, score, searchTrack.Bitrate, searchTrack.Username });
                     return new DiscoveryResult(searchTrack, log);
                 }
@@ -168,6 +169,7 @@ public class DownloadDiscoveryService
                         bestSilverScore, bestSilverMatch.Filename);
                     _forensicLogger.Info(track.TrackUniqueHash, Data.Entities.ForensicStage.Matching, 
                         $"Speculative Trigger (Silver): 5s timeout reached. Approved {bestSilverMatch.Username}'s file ({bestSilverScore:P0})",
+                        track.TrackUniqueHash,
                         new { bestSilverMatch.Filename, bestSilverScore, bestSilverMatch.Bitrate, bestSilverMatch.Username });
                     return new DiscoveryResult(bestSilverMatch, log);
                 }

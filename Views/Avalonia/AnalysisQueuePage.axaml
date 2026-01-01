@@ -33,32 +33,53 @@
 
         <!-- Mission Control: Thread Activity Grid -->
         <Grid Grid.Row="1" Margin="32,0,32,16" RowDefinitions="Auto,Auto">
-            <TextBlock Grid.Row="0" Text="🧵 THREAD ACTIVITY" FontSize="12" FontWeight="Bold" Foreground="#00D9FF" Margin="0,0,0,8"/>
-            <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveThreads}" AutoGenerateColumns="False" 
-                      CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8" MaxHeight="200">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Thread" Binding="{Binding ThreadId}" Width="80"/>
-                    <DataGridTemplateColumn Header="Status" Width="120">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Status}" 
-                                          Foreground="{Binding Status, Converter={StaticResource StatusColorConverter}}"
-                                          FontWeight="Bold"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Track" Binding="{Binding CurrentTrack}" Width="*"/>
-                    <DataGridTemplateColumn Header="Progress" Width="150">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <ProgressBar Value="{Binding Progress}" Maximum="100" Height="20" 
-                                            Foreground="#00D9FF" Background="#333"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Duration" Binding="{Binding ElapsedTime}" Width="80"/>
-                </DataGrid.Columns>
-            </DataGrid>
+            <Grid ColumnDefinitions="*,250" Margin="0,0,0,8">
+                <TextBlock Grid.Column="0" Text="🧵 THREAD ACTIVITY" FontSize="12" FontWeight="Bold" Foreground="#00D9FF" />
+                <TextBlock Grid.Column="1" Text="🕵️ LIVE FORENSIC STREAM" FontSize="12" FontWeight="Bold" Foreground="#FFA500" HorizontalAlignment="Right"/>
+            </Grid>
+            
+            <Grid Grid.Row="1" ColumnDefinitions="2*, 8, 1*">
+                <!-- Threads -->
+                <DataGrid Grid.Column="0" ItemsSource="{Binding ActiveThreads}" AutoGenerateColumns="False" 
+                          CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8" MaxHeight="250">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Thread" Binding="{Binding ThreadId}" Width="60"/>
+                        <DataGridTemplateColumn Header="Status" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Status}" 
+                                              Foreground="{Binding Status, Converter={StaticResource StatusColorConverter}}"
+                                              FontWeight="Bold"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Track" Binding="{Binding CurrentTrack}" Width="*"/>
+                        <DataGridTemplateColumn Header="Progress" Width="120">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ProgressBar Value="{Binding Progress}" Maximum="100" Height="10" 
+                                                Foreground="#00D9FF" Background="#333" VerticalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Time" Binding="{Binding ElapsedTime}" Width="70"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                
+                <!-- Live Logs -->
+                <Border Grid.Column="2" Background="#111" CornerRadius="8" BorderBrush="#333" BorderThickness="1">
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding LiveForensicLogs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding LogText}" FontFamily="Consolas, Monospace" FontSize="11" 
+                                              Foreground="{Binding LogColor}" TextWrapping="Wrap" Margin="4,2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- Mission Control: Metrics Footer -->

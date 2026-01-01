@@ -90,9 +90,13 @@ public class WaveformAnalysisService
                 
                 for (int i = 0; i < sampleCount; i++)
                 {
-                    // Read 16-bit sample
-                    short sample = BitConverter.ToInt16(buffer, i * 2);
-                    float normalized = Math.Abs(sample) / 32768f; // Normalize to 0.0 - 1.0
+                    // Read 16-bit sample (signed)
+                    short sampleValue = BitConverter.ToInt16(buffer, i * 2);
+                    
+                    // Fix: Math.Abs(short.MinValue) throws OverflowException.
+                    // Convert to float FIRST to handle the asymmetry of signed 16-bit integers (-32768 to 32767)
+                    float sample = sampleValue;
+                    float normalized = Math.Abs(sample) / 32768f; 
 
                     if (normalized > maxPeak) maxPeak = normalized;
                     sumSquares += normalized * normalized;

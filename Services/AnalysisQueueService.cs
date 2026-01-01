@@ -225,6 +225,7 @@ public class AnalysisWorker : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisWorker> _logger;
+    private readonly IForensicLogger _forensicLogger;
     private readonly int _maxConcurrentAnalyses;
     private readonly SemaphoreSlim _concurrencyLimiter;
     
@@ -235,14 +236,16 @@ public class AnalysisWorker : BackgroundService
     private const int BatchSize = 10;
     private readonly TimeSpan BatchTimeout = TimeSpan.FromSeconds(5);
 
-    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger, Configuration.AppConfig config)
+    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger, Configuration.AppConfig config, IForensicLogger forensicLogger)
     {
         _queue = queue;
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
         _logger = logger;
+        _forensicLogger = forensicLogger;
         
         // Determine optimal parallelism
+        // ... (keep default logic) ...
         int configuredValue = config.MaxConcurrentAnalyses;
         if (configuredValue == 0)
         {
@@ -263,7 +266,7 @@ public class AnalysisWorker : BackgroundService
         
         _concurrencyLimiter = new SemaphoreSlim(_maxConcurrentAnalyses, _maxConcurrentAnalyses);
     }
-
+    
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("🧠 Musical Brain (AnalysisWorker) started with {Threads} parallel threads.", _maxConcurrentAnalyses);
@@ -385,65 +388,78 @@ public class AnalysisWorker : BackgroundService
         );
     }
 
+
     private async Task ProcessRequestAsync(AnalysisRequest request, CancellationToken stoppingToken)
     {
         string trackHash = request.TrackHash;
         bool analysisSucceeded = false;
         string? errorMessage = null;
         
+        // Generate a Correlation ID for this entire analysis flow
+        string correlationId = Guid.NewGuid().ToString();
+
         // Context to hold results for batching
-        var resultContext = new AnalysisResultContext { TrackHash = trackHash, FilePath = request.FilePath };
+        var resultContext = new AnalysisResultContext { TrackHash = trackHash, FilePath = request.FilePath, CorrelationId = correlationId };
 
-        try
+        using (_forensicLogger.TimedOperation(correlationId, ForensicStage.AnalysisQueue, "Full Analysis Pipeline", trackHash))
         {
-            _queue.NotifyProcessingStarted(trackHash, request.FilePath);
+            try
+            {
+                _queue.NotifyProcessingStarted(trackHash, request.FilePath);
+                _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Processing started", trackHash);
 
-            using var scope = _serviceProvider.CreateScope();
-            var essentiaAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
-            var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
-            var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
+                using var scope = _serviceProvider.CreateScope();
+                var essentiaAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
+                var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
+                var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
 
-            _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
+                _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
 
-            // 1. Generate Waveform
-            PublishThrottled(new AnalysisProgressEvent(trackHash, "Generating waveform...", 10));
-            // Offload CPU bound work
-            resultContext.WaveformData = await Task.Run(() => waveformAnalyzer.GenerateWaveformAsync(request.FilePath, linkedCts.Token), linkedCts.Token);
+                // 1. Generate Waveform
+                PublishThrottled(new AnalysisProgressEvent(trackHash, "Generating waveform...", 10));
+                // Offload CPU bound work
+                // Note: WaveformAnalysisService might need update for correlationId if we want to trace it too [TODO]
+                resultContext.WaveformData = await Task.Run(() => waveformAnalyzer.GenerateWaveformAsync(request.FilePath, linkedCts.Token), linkedCts.Token);
+                _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Waveform generated", trackHash);
 
-            // 2. Musical Analysis
-            PublishThrottled(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
-            resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, linkedCts.Token), linkedCts.Token);
+                // 2. Musical Analysis
+                PublishThrottled(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
+                resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
 
-            // 3. Technical Analysis
-            PublishThrottled(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
-            resultContext.TechResult = await Task.Run(() => audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash, linkedCts.Token), linkedCts.Token);
+                // 3. Technical Analysis
+                PublishThrottled(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
+                resultContext.TechResult = await Task.Run(() => audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
 
-            PublishThrottled(new AnalysisProgressEvent(trackHash, "Queued for save...", 90));
-            
-            // Add to batch buffer
-            _pendingResults.Add(resultContext);
-            analysisSucceeded = true;
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogError("⏱ Track analysis timed out or cancelled: {Hash}", trackHash);
-            errorMessage = "Analysis timed out";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "❌ Error analyzing: {Hash}", trackHash);
-            errorMessage = ex.Message;
-        }
-        finally
-        {
-            // If failed, notify immediately. If succeeded, notification happens after batch save?
-            // User expects visual update. If we delay "Completed" event until flush, UI stays "Analyzing...".
-            // If we send "Completed" now, UI thinks it's done but DB isn't updated.
-            // Compromise: Send Completed now so UI unblocks. Data consistency is handled by Flush.
-            _queue.NotifyProcessingCompleted(trackHash, analysisSucceeded, errorMessage);
+                PublishThrottled(new AnalysisProgressEvent(trackHash, "Queued for save...", 90));
+                
+                // Add to batch buffer
+                _pendingResults.Add(resultContext);
+                analysisSucceeded = true;
+                _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Results queued for batch persistence", trackHash);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogError("⏱ Track analysis timed out or cancelled: {Hash}", trackHash);
+                errorMessage = "Analysis timed out";
+                _forensicLogger.Warning(correlationId, ForensicStage.AnalysisQueue, "Analysis timed out or cancelled", trackHash);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error analyzing: {Hash}", trackHash);
+                errorMessage = ex.Message;
+                _forensicLogger.Error(correlationId, ForensicStage.AnalysisQueue, "Pipeline crashed", trackHash, ex);
+            }
+            finally
+            {
+                // If failed, notify immediately. If succeeded, notification happens after batch save?
+                // User expects visual update. If we delay "Completed" event until flush, UI stays "Analyzing...".
+                // If we send "Completed" now, UI thinks it's done but DB isn't updated.
+                // Compromise: Send Completed now so UI unblocks. Data consistency is handled by Flush.
+                _queue.NotifyProcessingCompleted(trackHash, analysisSucceeded, errorMessage);
+            }
         }
     }
 
@@ -500,6 +516,13 @@ public class AnalysisWorker : BackgroundService
             }
 
             await dbContext.SaveChangesAsync(token);
+            
+            // NEW: After successful DB save, notify the UI for each track in the batch
+            foreach (var result in _pendingResults)
+            {
+                _eventBus.Publish(new TrackMetadataUpdatedEvent(result.TrackHash));
+            }
+
             _lastBatchSave = DateTime.UtcNow;
             _pendingResults.Clear();
             _logger.LogInformation("✅ Batch save completed.");
@@ -572,9 +595,10 @@ public class AnalysisWorker : BackgroundService
         }
     }
 
-    // Helper class for batch context
     private class AnalysisResultContext
     {
+        public string InteractionId { get; set; } = Guid.NewGuid().ToString(); // Internal tracking
+        public string CorrelationId { get; set; } = string.Empty;
         public string TrackHash { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
         public WaveformAnalysisData? WaveformData { get; set; } // Changed from WaveformData

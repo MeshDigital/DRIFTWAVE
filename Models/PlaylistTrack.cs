@@ -82,6 +82,11 @@ public class PlaylistTrack
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
+    /// Timestamp when this track finished downloading or failed.
+    /// </summary>
+    public DateTime? CompletedAt { get; set; }
+
+    /// <summary>
     /// Custom sort order for track reordering (Rekordbox style).
     /// </summary>
     public int SortOrder { get; set; }

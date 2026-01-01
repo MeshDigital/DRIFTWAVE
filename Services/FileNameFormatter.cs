@@ -32,6 +32,18 @@ public class FileNameFormatter
             return GetVariable(expr, track);
         });
 
+        // Global Fallback Strategy:
+        // If the resulting name has no actual alphanumeric content (only separators/spaces)
+        // or contains "Unknown - Unknown", we fallback to the uploader's original filename.
+        var hasContent = Regex.IsMatch(result, @"[a-zA-Z0-9]");
+        if (!hasContent || result.Contains("Unknown - Unknown"))
+        {
+            if (!string.IsNullOrEmpty(track.Filename))
+            {
+                return Path.GetFileNameWithoutExtension(track.Filename);
+            }
+        }
+
         // Sanitize filename
         result = FileFormattingUtils.SanitizeFilename(result);
         return result;
@@ -83,9 +95,10 @@ public class FileNameFormatter
             "title" => track.Title ?? "",
             "album" => track.Album ?? "",
             "filename" => Path.GetFileNameWithoutExtension(track.Filename) ?? "",
-            //"bitrate" => track.Bitrate?.ToString() ?? "",
-            //"samplerate" or "samplerate" => track.SampleRate?.ToString() ?? "",
-            //"bitdepth" => track.BitDepth?.ToString() ?? "",
+            "bitrate" => track.Bitrate.ToString(),
+            "bpm" => track.BPM?.ToString("0") ?? "",
+            "key" => track.MusicalKey ?? "",
+            "energy" => (track.Energy * 100)?.ToString("0") ?? "",
             "format" => track.GetExtension(),
             "length" => track.Length?.ToString() ?? "",
             "user" or "username" => track.Username ?? "",

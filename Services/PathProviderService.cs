@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Configuration;
+using SLSKDONET.Models;
 
 namespace SLSKDONET.Services;
 
@@ -15,23 +16,48 @@ namespace SLSKDONET.Services;
 public class PathProviderService
 {
     private readonly AppConfig _config;
+    private readonly FileNameFormatter _fileNameFormatter;
     private readonly ILogger<PathProviderService> _logger;
 
-    public PathProviderService(AppConfig config, ILogger<PathProviderService> logger)
+    public PathProviderService(AppConfig config, FileNameFormatter fileNameFormatter, ILogger<PathProviderService> logger)
     {
         _config = config;
+        _fileNameFormatter = fileNameFormatter;
         _logger = logger;
     }
 
     /// <summary>
-    /// Gets the full path for a track with artist/album folder structure.
-    /// Example: C:\Music\Artist Name\Album Name\Track.mp3
+    /// Gets the full path for a track using either the custom template or default Artist/Album structure.
     /// </summary>
-    /// <param name="artist">Artist name (will be slugified)</param>
-    /// <param name="album">Album name (will be slugified)</param>
-    /// <param name="title">Track title (will be slugified)</param>
-    /// <param name="extension">File extension without dot (e.g., "mp3", "flac")</param>
-    /// <returns>Full filesystem path to the track</returns>
+    public string GetTrackPath(Track track)
+    {
+        var template = _config.NameFormat;
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            // Fallback to legacy hardcoded structure: Artist/Album/Title.ext
+            return GetTrackPath(track.Artist ?? "Unknown", track.Album ?? "Unknown", track.Title ?? "Unknown", track.GetExtension());
+        }
+
+        var formatted = _fileNameFormatter.Format(template, track);
+        var extension = track.GetExtension();
+        
+        // Handle potential subfolders in template (e.g. "{artist}/{title}")
+        var segments = formatted.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        var safeSegments = segments.Select(Slugify).ToArray();
+        
+        var relativePath = Path.Combine(safeSegments) + "." + extension;
+        var fullPath = Path.Combine(_config.DownloadDirectory ?? "Downloads", relativePath);
+
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(fullPath);
+        if (directory != null) Directory.CreateDirectory(directory);
+
+        return fullPath;
+    }
+
+    /// <summary>
+    /// Legacy support for explicit string arguments.
+    /// </summary>
     public string GetTrackPath(string artist, string album, string title, string extension)
     {
         var safeArtist = Slugify(artist);

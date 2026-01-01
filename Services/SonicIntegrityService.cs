@@ -9,6 +9,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Models;
+using SLSKDONET.Data.Entities;
 
 namespace SLSKDONET.Services;
 
@@ -30,8 +31,9 @@ public class SonicAnalysisResult
 /// </summary>
 public class SonicIntegrityService : IDisposable
 {
+    private readonly IForensicLogger _forensicLogger;
     private readonly ILogger<SonicIntegrityService> _logger;
-    private readonly string _ffmpegPath = "ffmpeg"; // Validated via dependency checker in Settings
+    private readonly string _ffmpegPath = "ffmpeg";
     
     // Producer-Consumer pattern for batch analysis
     private readonly Channel<AnalysisRequest> _analysisQueue;
@@ -40,9 +42,10 @@ public class SonicIntegrityService : IDisposable
     private readonly List<Task> _workerTasks = new();
     private bool _isInitialized = false;
 
-    public SonicIntegrityService(ILogger<SonicIntegrityService> logger)
+    public SonicIntegrityService(ILogger<SonicIntegrityService> logger, IForensicLogger forensicLogger)
     {
         _logger = logger;
+        _forensicLogger = forensicLogger;
         
         // Create unbounded channel for analysis requests
         _analysisQueue = Channel.CreateUnbounded<AnalysisRequest>(new UnboundedChannelOptions
@@ -112,7 +115,7 @@ public class SonicIntegrityService : IDisposable
     /// Performs spectral analysis on an audio file to detect upscaling or low-quality VBR.
     /// Uses Producer-Consumer pattern to queue analysis and prevent CPU spikes.
     /// </summary>
-    public async Task<SonicAnalysisResult> AnalyzeTrackAsync(string filePath)
+    public async Task<SonicAnalysisResult> AnalyzeTrackAsync(string filePath, string? correlationId = null)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Audio file not found for analysis", filePath);
@@ -120,6 +123,8 @@ public class SonicIntegrityService : IDisposable
         if (!_isInitialized)
         {
             _logger.LogWarning("FFmpeg not available, skipping sonic analysis for {File}", Path.GetFileName(filePath));
+             if (correlationId != null)
+                 _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "FFmpeg validation failed - skipping sonic check");
             return new SonicAnalysisResult 
             { 
                 IsTrustworthy = true, // Assume trustworthy if can't analyze
@@ -129,7 +134,7 @@ public class SonicIntegrityService : IDisposable
 
         // Create request with completion source
         var tcs = new TaskCompletionSource<SonicAnalysisResult>();
-        var request = new AnalysisRequest(filePath, tcs);
+        var request = new AnalysisRequest(filePath, correlationId ?? Guid.NewGuid().ToString(), tcs);
         
         // Queue for processing
         await _analysisQueue.Writer.WriteAsync(request);
@@ -147,12 +152,16 @@ public class SonicIntegrityService : IDisposable
         {
             try
             {
-                var result = await PerformAnalysisAsync(request.FilePath, cancellationToken);
+                var result = await PerformAnalysisAsync(request.FilePath, request.CorrelationId, cancellationToken);
                 request.CompletionSource.SetResult(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Analysis failed for {File}", Path.GetFileName(request.FilePath));
+                
+                // Log failure via forensic logger
+                 _forensicLogger.Error(request.CorrelationId, ForensicStage.IntegrityCheck, "Analysis worker crashed", null, ex);
+
                 request.CompletionSource.SetResult(new SonicAnalysisResult 
                 { 
                     IsTrustworthy = false, 
@@ -166,11 +175,12 @@ public class SonicIntegrityService : IDisposable
     /// <summary>
     /// Core analysis logic (extracted from original AnalyzeTrackAsync).
     /// </summary>
-    private async Task<SonicAnalysisResult> PerformAnalysisAsync(string filePath, CancellationToken ct)
+    private async Task<SonicAnalysisResult> PerformAnalysisAsync(string filePath, string correlationId, CancellationToken ct)
     {
         try
         {
             _logger.LogInformation("Starting sonic integrity analysis for: {File}", Path.GetFileName(filePath));
+            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, "Starting spectral energy distribution scan");
 
             // Stage 1: Check energy above 16kHz (Cutoff for 128kbps)
             double energy16k = await GetEnergyAboveFrequencyAsync(filePath, 16000, ct);
@@ -183,6 +193,9 @@ public class SonicIntegrityService : IDisposable
 
             _logger.LogDebug("Energy Profile for {File}: 16k={E16}dB, 19k={E19}dB, 21k={E21}dB", 
                 Path.GetFileName(filePath), energy16k, energy19k, energy21k);
+                
+            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, 
+                $"Spectral Energy: 16k={energy16k:F1}dB | 19k={energy19k:F1}dB | 21k={energy21k:F1}dB");
 
             int cutoff = 0;
             double confidence = 1.0;
@@ -195,12 +208,14 @@ public class SonicIntegrityService : IDisposable
                 confidence = 0.3; // Very likely an upscale if reported as FLAC/320k
                 trustworthy = energy16k > -70; // If it's -90, it's a hard cutoff (fake)
                 details = "FAKED: Low-quality upscale (128kbps profile)";
+                _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "Severe high-frequency cutoff detected (16kHz)");
             }
             else if (energy19k < -55)
             {
                 cutoff = 19000;
                 confidence = 0.7;
                 details = "MID-QUALITY: 192kbps profile detected";
+                 _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "Moderate high-frequency attenuation (19kHz)");
             }
             else if (energy21k < -50)
             {
@@ -217,6 +232,8 @@ public class SonicIntegrityService : IDisposable
 
             // Simple spectral hash based on energy ratios
             string spectralHash = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{energy16k:F1}|{energy19k:F1}")).Substring(0, 8);
+            
+            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, $"Analysis Conclusion: {details}");
 
             return new SonicAnalysisResult
             {
@@ -230,6 +247,7 @@ public class SonicIntegrityService : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Sonic analysis failed for {File}", filePath);
+             _forensicLogger.Error(correlationId, ForensicStage.IntegrityCheck, "Spectral analysis failed", null, ex);
             return new SonicAnalysisResult { IsTrustworthy = false, Details = "Analysis error: " + ex.Message };
         }
     }
@@ -299,5 +317,5 @@ public class SonicIntegrityService : IDisposable
     /// <summary>
     /// Internal request model for the Producer-Consumer queue.
     /// </summary>
-    private record AnalysisRequest(string FilePath, TaskCompletionSource<SonicAnalysisResult> CompletionSource);
+    private record AnalysisRequest(string FilePath, string CorrelationId, TaskCompletionSource<SonicAnalysisResult> CompletionSource);
 }

@@ -76,6 +76,7 @@ public class DropDetectionEngine
 
         _forensicLogger.Info(correlationId, "DropDetection", 
             $"Drop Candidate Selected: {estimatedDropTime:F1}s", 
+            correlationId,
             new { 
                 Strategy = "StructureHeuristic", 
                 EstimatedTime = estimatedDropTime, 

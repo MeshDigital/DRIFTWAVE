@@ -540,6 +540,7 @@ public partial class App : Application
         
         // Phase 4.7: Forensic Logging (Track-scoped correlation)
         services.AddSingleton<TrackForensicLogger>();
+        services.AddSingleton<IForensicLogger>(sp => sp.GetRequiredService<TrackForensicLogger>());
         
         // Phase 3: Audio Analysis Services
         services.AddSingleton<WaveformAnalysisService>();

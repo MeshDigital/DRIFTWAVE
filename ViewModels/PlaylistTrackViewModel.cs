@@ -318,7 +318,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      Model.AlbumArtUrl = updatedTrack.AlbumArtUrl;
                      Model.SpotifyTrackId = updatedTrack.SpotifyTrackId;
                      Model.SpotifyAlbumId = updatedTrack.SpotifyAlbumId;
-                     Model.IsEnriched = updatedTrack.IsEnriched;
+                     Model.SpotifyArtistId = updatedTrack.SpotifyArtistId;
                      Model.IsEnriched = updatedTrack.IsEnriched;
                      Model.Album = updatedTrack.Album;
                      
@@ -330,6 +330,14 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      Model.Valence = updatedTrack.Valence;
                      Model.Popularity = updatedTrack.Popularity;
                      Model.Genres = updatedTrack.Genres;
+                     
+                     // NEW: Sync Waveform and Technical Analysis results
+                     Model.WaveformData = updatedTrack.WaveformData;
+                     Model.RmsData = updatedTrack.RmsData;
+                     Model.CanonicalDuration = updatedTrack.CanonicalDuration;
+                     Model.Bitrate = updatedTrack.Bitrate;
+                     Model.QualityConfidence = updatedTrack.QualityConfidence;
+                     Model.IsTrustworthy = updatedTrack.IsTrustworthy;
                      
                      // Load artwork if URL is available
                      if (!string.IsNullOrWhiteSpace(updatedTrack.AlbumArtUrl))
@@ -360,6 +368,13 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              OnPropertyChanged(nameof(Valence));
              OnPropertyChanged(nameof(Genres));
              OnPropertyChanged(nameof(Popularity));
+             
+             // NEW: Notify Waveform and technical props
+             OnPropertyChanged(nameof(WaveformData));
+             OnPropertyChanged(nameof(Bitrate));
+             OnPropertyChanged(nameof(IntegritySymbol));
+             OnPropertyChanged(nameof(IntegrityText));
+             OnPropertyChanged(nameof(Duration));
         });
     }
 

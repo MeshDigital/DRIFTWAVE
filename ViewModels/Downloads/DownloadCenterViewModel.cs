@@ -52,6 +52,13 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
     private readonly ReadOnlyObservableCollection<UnifiedTrackViewModel> _backgroundItems;
     public ReadOnlyObservableCollection<UnifiedTrackViewModel> BackgroundItems => _backgroundItems;
 
+    // Ongoing vs Queued Split
+    private readonly ReadOnlyObservableCollection<UnifiedTrackViewModel> _ongoingDownloads;
+    public ReadOnlyObservableCollection<UnifiedTrackViewModel> OngoingDownloads => _ongoingDownloads;
+
+    private readonly ReadOnlyObservableCollection<UnifiedTrackViewModel> _queuedDownloads;
+    public ReadOnlyObservableCollection<UnifiedTrackViewModel> QueuedDownloads => _queuedDownloads;
+
     // Stats
     private int _activeCount;
     public int ActiveCount
@@ -115,12 +122,18 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
     public ICommand RetryAllFailedCommand { get; }
     
     private readonly ArtworkCacheService _artworkCache;
+    private readonly ILibraryService _libraryService;
     
-    public DownloadCenterViewModel(DownloadManager downloadManager, IEventBus eventBus, ArtworkCacheService artworkCache)
+    public DownloadCenterViewModel(
+        DownloadManager downloadManager, 
+        IEventBus eventBus, 
+        ArtworkCacheService artworkCache,
+        ILibraryService libraryService)
     {
         _downloadManager = downloadManager;
         _eventBus = eventBus;
         _artworkCache = artworkCache;
+        _libraryService = libraryService;
         
         // Initialize commands (ReactiveCommand)
         PauseAllCommand = ReactiveCommand.Create(PauseAll, 
@@ -166,6 +179,21 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
             // DynamicData's DisposeMany() on the SourceCache connects does that.
             .Subscribe()
             .DisposeWith(_subscriptions);
+
+        // 1.1 Ongoing Downloads (Downloading/Searching state)
+        sharedSource
+            .Filter(x => x.State == PlaylistTrackState.Downloading || x.State == PlaylistTrackState.Searching)
+            .SortAndBind(out _ongoingDownloads, SortExpressionComparer<UnifiedTrackViewModel>.Descending(x => x.State == PlaylistTrackState.Downloading).ThenByDescending(x => x.DownloadSpeed))
+            .Subscribe()
+            .DisposeWith(_subscriptions);
+
+        // 1.2 Queued Downloads (Queued/Pending)
+        sharedSource
+            .Filter(x => x.State == PlaylistTrackState.Queued || x.State == PlaylistTrackState.Pending)
+            .SortAndBind(out _queuedDownloads, SortExpressionComparer<UnifiedTrackViewModel>.Ascending(x => x.Model.Priority).ThenByAscending(x => x.Model.AddedAt))
+            .Subscribe()
+            .DisposeWith(_subscriptions);
+
 
         // Update counts
         _activeDownloads.ToObservableChangeSet()
@@ -271,7 +299,7 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
             var track = e.TrackModel;
             
             // Phase 2.5: Create Smart View Model
-            var viewModel = new UnifiedTrackViewModel(track, _downloadManager, _eventBus, _artworkCache);
+            var viewModel = new UnifiedTrackViewModel(track, _downloadManager, _eventBus, _artworkCache, _libraryService);
             
             // Set initial state override if needed
             if (e.InitialState.HasValue)

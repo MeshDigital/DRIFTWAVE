@@ -67,6 +67,7 @@ public class ManualCueGenerationService
         // Phase 4.7: Log user action initiation
         _forensicLogger.Info(batchCorrelationId, Data.Entities.ForensicStage.CueGeneration,
             $"User triggered batch cue generation for {tracks.Count} tracks",
+            null,
             new { PlaylistId = playlistId, TrackCount = tracks.Count });
 
         for (int i = 0; i < tracks.Count; i++)
@@ -88,6 +89,7 @@ public class ManualCueGenerationService
                     _logger.LogDebug("Track {Title} already has cues - skipping", track.Title);
                     _forensicLogger.Info(trackCorrelationId, Data.Entities.ForensicStage.CueGeneration,
                         "Track already has cues - skipped",
+                        trackCorrelationId,
                         new { Title = track.Title, ExistingDrop = existingFeatures.DropTimeSeconds });
                     result.Skipped++;
                     continue;
@@ -99,6 +101,7 @@ public class ManualCueGenerationService
                     // Phase 4.7: Log analysis start
                     _forensicLogger.Info(trackCorrelationId, Data.Entities.ForensicStage.MusicalAnalysis,
                         "Starting musical analysis with cue generation",
+                        trackCorrelationId,
                         new { TrackIdentifier = track.TrackUniqueHash, Title = track.Title });
                     
                     using var timedOp = _forensicLogger.TimedOperation(trackCorrelationId, 
@@ -122,6 +125,7 @@ public class ManualCueGenerationService
                         // Phase 4.7: Log success with cue details
                         _forensicLogger.Info(trackCorrelationId, Data.Entities.ForensicStage.Persistence,
                             "Cues generated and saved to database",
+                            trackCorrelationId,
                             new { 
                                 BPM = features.Bpm,
                                 Key = features.CamelotKey,
@@ -139,6 +143,7 @@ public class ManualCueGenerationService
                         // Phase 4.7: Log failure
                         _forensicLogger.Warning(trackCorrelationId, Data.Entities.ForensicStage.MusicalAnalysis,
                             "Cue generation failed - no drop detected or analysis returned null",
+                            trackCorrelationId,
                             new { Title = track.Title });
                     }
                 }
@@ -150,7 +155,7 @@ public class ManualCueGenerationService
                 
                 // Phase 4.7: Log exception with stack trace
                 _forensicLogger.Error(trackCorrelationId, Data.Entities.ForensicStage.CueGeneration,
-                    $"Exception during cue generation for {track.Title}", ex);
+                    $"Exception during cue generation for {track.Title}", trackCorrelationId, ex);
             }
 
             // Report progress

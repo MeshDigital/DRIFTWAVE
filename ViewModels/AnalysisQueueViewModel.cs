@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
+using SLSKDONET.Data.Entities;
+using Avalonia.Media;
 
 namespace SLSKDONET.ViewModels;
 
@@ -53,6 +55,31 @@ public class AnalysisJobViewModel : ReactiveObject
     {
         TrackHash = trackHash;
         FilePath = filePath;
+    }
+}
+
+public class LiveLogViewModel
+{
+    private readonly ForensicLogEntry _log;
+    
+    public string LogText => $"[{_log.Timestamp:HH:mm:ss}] [{_log.Level.ToUpper()}] [{_log.Stage}] {_log.Message}";
+    public IBrush LogColor 
+    {
+        get
+        {
+            return _log.Level switch
+            {
+                "Error" => Brushes.OrangeRed,
+                "Warning" => Brushes.Yellow,
+                "Debug" => Brushes.Gray,
+                _ => Brushes.LightGreen
+            };
+        }
+    }
+    
+    public LiveLogViewModel(ForensicLogEntry log)
+    {
+        _log = log;
     }
 }
 
@@ -119,13 +146,19 @@ public class AnalysisQueueViewModel : ReactiveObject
     public ReactiveCommand<AnalysisJobViewModel, Unit> InspectTrackCommand { get; }
     public ReactiveCommand<Unit, Unit> RunBrainTestCommand { get; }
 
+    // Mission Control: Live Forensic Stream
+    public ObservableCollection<LiveLogViewModel> LiveForensicLogs { get; } = new();
+    private const int MaxLogHistory = 100;
+    private readonly IForensicLogger _forensicLogger; // Add this field
+
     public AnalysisQueueViewModel(
         ILogger<AnalysisQueueViewModel> logger,
         IEventBus eventBus,
         INavigationService navigationService,
         LibraryViewModel libraryViewModel,
         AnalysisQueueService queueService,
-        MusicalBrainTestService testService)
+        MusicalBrainTestService testService,
+        IForensicLogger forensicLogger) // Inject interface
     {
         _logger = logger;
         _eventBus = eventBus;
@@ -133,6 +166,7 @@ public class AnalysisQueueViewModel : ReactiveObject
         _libraryViewModel = libraryViewModel;
         _queueService = queueService;
         _testService = testService;
+        _forensicLogger = forensicLogger;
 
         InspectTrackCommand = ReactiveCommand.Create<AnalysisJobViewModel>(InspectTrack);
         RunBrainTestCommand = ReactiveCommand.CreateFromTask(RunBrainTestAsync);
@@ -153,6 +187,28 @@ public class AnalysisQueueViewModel : ReactiveObject
         _eventBus.GetEvent<TrackAnalysisFailedEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(OnAnalysisFailed);
+
+        // Subscribe to live logs
+        if (_forensicLogger is Services.TrackForensicLogger concreteLogger)
+        {
+            Observable.FromEventPattern<EventHandler<ForensicLogEntry>, ForensicLogEntry>(
+                h => concreteLogger.LogGenerated += h,
+                h => concreteLogger.LogGenerated -= h)
+                .Select(x => x.EventArgs)
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(OnNewForensicLog);
+        }
+    }
+
+    private void OnNewForensicLog(ForensicLogEntry log)
+    {
+        var vm = new LiveLogViewModel(log);
+        LiveForensicLogs.Insert(0, vm);
+        
+        while (LiveForensicLogs.Count > MaxLogHistory)
+        {
+            LiveForensicLogs.RemoveAt(LiveForensicLogs.Count - 1);
+        }
     }
 
     private void InspectTrack(AnalysisJobViewModel job)

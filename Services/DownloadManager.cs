@@ -559,7 +559,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     AlbumArtUrl = t.AlbumArtUrl,
                     Format = t.Format,
                     Bitrate = t.Bitrate,
-                    Priority = t.Priority
+                    Priority = t.Priority,
+                    AddedAt = t.AddedAt,
+                    CompletedAt = t.CompletedAt
                 };
                 
                 // Map status to download state
@@ -721,6 +723,12 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         ctx.State = newState;
         ctx.ErrorMessage = error; // Update context
         
+        // Update model and timestamp for terminal states
+        if (newState == PlaylistTrackState.Completed || newState == PlaylistTrackState.Failed || newState == PlaylistTrackState.Cancelled)
+        {
+            ctx.Model.CompletedAt = DateTime.UtcNow;
+        }
+        
         // Publish with ProjectId for targeted updates
         _eventBus.Publish(new TrackStateChangedEvent(ctx.GlobalId, ctx.Model.PlaylistId, newState, error));
         
@@ -781,13 +789,11 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 State = ctx.State.ToString(),
                 Filename = ctx.Model.ResolvedFilePath,
                 Size = 0, 
-                AddedAt = DateTime.Now, // ctx doesn't track AddedAt yet, assume Now or Model property
+                AddedAt = ctx.Model.AddedAt,
+                CompletedAt = ctx.Model.CompletedAt,
                 ErrorMessage = ctx.ErrorMessage,
                 AlbumArtUrl = ctx.Model.AlbumArtUrl,
                 SpotifyTrackId = ctx.Model.SpotifyTrackId,
-                // These are actually only in PlaylistTrackEntity currently, 
-                // but TrackEntity (global history) doesn't have them yet.
-                // For now, focusing on the PlaylistTrack flow which is the primary failure point.
             });
         }  
         catch (Exception ex)
@@ -1478,6 +1484,14 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     return;
                 }
                 
+                // Check if it's a global shutdown
+                if (_globalCts.Token.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Shutdown detected. Preserving state for {Title} (Current State: {State})", 
+                        ctx.Model.Title, ctx.State);
+                    return;
+                }
+
                 // Otherwise it's an unexpected cancellation (health monitor, timeout, etc.)
                 cancellationReason = "System/timeout cancellation";
                 _logger.LogWarning("⚠️ Unexpected cancellation for {Title} in state {State}. Marking as cancelled. Reason: {Reason}", 
@@ -1533,12 +1547,21 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         ctx.CurrentUsername = bestMatch.Username;
 
         // Phase 2.5: Use PathProviderService for consistent folder structure
-        var finalPath = _pathProvider.GetTrackPath(
-            ctx.Model.Artist,
-            ctx.Model.Album ?? "Unknown Album",
-            ctx.Model.Title,
-            bestMatch.GetExtension()
-        );
+        // Create a temporary track object to combine DB (enriched) metadata with search result (technical) info
+        var namingTrack = new Track
+        {
+            Artist = ctx.Model.Artist,
+            Title = ctx.Model.Title,
+            Album = ctx.Model.Album,
+            Bitrate = bestMatch.Bitrate,
+            BPM = ctx.Model.BPM,
+            MusicalKey = ctx.Model.MusicalKey,
+            Energy = ctx.Model.Energy,
+            Filename = bestMatch.Filename, // For {filename} variable
+            Username = bestMatch.Username, // For {user} variable
+            Length = ctx.Model.CanonicalDuration // For {length} variable
+        };
+        var finalPath = _pathProvider.GetTrackPath(namingTrack);
 
         var partPath = finalPath + ".part";
         long startPosition = 0;

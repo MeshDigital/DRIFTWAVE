@@ -308,8 +308,9 @@ namespace SLSKDONET.ViewModels
                 var logs = await Task.Run(async () =>
                 {
                     using var db = new Data.AppDbContext();
+                    // Query by TrackIdentifier (which stores the Hash) OR CorrelationId
                     return await db.ForensicLogs
-                        .Where(l => l.CorrelationId == trackHash)
+                        .Where(l => l.TrackIdentifier == trackHash || l.CorrelationId == trackHash)
                         .OrderByDescending(l => l.Timestamp)
                         .ToListAsync();
                 });
@@ -319,9 +320,13 @@ namespace SLSKDONET.ViewModels
                 {
                     ForensicLogs.Add(log);
                 }
-                 OnPropertyChanged(nameof(ForensicLogs));
+                 OnPropertyChanged(nameof(ForensicLogs)); // Force UI refresh
+                 System.Diagnostics.Debug.WriteLine($"[Inspector] Loaded {logs.Count} forensic logs for {trackHash}");
             }
-            catch (Exception) { /* Fail silently */ }
+            catch (Exception ex) 
+            {
+                 System.Diagnostics.Debug.WriteLine($"[Inspector] Failed to load forensic logs: {ex.Message}");
+            }
         }
 
         public void NotifyAnalysisProperties()
@@ -556,7 +561,7 @@ namespace SLSKDONET.ViewModels
             if (System.Collections.Generic.EqualityComparer<T>.Default.Equals(field, value)) return false;
             field = value;
             OnPropertyChanged(propertyName);
-            return false;
+            return true;
         }
 
         public void Dispose()

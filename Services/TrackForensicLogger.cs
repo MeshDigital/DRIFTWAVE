@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using SLSKDONET.Data.Entities;
 
 namespace SLSKDONET.Services;
 
@@ -11,20 +12,20 @@ namespace SLSKDONET.Services;
 /// Track-scoped forensic logger that writes correlation-based logs.
 /// Wraps standard ILogger with automatic CorrelationId prefixing and database persistence.
 /// </summary>
-public class TrackForensicLogger : IDisposable
+public class TrackForensicLogger : IForensicLogger, IDisposable
 {
     private readonly ILogger<TrackForensicLogger> _logger;
-    private readonly Channel<Data.Entities.ForensicLogEntry> _logChannel;
+    private readonly Channel<ForensicLogEntry> _logChannel;
     
     public TrackForensicLogger(ILogger<TrackForensicLogger> logger)
     {
         _logger = logger;
         
         // Producer-Consumer channel for async log persistence (non-blocking)
-        _logChannel = Channel.CreateUnbounded<Data.Entities.ForensicLogEntry>(new UnboundedChannelOptions
+        _logChannel = Channel.CreateUnbounded<ForensicLogEntry>(new UnboundedChannelOptions
         {
             SingleWriter = false,
-            SingleReader = true
+            SingleReader = true // Note: SingleReader=true is optimal if only ConsumerAsync reads. We have event for UI.
         });
         
         // Start background consumer
@@ -34,69 +35,70 @@ public class TrackForensicLogger : IDisposable
     /// <summary>
     /// Logs a debug message with correlation context
     /// </summary>
-    public void Debug(string correlationId, string stage, string message, object? data = null)
+    public void Debug(string correlationId, string stage, string message, string? trackId = null, object? data = null)
     {
-        LogInternal(correlationId, stage, Data.Entities.ForensicLevel.Debug, message, data);
+        LogInternal(correlationId, stage, ForensicLevel.Debug, message, trackId, data);
     }
     
     /// <summary>
     /// Logs an info message with correlation context
     /// </summary>
-    public void Info(string correlationId, string stage, string message, object? data = null)
+    public void Info(string correlationId, string stage, string message, string? trackId = null, object? data = null)
     {
-        LogInternal(correlationId, stage, Data.Entities.ForensicLevel.Info, message, data);
+        LogInternal(correlationId, stage, ForensicLevel.Info, message, trackId, data);
     }
     
     /// <summary>
     /// Logs a warning with correlation context
     /// </summary>
-    public void Warning(string correlationId, string stage, string message, object? data = null)
+    public void Warning(string correlationId, string stage, string message, string? trackId = null, object? data = null)
     {
-        LogInternal(correlationId, stage, Data.Entities.ForensicLevel.Warning, message, data);
+        LogInternal(correlationId, stage, ForensicLevel.Warning, message, trackId, data);
     }
     
     /// <summary>
     /// Logs an error with correlation context
     /// </summary>
-    public void Error(string correlationId, string stage, string message, Exception? ex = null, object? data = null)
+    public void Error(string correlationId, string stage, string message, string? trackId = null, Exception? ex = null, object? data = null)
     {
         var errorData = data != null ? data : (ex != null ? new { Exception = ex.Message, StackTrace = ex.StackTrace } : null);
-        LogInternal(correlationId, stage, Data.Entities.ForensicLevel.Error, message, errorData);
+        LogInternal(correlationId, stage, ForensicLevel.Error, message, trackId, errorData);
     }
     
     /// <summary>
     /// Logs a timed operation (auto-calculates duration)
     /// </summary>
-    public IDisposable TimedOperation(string correlationId, string stage, string operation)
+    public IDisposable TimedOperation(string correlationId, string stage, string operation, string? trackId = null)
     {
-        return new TimedLogScope(this, correlationId, stage, operation);
+        return new TimedLogScope(this, correlationId, stage, operation, trackId);
     }
     
-    private void LogInternal(string correlationId, string stage, string level, string message, object? data)
+    private void LogInternal(string correlationId, string stage, string level, string message, string? trackId, object? data)
     {
         // Standard console log with correlation prefix
-        var enrichedMessage = $"[CID: {correlationId[..8]}] [{stage}] {message}";
+        var enrichedMessage = $"[CID: {correlationId[..8]}] [{stage}] {(trackId != null ? $"[T: {trackId[..6]}] " : "")}{message}";
         
         switch (level)
         {
-            case Data.Entities.ForensicLevel.Debug:
+            case ForensicLevel.Debug:
                 _logger.LogDebug(enrichedMessage);
                 break;
-            case Data.Entities.ForensicLevel.Info:
+            case ForensicLevel.Info:
                 _logger.LogInformation(enrichedMessage);
                 break;
-            case Data.Entities.ForensicLevel.Warning:
+            case ForensicLevel.Warning:
                 _logger.LogWarning(enrichedMessage);
                 break;
-            case Data.Entities.ForensicLevel.Error:
+            case ForensicLevel.Error:
                 _logger.LogError(enrichedMessage);
                 break;
         }
         
         // Queue for database persistence (non-blocking)
-        var entry = new Data.Entities.ForensicLogEntry
+        var entry = new ForensicLogEntry
         {
             CorrelationId = correlationId,
+            TrackIdentifier = trackId,
             Stage = stage,
             Level = level,
             Message = message,
@@ -104,8 +106,16 @@ public class TrackForensicLogger : IDisposable
             Timestamp = DateTime.UtcNow
         };
         
+        // Notify live listeners (e.g. Mission Control UI)
+        LogGenerated?.Invoke(this, entry);
+        
         _logChannel.Writer.TryWrite(entry);
     }
+    
+    /// <summary>
+    /// Event fired when a new log entry is generated. Safe for UI subscription (but marshaling required).
+    /// </summary>
+    public event EventHandler<ForensicLogEntry>? LogGenerated;
     
     /// <summary>
     /// Signals the consumer to stop and waits for remaining logs to be persisted
@@ -156,23 +166,25 @@ public class TrackForensicLogger : IDisposable
         private readonly string _correlationId;
         private readonly string _stage;
         private readonly string _operation;
+        private readonly string? _trackId;
         private readonly Stopwatch _stopwatch;
         
-        public TimedLogScope(TrackForensicLogger logger, string correlationId, string stage, string operation)
+        public TimedLogScope(TrackForensicLogger logger, string correlationId, string stage, string operation, string? trackId = null)
         {
             _logger = logger;
             _correlationId = correlationId;
             _stage = stage;
             _operation = operation;
+            _trackId = trackId;
             _stopwatch = Stopwatch.StartNew();
             
-            _logger.Debug(correlationId, stage, $"{operation} started");
+            _logger.Debug(correlationId, stage, $"{operation} started", trackId);
         }
         
         public void Dispose()
         {
             _stopwatch.Stop();
-            _logger.Info(_correlationId, _stage, $"{_operation} completed in {_stopwatch.ElapsedMilliseconds}ms");
+            _logger.Info(_correlationId, _stage, $"{_operation} completed in {_stopwatch.ElapsedMilliseconds}ms", _trackId);
         }
     }
 }

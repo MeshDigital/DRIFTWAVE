@@ -74,6 +74,7 @@ public static class ForensicStage
     public const string MusicalAnalysis = "MusicalAnalysis";
     public const string Persistence = "Persistence";
     public const string CueGeneration = "CueGeneration"; // Phase 4 specific
+    public const string AnalysisQueue = "AnalysisQueue"; // New stage for queue orchestration
 }
 
 /// <summary>

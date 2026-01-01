@@ -6,6 +6,8 @@ public class TrackEnrichmentResult
     public string OfficialArtist { get; set; } = string.Empty;
     public string OfficialTitle { get; set; } = string.Empty;
     public string AlbumArtUrl { get; set; } = string.Empty;
+    public string SpotifyAlbumId { get; set; } = string.Empty;
+    public string SpotifyArtistId { get; set; } = string.Empty;
     public string? ISRC { get; set; }
     
     // Audio Features

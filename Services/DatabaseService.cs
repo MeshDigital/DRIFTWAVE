@@ -189,6 +189,9 @@ public class DatabaseService
             if (!existingColumns.Contains("QualityDetails"))
                 columnsToAdd.Add(("QualityDetails", "QualityDetails TEXT NULL"));
             
+            if (!existingColumns.Contains("CompletedAt"))
+                columnsToAdd.Add(("CompletedAt", "CompletedAt TEXT NULL"));
+            
             foreach (var (name, definition) in columnsToAdd)
             {
                 _logger.LogWarning("Schema Patch: Adding missing column '{Column}' to PlaylistTracks", name);
@@ -386,6 +389,9 @@ public class DatabaseService
             if (!existingColumns.Contains("IsEnriched"))
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN IsEnriched INTEGER DEFAULT 0");
 
+            if (!existingColumns.Contains("CompletedAt"))
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Tracks ADD COLUMN CompletedAt TEXT NULL");
+            
             // Check LibraryHealth table
             cmdSchema.CommandText = "PRAGMA table_info(LibraryHealth)";
             existingColumns.Clear();
@@ -959,6 +965,7 @@ public class DatabaseService
                         existingTrack.QualityDetails = track.QualityDetails;
                         
                         existingTrack.IsEnriched = track.IsEnriched;
+                        existingTrack.CompletedAt = track.CompletedAt;
 
                         // Don't update AddedAt - preserve original
                         // context.Tracks.Update() is not needed - EF Core tracks changes automatically
@@ -1074,6 +1081,12 @@ public class DatabaseService
         foreach (var pt in playlistTracks)
         {
             pt.Status = newStatus;
+            
+            if (newStatus == TrackStatus.Downloaded || newStatus == TrackStatus.Failed || newStatus == TrackStatus.Skipped)
+            {
+                pt.CompletedAt = DateTime.UtcNow;
+            }
+
             if (!string.IsNullOrEmpty(resolvedPath))
             {
                 pt.ResolvedFilePath = resolvedPath;
@@ -1218,6 +1231,8 @@ public class DatabaseService
             if (result.Success)
             {
                 entry.SpotifyTrackId = result.SpotifyId;
+                entry.SpotifyAlbumId = result.SpotifyAlbumId;
+                entry.SpotifyArtistId = result.SpotifyArtistId;
                 if (!string.IsNullOrEmpty(result.ISRC)) entry.ISRC = result.ISRC;
                 if (!string.IsNullOrEmpty(result.AlbumArtUrl) && string.IsNullOrEmpty(entry.AlbumArtUrl))
                     entry.AlbumArtUrl = result.AlbumArtUrl;
@@ -1253,6 +1268,8 @@ public class DatabaseService
             foreach (var pt in relatedTracks)
             {
                 pt.SpotifyTrackId = result.SpotifyId;
+                pt.SpotifyAlbumId = result.SpotifyAlbumId;
+                pt.SpotifyArtistId = result.SpotifyArtistId;
                 if (!string.IsNullOrEmpty(result.ISRC)) pt.ISRC = result.ISRC;
                 if (!string.IsNullOrEmpty(result.AlbumArtUrl)) pt.AlbumArtUrl = result.AlbumArtUrl;
                 if (result.Bpm > 0)
@@ -1288,6 +1305,8 @@ public class DatabaseService
             if (result.Success)
             {
                 track.SpotifyTrackId = result.SpotifyId;
+                track.SpotifyAlbumId = result.SpotifyAlbumId;
+                track.SpotifyArtistId = result.SpotifyArtistId;
                 if (!string.IsNullOrEmpty(result.ISRC)) track.ISRC = result.ISRC;
                 if (!string.IsNullOrEmpty(result.AlbumArtUrl)) track.AlbumArtUrl = result.AlbumArtUrl;
                 

@@ -24,6 +24,7 @@ public class TrackEntity
     
     // Metadata for re-hydration
     public DateTime AddedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
     public string? ErrorMessage { get; set; }
     public string? CoverArtUrl { get; set; } // Added for Album Art
 
@@ -151,6 +152,7 @@ public class PlaylistTrackEntity
     public DateTime? LastPlayedAt { get; set; }
 
     public DateTime AddedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
     public int SortOrder { get; set; }
     
     // Spotify Metadata

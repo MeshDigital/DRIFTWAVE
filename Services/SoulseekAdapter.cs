@@ -221,17 +221,8 @@ public class SoulseekAdapter : ISoulseekAdapter, IDisposable
                                 continue;
                             }
 
-                            // Parse filename to extract info
-                            var track = new Track
-                            {
-                                Title = Path.GetFileNameWithoutExtension(file.Filename),
-                                // Simplified parsing for now
-                            };
-                            
-                            // Basic population from file attributes
-                            // Note: Soulseek.File doesn't always have metadata, depend on filename mostly
-                            if (file.Length > 0) track.Length = file.Length;
-                            if (file.BitRate > 0) track.Bitrate = file.BitRate.GetValueOrDefault(); // Soulseek file has BitRate (nullable), Track has Bitrate
+                            // Use the helper method to parse metadata correctly
+                            var track = ParseTrackFromFile(file, response);
                             
                             // Apply bitrate filter
                             if (bitrateFilter.Min.HasValue && track.Bitrate < bitrateFilter.Min.Value)
@@ -499,12 +490,23 @@ public class SoulseekAdapter : ISoulseekAdapter, IDisposable
         var lengthAttr = file.Attributes?.FirstOrDefault(a => a.Type == FileAttributeType.Length);
         var length = lengthAttr?.Value ?? 0;
 
-        // Parse filename for artist/title (basic implementation)
+        // Parse filename for artist/title
         var filename = Path.GetFileNameWithoutExtension(file.Filename);
-        var parts = filename.Split(new[] { '-', '_' }, 2);
         
+        // Remove leading track numbers (e.g. "01 - ", "01.", "01_")
+        var cleanFilename = System.Text.RegularExpressions.Regex.Replace(filename, @"^\d+[\s\-_\.]+", "");
+
+        // Split by common separators
+        var parts = cleanFilename.Split(new[] { " - ", "_-_", " -", "- " }, 2, StringSplitOptions.RemoveEmptyEntries);
+        
+        // If no clear multi-character separator, try single dash but be careful
+        if (parts.Length < 2 && cleanFilename.Contains("-"))
+        {
+            parts = cleanFilename.Split(new[] { '-' }, 2, StringSplitOptions.RemoveEmptyEntries);
+        }
+
         string artist = "Unknown Artist";
-        string title = filename;
+        string title = cleanFilename; // Default to full cleaned filename
         string album = "";
 
         if (parts.Length >= 2)

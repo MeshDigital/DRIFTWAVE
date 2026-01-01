@@ -19,7 +19,7 @@ public class AppConfig
     public string? DownloadDirectory { get; set; }
     public string? SharedFolderPath { get; set; }
     public int MaxConcurrentDownloads { get; set; } = 5; // Optimized: was 2, increased for better throughput
-    public string? NameFormat { get; set; } = "{artist} - {title}";
+    public string? NameFormat { get; set; } = "{artist|filename} - {title}";
     public bool CheckForDuplicates { get; set; } = true;
 
     // Soulseek Network Settings (matches Soulseek.NET library defaults)

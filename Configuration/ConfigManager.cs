@@ -71,7 +71,7 @@ public class ConfigManager
                 DownloadDirectory = config["Download:Directory"],
                 SharedFolderPath = config["Download:SharedFolder"],
                 MaxConcurrentDownloads = int.TryParse(config["Download:MaxConcurrentDownloads"], out var mcd) ? mcd : 2,
-                NameFormat = config["Download:NameFormat"] ?? "{artist} - {title}",
+                NameFormat = config["Download:NameFormat"] ?? "{artist|filename} - {title}",
                 CheckForDuplicates = !bool.TryParse(config["Download:CheckForDuplicates"], out var check) || check, // Default to true
                 SearchLengthToleranceSeconds = int.TryParse(config["Download:SearchLengthToleranceSeconds"], out var tol) ? tol : 3,
                 FuzzyMatchEnabled = !bool.TryParse(config["Download:FuzzyMatchEnabled"], out var fz) || fz, // Default true
@@ -88,6 +88,7 @@ public class ConfigManager
                 SpotifyCallbackPort = int.TryParse(config["Spotify:SpotifyCallbackPort"], out var scp) ? scp : 5000,
                 SpotifyRedirectUri = config["Spotify:SpotifyRedirectUri"] ?? "http://127.0.0.1:5000/callback",
                 ClearSpotifyOnExit = bool.TryParse(config["Spotify:ClearSpotifyOnExit"], out var csoe) && csoe,
+                SpotifyEnableAudioFeatures = bool.TryParse(config["Spotify:SpotifyEnableAudioFeatures"], out var seaf) && seaf,
 
                 // [Search] & Brain 2.0
                 RankingProfile = config["Search:RankingProfile"] ?? "Balanced",
@@ -189,6 +190,7 @@ public class ConfigManager
         iniContent.AppendLine($"SpotifyRedirectUri = {config.SpotifyRedirectUri}");
         iniContent.AppendLine($"SpotifyRememberAuth = {config.SpotifyRememberAuth}");
         iniContent.AppendLine($"MetadataEnrichmentEnabled = {config.SpotifyUseApi}");
+        iniContent.AppendLine($"SpotifyEnableAudioFeatures = {config.SpotifyEnableAudioFeatures}");
         iniContent.AppendLine($"ClearSpotifyOnExit = {config.ClearSpotifyOnExit}");
 
         iniContent.AppendLine();
