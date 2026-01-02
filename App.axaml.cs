@@ -605,7 +605,7 @@ public partial class App : Application
         // Phase 15: Style Lab (Sonic Taxonomy)
         services.AddSingleton<Services.AI.PersonalClassifierService>();
         services.AddSingleton<Services.AI.IStyleClassifierService, Services.AI.StyleClassifierService>();
-        services.AddSingleton<ViewModels.StyleLabViewModel>();
+        services.AddTransient<ViewModels.StyleLabViewModel>();
         
         // Phase 0: ViewModel Refactoring - Library child ViewModels
         services.AddTransient<ViewModels.Library.ProjectListViewModel>();
@@ -647,6 +647,7 @@ public partial class App : Application
         services.AddTransient<Views.Avalonia.UpgradeScoutView>();
         services.AddTransient<Views.Avalonia.InspectorPage>();
         services.AddTransient<Views.Avalonia.AnalysisQueuePage>();
+        services.AddTransient<Views.Avalonia.StyleLabPage>();
         
         // Singleton ViewModels
         services.AddSingleton<ViewModels.TrackInspectorViewModel>();
