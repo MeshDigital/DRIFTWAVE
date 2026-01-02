@@ -145,10 +145,20 @@ public class MetadataEnrichmentOrchestrator : IDisposable
             if (enriched)
             {
                 trackEntity.SpotifyTrackId = model.SpotifyTrackId;
+                trackEntity.SpotifyAlbumId = model.SpotifyAlbumId;
+                trackEntity.SpotifyArtistId = model.SpotifyArtistId;
                 trackEntity.CoverArtUrl = model.AlbumArtUrl;
+                trackEntity.AlbumArtUrl = model.AlbumArtUrl;
                 trackEntity.BPM = model.BPM;
                 trackEntity.MusicalKey = model.MusicalKey;
-                // Add any other enriched fields here
+                trackEntity.Genres = model.Genres;
+                trackEntity.Popularity = model.Popularity;
+                trackEntity.CanonicalDuration = model.CanonicalDuration;
+                trackEntity.ReleaseDate = model.ReleaseDate;
+                trackEntity.Energy = model.Energy;
+                trackEntity.Danceability = model.Danceability;
+                trackEntity.Valence = model.Valence;
+                trackEntity.IsEnriched = true;
                 
                 await _databaseService.SaveTrackAsync(trackEntity);
                 _eventBus.Publish(new TrackMetadataUpdatedEvent(trackEntity.GlobalId));

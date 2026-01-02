@@ -342,6 +342,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      // NEW: Sync Waveform and Technical Analysis results
                      Model.WaveformData = updatedTrack.WaveformData;
                      Model.RmsData = updatedTrack.RmsData;
+                     Model.LowData = updatedTrack.LowData;
+                     Model.MidData = updatedTrack.MidData;
+                     Model.HighData = updatedTrack.HighData;
                      Model.CanonicalDuration = updatedTrack.CanonicalDuration;
                      Model.Bitrate = updatedTrack.Bitrate;
                      Model.QualityConfidence = updatedTrack.QualityConfidence;

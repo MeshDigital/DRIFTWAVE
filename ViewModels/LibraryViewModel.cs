@@ -31,6 +31,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     private readonly AnalysisQueueService _analysisQueueService; // Analysis queue control
     private readonly Services.Library.SmartSorterService _smartSorterService; // Phase 16: Smart Sorter
     private readonly Services.AI.PersonalClassifierService _personalClassifier;
+    private readonly LibraryCacheService _libraryCacheService; // Session 1: Performance Optimization
     private readonly IServiceProvider _serviceProvider;
     private System.Threading.Timer? _selectionDebounceTimer; // Debounce for harmonic matching
     private System.Threading.CancellationTokenSource? _matchLoadCancellation; // Phase 9B: Cancel overlapping operations
@@ -202,6 +203,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         HarmonicMatchService harmonicMatchService, // Phase 8: DJ Features
         AnalysisQueueService analysisQueueService, // Analysis queue
         Services.Library.SmartSorterService smartSorterService, // Phase 16
+        LibraryCacheService libraryCacheService,
         IServiceProvider serviceProvider) // Factory for transient VMs
     {
         _logger = logger;
@@ -219,6 +221,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         _personalClassifier = serviceProvider.GetService(typeof(Services.AI.PersonalClassifierService)) as Services.AI.PersonalClassifierService 
                              ?? throw new InvalidOperationException("PersonalClassifierService not found");
         _serviceProvider = serviceProvider;
+        _libraryCacheService = libraryCacheService;
         
         // Assign child ViewModels
         Projects = projects;
@@ -527,25 +530,36 @@ public class LibraryViewModel : INotifyPropertyChanged
     /// </summary>
     private async Task ExecuteRefreshLibraryAsync()
     {
+        IsLoading = true;
         try
         {
             _logger.LogInformation("Refreshing library...");
+            
+            // Session 1: Performance Optimization - Clear cache before reload
+            _libraryCacheService.ClearCache();
+            
             await Projects.LoadProjectsAsync();
             
             // Phase 6: Sync "All Tracks" index before reloading
             await _libraryService.SyncLibraryEntriesFromTracksAsync().ConfigureAwait(false);
             
-            // If a project is selected, reload its tracks
+            // If a project is selected, reload its tracks to reflect any changes
             if (SelectedProject != null)
             {
                 await Tracks.LoadProjectTracksAsync(SelectedProject);
             }
             
+            _notificationService.Show("Library Refreshed", "Project list and tracks have been synchronized.");
             _logger.LogInformation("Library refreshed successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to refresh library");
+            _notificationService.Show("Refresh Failed", $"Error: {ex.Message}", NotificationType.Error);
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
     

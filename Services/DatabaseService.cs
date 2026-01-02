@@ -96,6 +96,119 @@ public class DatabaseService
             }
             
             _logger.LogInformation("[{Ms}ms] Database Init: Column check completed", sw.ElapsedMilliseconds);
+
+            // Phase 15: Ensure tables exist (for cases where EnsureCreatedAsync skips them due to existing DB)
+            var tablesToCheck = new List<(string Name, string CreateSql)>
+            {
+                ("style_definitions", @"CREATE TABLE ""style_definitions"" (
+                    ""Id"" TEXT NOT NULL PRIMARY KEY,
+                    ""Name"" TEXT NOT NULL,
+                    ""ColorHex"" TEXT NULL,
+                    ""ParentGenre"" TEXT NULL,
+                    ""CentroidJson"" TEXT NULL,
+                    ""ReferenceTrackHashesJson"" TEXT NULL
+                )"),
+                ("EnrichmentTasks", @"CREATE TABLE ""EnrichmentTasks"" (
+                    ""Id"" TEXT NOT NULL PRIMARY KEY,
+                    ""TrackId"" TEXT NOT NULL,
+                    ""AlbumId"" TEXT NULL,
+                    ""Status"" INTEGER NOT NULL,
+                    ""RetryCount"" INTEGER NOT NULL,
+                    ""ErrorMessage"" TEXT NULL,
+                    ""CreatedAt"" TEXT NOT NULL,
+                    ""UpdatedAt"" TEXT NULL
+                )"),
+                ("audio_analysis", @"CREATE TABLE ""audio_analysis"" (
+                    ""Id"" TEXT NOT NULL PRIMARY KEY,
+                    ""TrackUniqueHash"" TEXT NOT NULL,
+                    ""Bitrate"" INTEGER NOT NULL,
+                    ""SampleRate"" INTEGER NOT NULL,
+                    ""Channels"" INTEGER NOT NULL,
+                    ""Codec"" TEXT NULL,
+                    ""DurationMs"" INTEGER NOT NULL,
+                    ""LoudnessLufs"" REAL NOT NULL,
+                    ""TruePeakDb"" REAL NOT NULL,
+                    ""DynamicRange"" REAL NOT NULL,
+                    ""AnalyzedAt"" TEXT NOT NULL,
+                    ""IsUpscaled"" INTEGER NOT NULL,
+                    ""SpectralHash"" TEXT NULL,
+                    ""FrequencyCutoff"" INTEGER NOT NULL,
+                    ""QualityConfidence"" REAL NOT NULL
+                )"),
+                ("audio_features", @"CREATE TABLE ""audio_features"" (
+                    ""Id"" TEXT NOT NULL PRIMARY KEY,
+                    ""TrackUniqueHash"" TEXT NOT NULL,
+                    ""Bpm"" REAL NOT NULL,
+                    ""BpmConfidence"" REAL NOT NULL,
+                    ""Key"" TEXT NULL,
+                    ""Scale"" TEXT NULL,
+                    ""KeyConfidence"" REAL NOT NULL,
+                    ""CamelotKey"" TEXT NULL,
+                    ""Energy"" REAL NOT NULL,
+                    ""Danceability"" REAL NOT NULL,
+                    ""SpectralCentroid"" REAL NOT NULL,
+                    ""SpectralComplexity"" REAL NOT NULL,
+                    ""OnsetRate"" REAL NOT NULL,
+                    ""DynamicComplexity"" REAL NOT NULL,
+                    ""LoudnessLUFS"" REAL NOT NULL,
+                    ""DropTimeSeconds"" REAL NULL,
+                    ""CueIntro"" REAL NOT NULL,
+                    ""CueBuild"" REAL NULL,
+                    ""CueDrop"" REAL NULL,
+                    ""CuePhraseStart"" REAL NULL,
+                    ""BpmStability"" REAL NOT NULL,
+                    ""IsDynamicCompressed"" INTEGER NOT NULL,
+                    ""InstrumentalProbability"" REAL NOT NULL,
+                    ""MoodTag"" TEXT NULL,
+                    ""MoodConfidence"" REAL NOT NULL,
+                    ""ChordProgression"" TEXT NULL,
+                    ""Fingerprint"" TEXT NULL,
+                    ""AnalysisVersion"" TEXT NULL,
+                    ""AnalyzedAt"" TEXT NOT NULL,
+                    ""DetectedSubGenre"" TEXT NULL,
+                    ""SubGenreConfidence"" REAL NOT NULL,
+                    ""GenreDistributionJson"" TEXT NULL,
+                    ""AiEmbeddingJson"" TEXT NULL,
+                    ""PredictedVibe"" TEXT NULL,
+                    ""PredictionConfidence"" REAL NOT NULL,
+                    ""EmbeddingMagnitude"" REAL NOT NULL
+                )"),
+                ("ForensicLogs", @"CREATE TABLE ""ForensicLogs"" (
+                    ""Id"" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    ""CorrelationId"" TEXT NOT NULL,
+                    ""TrackIdentifier"" TEXT NULL,
+                    ""Stage"" TEXT NOT NULL,
+                    ""Level"" TEXT NOT NULL,
+                    ""Message"" TEXT NOT NULL,
+                    ""Data"" TEXT NULL,
+                    ""Timestamp"" TEXT NOT NULL,
+                    ""DurationMs"" INTEGER NULL
+                )"),
+                ("LibraryActionLogs", @"CREATE TABLE ""LibraryActionLogs"" (
+                    ""Id"" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    ""BatchId"" TEXT NOT NULL,
+                    ""ActionType"" INTEGER NOT NULL,
+                    ""SourcePath"" TEXT NOT NULL,
+                    ""DestinationPath"" TEXT NOT NULL,
+                    ""Timestamp"" TEXT NOT NULL,
+                    ""TrackArtist"" TEXT NULL,
+                    ""TrackTitle"" TEXT NULL
+                )")
+            };
+
+            foreach (var (tableName, createSql) in tablesToCheck)
+            {
+                using var cmdCheck = connection.CreateCommand();
+                cmdCheck.CommandText = $"SELECT name FROM sqlite_master WHERE type='table' AND name='{tableName}'";
+                var exists = await cmdCheck.ExecuteScalarAsync();
+                if (exists == null)
+                {
+                    _logger.LogWarning("Schema Patch: Creating missing table '{Table}'", tableName);
+                    using var cmdCreate = connection.CreateCommand();
+                    cmdCreate.CommandText = createSql;
+                    await cmdCreate.ExecuteNonQueryAsync();
+                }
+            }
             
             // Add missing columns to PlaylistTracks
             var columnsToAdd = new List<(string Name, string Definition)>();

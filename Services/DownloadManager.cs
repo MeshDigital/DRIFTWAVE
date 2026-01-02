@@ -140,9 +140,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         // - 4 concurrent = 95% success rate, ~2MB/s aggregate
         // - 20 concurrent = 60% success rate, ~1.5MB/s (contention overhead)
         int initialLimit = _config.MaxConcurrentDownloads > 0 ? _config.MaxConcurrentDownloads : 4;
+        _maxActiveDownloads = initialLimit; // FIX: Set private field first to avoid double-release in property setter
         _downloadSemaphore = new SemaphoreSlim(initialLimit, 50); // Hard cap at 50 to prevent DOS
-        MaxActiveDownloads = initialLimit;
-
+        
         // Phase 8: Automation Subscriptions
         _eventBus.GetEvent<AutoDownloadTrackEvent>().Subscribe(OnAutoDownloadTrack);
         _eventBus.GetEvent<AutoDownloadUpgradeEvent>().Subscribe(OnAutoDownloadUpgrade);

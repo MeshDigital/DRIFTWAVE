@@ -236,6 +236,17 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     
     public string BpmDisplay => Model.BPM.HasValue ? $"{Model.BPM:0}" : "—";
     public string KeyDisplay => Model.MusicalKey ?? "—";
+    public bool IsEnriched => Model.IsEnriched;
+
+    public WaveformAnalysisData WaveformData => new WaveformAnalysisData
+    {
+        PeakData = Model.WaveformData ?? Array.Empty<byte>(),
+        RmsData = Model.RmsData ?? Array.Empty<byte>(),
+        LowData = Model.LowData ?? Array.Empty<byte>(),
+        MidData = Model.MidData ?? Array.Empty<byte>(),
+        HighData = Model.HighData ?? Array.Empty<byte>(),
+        DurationSeconds = (Model.CanonicalDuration ?? 0) / 1000.0
+    };
     
     // Commands
     public ICommand PlayCommand { get; }
@@ -319,6 +330,19 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 Model.BPM = updatedTrack.BPM;
                 Model.MusicalKey = updatedTrack.MusicalKey;
                 Model.IsEnriched = updatedTrack.IsEnriched;
+                Model.Energy = updatedTrack.Energy;
+                Model.Danceability = updatedTrack.Danceability;
+                Model.Valence = updatedTrack.Valence;
+                Model.Genres = updatedTrack.Genres;
+                Model.Popularity = updatedTrack.Popularity;
+                
+                // Sync Waveform bands
+                Model.LowData = updatedTrack.LowData;
+                Model.MidData = updatedTrack.MidData;
+                Model.HighData = updatedTrack.HighData;
+                Model.WaveformData = updatedTrack.WaveformData;
+                Model.RmsData = updatedTrack.RmsData;
+                Model.CanonicalDuration = updatedTrack.CanonicalDuration;
                 
                 this.RaisePropertyChanged(nameof(ArtistName));
                 this.RaisePropertyChanged(nameof(TrackTitle));
@@ -328,6 +352,10 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 this.RaisePropertyChanged(nameof(KeyDisplay));
                 this.RaisePropertyChanged(nameof(IntegrityScore));
                 this.RaisePropertyChanged(nameof(TechnicalSummary));
+                
+                // Audio features
+                this.RaisePropertyChanged(nameof(IsEnriched));
+                this.RaisePropertyChanged(nameof(WaveformData));
                 
                 // Trigger artwork reload now that we have the AlbumArtUrl and SpotifyAlbumId
                 await LoadAlbumArtworkAsync();

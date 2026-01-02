@@ -68,7 +68,8 @@ public class StyleLabViewModel : ReactiveObject
         _logger = logger;
         _eventBus = eventBus;
 
-        CreateStyleCommand = ReactiveCommand.CreateFromTask(CreateStyleAsync);
+        var canCreate = this.WhenAnyValue(x => x.NewStyleName, name => !string.IsNullOrWhiteSpace(name));
+        CreateStyleCommand = ReactiveCommand.CreateFromTask(CreateStyleAsync, canCreate);
         DeleteStyleCommand = ReactiveCommand.CreateFromTask<StyleDefinitionEntity>(DeleteStyleAsync);
         TrainStyleCommand = ReactiveCommand.CreateFromTask<StyleDefinitionEntity>(TrainStyleAsync);
         TrainGlobalModelCommand = ReactiveCommand.CreateFromTask(TrainGlobalModelAsync);
@@ -106,6 +107,7 @@ public class StyleLabViewModel : ReactiveObject
         await context.SaveChangesAsync();
 
         Styles.Add(style);
+        SelectedStyle = style; // Auto-select the new category
         NewStyleName = string.Empty; // Reset input
         _eventBus.Publish(new StyleDefinitionsUpdatedEvent());
     }

@@ -6,6 +6,7 @@
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
              x:Class="SLSKDONET.Views.Avalonia.StyleLabPage"
              x:DataType="vm:StyleLabViewModel"
+             x:Name="Root"
              Background="#1E1E1E" Foreground="White">
 
     <Grid ColumnDefinitions="300,*">
@@ -78,7 +79,9 @@
                                 CornerRadius="8" 
                                 Background="#1E1E1E"
                                 DragDrop.AllowDrop="True">
-                            <ListBox ItemsSource="{Binding ReferenceTracks}" Background="Transparent" Margin="4">
+                            <ListBox ItemsSource="{Binding ReferenceTracks}" 
+                                     Background="Transparent" Margin="4"
+                                     DragDrop.AllowDrop="True">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid ColumnDefinitions="*,Auto,Auto">

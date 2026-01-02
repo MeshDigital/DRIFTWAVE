@@ -83,7 +83,7 @@ public class ConfigManager
                 SpotifyUsePublicOnly = !bool.TryParse(config["Spotify:SpotifyUsePublicOnly"], out var supo) || supo, // Default true
                 SpotifyClientId = config["Spotify:SpotifyClientId"],
                 SpotifyClientSecret = config["Spotify:SpotifyClientSecret"],
-                SpotifyUseApi = bool.TryParse(config["Spotify:MetadataEnrichmentEnabled"], out var sua) && sua,
+                SpotifyUseApi = !bool.TryParse(config["Spotify:MetadataEnrichmentEnabled"], out var sua) || sua,
                 SpotifyRememberAuth = !bool.TryParse(config["Spotify:SpotifyRememberAuth"], out var sra) || sra, // Default true
                 SpotifyCallbackPort = int.TryParse(config["Spotify:SpotifyCallbackPort"], out var scp) ? scp : 5000,
                 SpotifyRedirectUri = config["Spotify:SpotifyRedirectUri"] ?? "http://127.0.0.1:5000/callback",
