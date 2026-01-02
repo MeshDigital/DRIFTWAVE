@@ -37,5 +37,5 @@ public class WaveformAnalysisData
     /// </summary>
     public double DurationSeconds { get; set; }
     
-    public bool IsEmpty => PeakData.Length == 0;
+    public bool IsEmpty => PeakData.Length == 0 || RmsData.Length == 0;
 }

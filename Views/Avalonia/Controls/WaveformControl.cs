@@ -79,7 +79,7 @@ namespace SLSKDONET.Views.Avalonia.Controls
                           data.MidData != null && data.MidData.Length > 0 &&
                           data.HighData != null && data.HighData.Length > 0;
 
-            int samples = data.PeakData.Length;
+            int samples = Math.Min(data.PeakData.Length, data.RmsData.Length);
             double step = width / samples;
 
             for (int i = 0; i < samples; i++)
@@ -95,7 +95,7 @@ namespace SLSKDONET.Views.Avalonia.Controls
                 double peakH = peakVal * mid;
                 double rmsH = rmsVal * mid;
 
-                if (hasRgb)
+                if (hasRgb && i < data.LowData.Length && i < data.MidData.Length && i < data.HighData.Length)
                 {
                     // RGB Rendering
                     float low = data.LowData[i] / 255f;
