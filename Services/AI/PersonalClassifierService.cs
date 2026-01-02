@@ -41,58 +41,66 @@ public class PersonalClassifierService
     /// <summary>
     /// Trains the LightGBM model with the provided dictionary of labeled embeddings.
     /// </summary>
-    public void Train(string modelName, Dictionary<string, List<float[]>> trainingData)
+    public async Task<bool> TrainModelAsync(string modelName, Dictionary<string, List<float[]>> trainingData)
     {
-        // 1. Flatten the dictionary into a list of inputs
-        var dataPoints = new List<VibeInput>();
-        foreach (var kvp in trainingData)
+        return await Task.Run(() => 
         {
-            var label = kvp.Key;
-            foreach (var embedding in kvp.Value)
+            try
             {
-                if (embedding.Length != 128) continue; // Safety check for dimension mismatch
-                dataPoints.Add(new VibeInput { Embedding = embedding, Label = label });
-            }
-        }
-
-        // Need valid data to train
-        if (dataPoints.Count < 5)
-        {
-            // In a real scenario, we might want to just log this or handle it gracefully,
-            // but for now we'll return or throw. A service shouldn't crash the app though.
-            Console.WriteLine("Not enough training data to train model.");
-            return;
-        }
-
-        // 2. Load Data
-        var trainingDataView = _mlContext.Data.LoadFromEnumerable(dataPoints);
-
-        // 3. Define Pipeline
-        // MapValueToKey: Converts string labels to keys (0, 1, 2...)
-        // LightGbm: Fast, accurate tree-based gradient boosting
-        // MapKeyToValue: Converts the predicted key back to the string label
-        var pipeline = _mlContext.Transforms.Conversion.MapValueToKey("Label")
-            .Append(_mlContext.MulticlassClassification.Trainers.LightGbm(
-                new LightGbmMulticlassTrainer.Options
+                // 1. Flatten the dictionary into a list of inputs
+                var dataPoints = new List<VibeInput>();
+                foreach (var kvp in trainingData)
                 {
-                    NumberOfIterations = 50,
-                    LearningRate = 0.1f,
-                    UseSoftmax = true 
-                }))
-            .Append(_mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
+                    var label = kvp.Key;
+                    foreach (var embedding in kvp.Value)
+                    {
+                        if (embedding.Length != 128) continue; // Safety check for dimension mismatch
+                        dataPoints.Add(new VibeInput { Embedding = embedding, Label = label });
+                    }
+                }
 
-        // 4. Train
-        _trainedModel = pipeline.Fit(trainingDataView);
-        
-        // 5. Save Model
-        var modelDirectory = Path.GetDirectoryName(ModelPath);
-        if (!string.IsNullOrEmpty(modelDirectory))
-            Directory.CreateDirectory(modelDirectory);
-            
-        _mlContext.Model.Save(_trainedModel, trainingDataView.Schema, ModelPath);
-        
-        // 6. Refresh Prediction Engine
-        CreatePredictionEngine();
+                // Need valid data to train
+                if (dataPoints.Count < 5)
+                {
+                    Console.WriteLine("Not enough training data to train model.");
+                    return false;
+                }
+
+                // 2. Load Data
+                var trainingDataView = _mlContext.Data.LoadFromEnumerable(dataPoints);
+
+                // 3. Define Pipeline
+                var pipeline = _mlContext.Transforms.Conversion.MapValueToKey("Label")
+                    .Append(_mlContext.MulticlassClassification.Trainers.LightGbm(
+                        new LightGbmMulticlassTrainer.Options
+                        {
+                            NumberOfIterations = 50,
+                            LearningRate = 0.1f,
+                            UseSoftmax = true 
+                        }))
+                    .Append(_mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
+
+                // 4. Train
+                _trainedModel = pipeline.Fit(trainingDataView);
+                
+                // 5. Save Model
+                var modelDirectory = Path.GetDirectoryName(ModelPath);
+                if (!string.IsNullOrEmpty(modelDirectory))
+                    Directory.CreateDirectory(modelDirectory);
+                    
+                _mlContext.Model.Save(_trainedModel, trainingDataView.Schema, ModelPath);
+                
+                // 6. Refresh Prediction Engine
+                CreatePredictionEngine();
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Training Failed: {ex.Message}");
+                return false;
+            }
+        });
     }
 
     private void LoadModel()

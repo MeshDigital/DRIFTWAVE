@@ -91,7 +91,7 @@ public class StyleClassifierService : IStyleClassifierService
 
         if (totalTracks >= 5)
         {
-            await Task.Run(() => _personalClassifier.Train("UserStyleModel", trainingData));
+            await _personalClassifier.TrainModelAsync("UserStyleModel", trainingData);
             _logger.LogInformation("Trained PersonalClassifier with {Count} tracks across {Styles} styles", totalTracks, trainingData.Count);
         }
         else

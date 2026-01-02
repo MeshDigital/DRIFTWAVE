@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SLSKDONET.ViewModels"
+             x:Class="SLSKDONET.Views.Avalonia.StyleLabPage"
+             x:DataType="vm:StyleLabViewModel">
+
+    <Grid ColumnDefinitions="300, *" Background="#121212">
+        
+        <Border Grid.Column="0" Background="#1E1E1E" BorderBrush="#333" BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto, *">
+                <TextBlock Text="STYLE BUCKETS" Foreground="#888" Margin="15" FontWeight="Bold"/>
+                
+                <!-- Binding to Styles (each item is StyleDefinitionEntity) -->
+                <!-- We used StyleDefinitionEntity which has Name and ColorHex properties -->
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding Styles}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#252525" Margin="10,5" CornerRadius="4" Padding="10">
+                                <StackPanel>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="{Binding Name}" Foreground="{Binding ColorHex}" FontWeight="Bold"/>
+                                        <Border Background="{Binding ColorHex}" Width="8" Height="8" CornerRadius="4"/>
+                                    </Grid>
+                                    <TextBlock Text="Drop tracks here to train" FontSize="10" Foreground="#666" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" RowDefinitions="Auto, *, Auto">
+            <StackPanel Margin="20">
+                <TextBlock Text="🧪 SONIC INTELLIGENCE LAB" FontSize="20" FontWeight="Bold"/>
+                <TextBlock Text="Drag tracks to buckets to teach the AI your taste." Foreground="#AAA"/>
+            </StackPanel>
+
+            <Border Grid.Row="1" Margin="20" Background="#181818" CornerRadius="8" BorderBrush="#333" BorderThickness="1">
+                <Grid>
+                    <TextBlock Text="[ SPECTROGRAM STACK VISUALIZATION ]" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#444"/>
+                    <!-- Placeholder for the actual spectrogram control -->
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Padding="20" Background="#1E1E1E">
+                <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" IsVisible="{Binding IsTraining}" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock Text="Training..." Foreground="#3498DB"/>
+                        <ProgressBar IsIndeterminate="True" Width="100"/>
+                    </StackPanel>
+                    
+                    <TextBlock Text="{Binding TestTrackPrediction}" VerticalAlignment="Center" Foreground="Cyan"/>
+                    
+                    <Button Content="TRAIN MODEL" 
+                            Command="{Binding TrainGlobalModelCommand}" 
+                            IsEnabled="{Binding !IsTraining}"
+                            Background="#3498DB" Foreground="White" FontWeight="Bold" Padding="15,8"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

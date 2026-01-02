@@ -128,9 +128,11 @@ public class StyleLabViewModel : ReactiveObject
     
     private async Task TrainGlobalModelAsync()
     {
+        IsTraining = true;
         // Trigger global training via service (using Guid.Empty to signal global if needed, 
         // but our upgraded implementation ignores ID anyway)
         await _classifier.TrainStyleAsync(Guid.Empty);
+        IsTraining = false;
         IsModelOutdated = false;
     }
 
@@ -207,9 +209,48 @@ public class StyleLabViewModel : ReactiveObject
         }
     }
 
+    private string _testTrackPrediction = "Ready to test";
+    public string TestTrackPrediction
+    {
+        get => _testTrackPrediction;
+        set => this.RaiseAndSetIfChanged(ref _testTrackPrediction, value);
+    }
+
+    private bool _isTraining;
+    public bool IsTraining
+    {
+        get => _isTraining;
+        set => this.RaiseAndSetIfChanged(ref _isTraining, value);
+    }
+
     private string GenerateRandomColor()
     {
         var rnd = new Random();
         return $"#{rnd.Next(100, 255):X2}{rnd.Next(100, 255):X2}{rnd.Next(100, 255):X2}";
+    }
+}
+
+public class StyleBucketViewModel : ReactiveObject
+{
+    private string _name = "";
+    public string Name 
+    { 
+        get => _name; 
+        set => this.RaiseAndSetIfChanged(ref _name, value); 
+    }
+
+    private string _color = "#FFFFFF";
+    public string Color 
+    { 
+        get => _color; 
+        set => this.RaiseAndSetIfChanged(ref _color, value); 
+    }
+
+    public ObservableCollection<string> TrackNames { get; } = new();
+
+    public StyleBucketViewModel(StyleDefinitionEntity entity)
+    {
+        Name = entity.Name;
+        Color = entity.ColorHex;
     }
 }
