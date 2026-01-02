@@ -2507,6 +2507,26 @@ public class DatabaseService
         using var context = new AppDbContext();
         return await context.StyleDefinitions.AsNoTracking().ToListAsync();
     }
+
+    // Phase 16.2: Vibe Match
+    public async Task<List<AudioFeaturesEntity>> LoadAllAudioFeaturesAsync()
+    {
+        await _writeSemaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            using var context = new AppDbContext();
+            return await context.AudioFeatures.AsNoTracking().ToListAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load all audio features");
+            return new List<AudioFeaturesEntity>();
+        }
+        finally
+        {
+            _writeSemaphore.Release();
+        }
+    }
 }
 
 

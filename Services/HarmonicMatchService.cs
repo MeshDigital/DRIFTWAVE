@@ -308,5 +308,6 @@ public enum KeyRelationship
     Perfect,        // Same key
     Compatible,     // Adjacent on Camelot Wheel (±1 semitone)
     Relative,       // Relative major/minor (8A ↔ 8B)
-    Incompatible    // No harmonic relationship
+    Incompatible,   // No harmonic relationship
+    SonicTwin       // Phase 16.2: Vibe Match / Sonic Similarity
 }

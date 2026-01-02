@@ -154,4 +154,75 @@ public class PersonalClassifierService
 
         return (prediction.PredictedLabel, maxConfidence);
     }
+
+    /// <summary>
+    /// Phase 16.2: Finds likely matches using Cosine Similarity on embeddings.
+    /// </summary>
+    /// <param name="targetVector">The 128-float embedding of the source track.</param>
+    /// <param name="targetBpm">The BPM of the source track for pre-filtering.</param>
+    /// <param name="candidates">List of candidate tracks with their embeddings and magnitudes.</param>
+    /// <param name="limit">Number of results to return.</param>
+    /// <returns>List of matching TrackUniqueHashes with similarity scores.</returns>
+    public List<(string TrackHash, float Similarity)> FindSimilarTracks(
+        float[] targetVector, 
+        float targetBpm, 
+        List<Data.Entities.AudioFeaturesEntity> candidates, 
+        int limit = 50)
+    {
+        if (targetVector == null || targetVector.Length != 128) return new();
+
+        var matches = new List<(string, float)>();
+        float targetMag = (float)Math.Sqrt(targetVector.Sum(x => x * x));
+
+        // Parallel processing for speed with large libraries
+        var results = new System.Collections.Concurrent.ConcurrentBag<(string, float)>();
+
+        Parallel.ForEach(candidates, candidate =>
+        {
+            // 1. Pre-Filter: BPM & Existence
+            // Skip if BPM is too far off (+/- 30% range for wide vibe match, or tighter for mixing)
+            // Let's use a loose +/- 20 BPM filter to keep it "Vibe" focused, not just "Mix" focused
+            if (candidate.Bpm > 0 && Math.Abs(candidate.Bpm - targetBpm) > 30) // e.g. 174 vs 140 is allowed, 174 vs 120 is not
+            {
+                 return;
+            }
+
+            if (string.IsNullOrEmpty(candidate.AiEmbeddingJson)) return;
+
+            // 2. Deserialize Vector
+            // TODO: In future, cache these in memory to avoid deserialize overhead
+            float[]? candidateVector = null;
+            try
+            {
+                 candidateVector = System.Text.Json.JsonSerializer.Deserialize<float[]>(candidate.AiEmbeddingJson);
+            }
+            catch { return; }
+
+            if (candidateVector == null || candidateVector.Length != 128) return;
+
+            // 3. Cosine Similarity
+            // Sim = DotProduct(A, B) / (MagA * MagB)
+            float dotProduct = 0f;
+            for (int i = 0; i < 128; i++)
+            {
+                dotProduct += targetVector[i] * candidateVector[i];
+            }
+
+            // Use cached magnitude if available, else calc
+            float candMag = candidate.EmbeddingMagnitude > 0 
+                ? candidate.EmbeddingMagnitude 
+                : (float)Math.Sqrt(candidateVector.Sum(x => x * x));
+
+            if (targetMag * candMag == 0) return;
+
+            float similarity = dotProduct / (targetMag * candMag);
+
+            if (similarity > 0.8f) // Filter low relevance
+            {
+                results.Add((candidate.TrackUniqueHash, similarity));
+            }
+        });
+
+        return results.OrderByDescending(x => x.Item2).Take(limit).ToList();
+    }
 }

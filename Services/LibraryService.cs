@@ -918,6 +918,13 @@ public class LibraryService : ILibraryService
             throw;
         }
     }
+
+    // Phase 16.2: Vibe Match
+    public async Task<List<AudioFeaturesEntity>> GetAllAudioFeaturesAsync()
+    {
+        return await _databaseService.LoadAllAudioFeaturesAsync().ConfigureAwait(false);
+    }
+
     // Phase 15
     public async Task<List<StyleDefinitionEntity>> GetStyleDefinitionsAsync()
     {

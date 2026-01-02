@@ -112,6 +112,9 @@ public interface ILibraryService
     Task DeletePlaylistTracksAsync(Guid jobId);
     Task DeletePlaylistTrackAsync(Guid playlistTrackId);
 
+    // Phase 16.2: Vibe Match
+    Task<List<AudioFeaturesEntity>> GetAllAudioFeaturesAsync();
+
     /// <summary>
     /// Creates a new empty user playlist.
     /// </summary>

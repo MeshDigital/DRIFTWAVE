@@ -8,7 +8,7 @@ namespace SLSKDONET.ViewModels;
 /// </summary>
 public class HarmonicMatchViewModel
 {
-    public LibraryEntryEntity Track { get; set; } = null!;
+    public SLSKDONET.Models.LibraryEntry Track { get; set; } = null!;
     public double CompatibilityScore { get; set; }
     public KeyRelationship Relationship { get; set; }
     public double? BpmDifference { get; set; }
@@ -19,6 +19,7 @@ public class HarmonicMatchViewModel
         KeyRelationship.Perfect => "❤️",
         KeyRelationship.Compatible => "💚",
         KeyRelationship.Relative => "💙",
+        KeyRelationship.SonicTwin => "🧠",
         _ => "⚪"
     };
 

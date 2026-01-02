@@ -313,6 +313,27 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     AnalysisVersion = ANALYSIS_VERSION,
                     AnalyzedAt = DateTime.UtcNow
                 };
+
+                // Phase 16.2: Extract & Cache AI Embeddings
+                if (data.HighLevel?.ExtensionData != null)
+                {
+                    foreach (var kvp in data.HighLevel.ExtensionData)
+                    {
+                        // Look for the discogs-effnet model output
+                        if (kvp.Key.Contains("discogs", StringComparison.OrdinalIgnoreCase) && 
+                            kvp.Key.Contains("effnet", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var embedding = ExtractEmbeddingFromJson(kvp.Value);
+                            if (embedding != null && embedding.Length > 0)
+                            {
+                                entity.AiEmbeddingJson = JsonSerializer.Serialize(embedding);
+                                // Calculate L2 Norm (Magnitude) for efficient Cosine Similarity
+                                entity.EmbeddingMagnitude = (float)Math.Sqrt(embedding.Sum(x => x * x));
+                            }
+                            break;
+                        }
+                    }
+                }
                 
                 _forensicLogger.Info(cid, ForensicStage.MusicalAnalysis, 
                     $"Extracted: {entity.Bpm:F1} BPM | Key: {entity.Key} {entity.Scale} | Dance: {entity.Danceability:F1}", trackUniqueHash);
@@ -464,6 +485,51 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
         // Example: ["Am", "G", "F", "E"] -> "Am | G | F | E"
         var chords = chordsKey.Take(8).Where(c => !string.IsNullOrEmpty(c));
         return string.Join(" | ", chords);
+    }
+
+    private static float[]? ExtractEmbeddingFromJson(JsonElement element)
+    {
+        try
+        {
+            // Typical Essentia Structure: { "all": { "embeddings": [...] } } OR { "embeddings": [...] }
+            // Try "all" -> "embeddings"
+            if (element.TryGetProperty("all", out var allProp) && allProp.TryGetProperty("embeddings", out var embProp))
+            {
+                // Sometimes it's a nested array [[...]], take the first one (mean)
+                if (embProp.ValueKind == JsonValueKind.Array)
+                {
+                    // Check if it's array of arrays or flat
+                    var first = embProp.EnumerateArray().FirstOrDefault();
+                    if (first.ValueKind == JsonValueKind.Array)
+                    {
+                        return first.EnumerateArray().Select(x => x.GetSingle()).ToArray();
+                    }
+                    return embProp.EnumerateArray().Select(x => x.GetSingle()).ToArray();
+                }
+            }
+            
+            // Try direct "embeddings"
+            if (element.TryGetProperty("embeddings", out var directEmb))
+            {
+                if (directEmb.ValueKind == JsonValueKind.Array)
+                {
+                     // Check if it's array of arrays or flat
+                    var first = directEmb.EnumerateArray().FirstOrDefault();
+                    if (first.ValueKind == JsonValueKind.Array)
+                    {
+                        return first.EnumerateArray().Select(x => x.GetSingle()).ToArray();
+                    }
+                    return directEmb.EnumerateArray().Select(x => x.GetSingle()).ToArray();
+                }
+            }
+
+            // Validating raw output if structure is flattened
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public void Dispose()

@@ -94,6 +94,9 @@ public class HighLevelData
 
     [JsonPropertyName("mood_aggressive")]
     public ModelPrediction? MoodAggressive { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? ExtensionData { get; set; }
 }
 
 public class ModelPrediction

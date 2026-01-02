@@ -214,6 +214,10 @@ public class LibraryViewModel : INotifyPropertyChanged
         _harmonicMatchService = harmonicMatchService;
         _analysisQueueService = analysisQueueService;
         _smartSorterService = smartSorterService;
+        _analysisQueueService = analysisQueueService;
+        _smartSorterService = smartSorterService;
+        _personalClassifier = serviceProvider.GetService(typeof(Services.AI.PersonalClassifierService)) as Services.AI.PersonalClassifierService 
+                             ?? throw new InvalidOperationException("PersonalClassifierService not found");
         _serviceProvider = serviceProvider;
         
         // Assign child ViewModels
@@ -267,7 +271,7 @@ public class LibraryViewModel : INotifyPropertyChanged
         AnalyzeTrackCommand = new SLSKDONET.Views.RelayCommand<PlaylistTrackViewModel>(ExecuteAnalyzeTrack);
         ExportPlaylistCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportPlaylistAsync);
         AutoSortCommand = new AsyncRelayCommand(ExecuteAutoSortAsync);
-        
+        FindSonicTwinsCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteFindSonicTwinsAsync);
         
         // Wire up events between child ViewModels
         Projects.ProjectSelected += OnProjectSelected;
@@ -976,7 +980,7 @@ public class LibraryViewModel : INotifyPropertyChanged
             {
                 HarmonicMatches.Add(new HarmonicMatchViewModel
                 {
-                    Track = match.Track,
+                    Track = MapEntityToLibraryEntry(match.Track),
                     CompatibilityScore = match.CompatibilityScore,
                     Relationship = match.KeyRelationship,
                     BpmDifference = match.BpmDifference
@@ -993,6 +997,26 @@ public class LibraryViewModel : INotifyPropertyChanged
         {
             IsLoadingMatches = false;
         }
+    }
+
+    private SLSKDONET.Models.LibraryEntry MapEntityToLibraryEntry(SLSKDONET.Data.LibraryEntryEntity entity)
+    {
+        return new SLSKDONET.Models.LibraryEntry
+        {
+            Id = entity.Id,
+            UniqueHash = entity.UniqueHash,
+            Artist = entity.Artist,
+            Title = entity.Title,
+            Album = entity.Album,
+            FilePath = entity.FilePath,
+            Bitrate = entity.Bitrate,
+            DurationSeconds = entity.DurationSeconds,
+            Format = entity.Format,
+            AddedAt = entity.AddedAt,
+            BPM = entity.BPM,
+            MusicalKey = entity.MusicalKey,
+            IsEnriched = entity.IsEnriched
+        };
     }
     
     // Track Analysis Priority
@@ -1087,6 +1111,94 @@ public class LibraryViewModel : INotifyPropertyChanged
                 "Export Failed",
                 $"Error exporting playlist: {ex.Message}",
                 NotificationType.Error);
+        }
+    }
+
+    // Phase 16.2: Vibe Match (Sonic Twins)
+    private async Task ExecuteFindSonicTwinsAsync(PlaylistTrackViewModel? trackVm)
+    {
+        if (trackVm == null) return;
+        
+        IsLoadingMatches = true;
+        _logger.LogInformation("Creating Vibe Match playlist for: {Title}", trackVm.Title);
+
+        try
+        {
+            // 1. Get Source Embedding
+            var audioFeatures = await _libraryService.GetAllAudioFeaturesAsync();
+            var seedFeatures = audioFeatures.FirstOrDefault(af => af.TrackUniqueHash == trackVm.GlobalId);
+            
+            if (seedFeatures == null || string.IsNullOrEmpty(seedFeatures.AiEmbeddingJson))
+            {
+                _notificationService.Show("Vibe Match Failed", "No AI Analysis data found for this track. Please run analysis first.", NotificationType.Warning);
+                return;
+            }
+
+            // 2. Deserialize Seed Vector
+            float[]? seedVector = null;
+            try 
+            {
+                seedVector = System.Text.Json.JsonSerializer.Deserialize<float[]>(seedFeatures.AiEmbeddingJson);
+            }
+            catch 
+            {
+               // Fallback or log error
+            }
+
+            if (seedVector == null)
+            {
+                 _notificationService.Show("Error", "Invalid AI Embedding format.", NotificationType.Error);
+                 return;
+            }
+
+            // 3. Find Global Matches
+            // Run on background thread
+            var matches = await Task.Run(() => _personalClassifier.FindSimilarTracks(
+                seedVector, 
+                (float)(trackVm.Model.BPM ?? 120), // Fallback BPM and cast to float
+                audioFeatures, 
+                limit: 20
+            ));
+
+            // 4. Map to UI
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                HarmonicMatches.Clear();
+                MixHelperSeedTrack = trackVm;
+                IsMixHelperVisible = true; // Open sidebar
+
+                // We need LibraryEntry for display. Fetch them efficiently.
+                var allEntries = await _libraryService.LoadAllLibraryEntriesAsync();
+                var entryDict = allEntries.ToDictionary(e => e.UniqueHash);
+
+                foreach ((string hash, float score) in matches)
+                {
+                    if (entryDict.TryGetValue(hash, out var entry))
+                    {
+                        // Create ViewModel reusing HarmonicMatch structure but with Vibe info
+                        HarmonicMatches.Add(new HarmonicMatchViewModel
+                        {
+                            Track = entry,
+                            CompatibilityScore = score * 100, // 0-1 to 0-100%
+                            Relationship = Services.KeyRelationship.SonicTwin, 
+                            BpmDifference = trackVm.Model.BPM.HasValue && entry.BPM.HasValue 
+                                ? Math.Abs(trackVm.Model.BPM.Value - entry.BPM.Value) 
+                                : null
+                        });
+                    }
+                }
+            });
+            
+             _logger.LogInformation("Found {Count} sonic twins", matches.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to find sonic twins");
+             _notificationService.Show("Error", "Failed to calculate Vibe Match.", NotificationType.Error);
+        }
+        finally
+        {
+            IsLoadingMatches = false;
         }
     }
 }

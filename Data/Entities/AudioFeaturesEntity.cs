@@ -239,5 +239,11 @@ public class AudioFeaturesEntity
     /// The confidence score of the ML prediction (0.0 - 1.0).
     /// </summary>
     public float PredictionConfidence { get; set; }
+
+    /// <summary>
+    /// Cache of the embedding vector's magnitude (L2 norm).
+    /// Used for O(1) retrieval during Cosine Similarity search.
+    /// </summary>
+    public float EmbeddingMagnitude { get; set; }
 }
 
