@@ -59,7 +59,6 @@ namespace SLSKDONET.Views.Avalonia.Controls
             var data = WaveformData;
             if (data == null || data.IsEmpty)
             {
-                // Draw a simple flat line if no data
                 context.DrawLine(new Pen(Brushes.Gray, 1), new Point(0, Bounds.Height / 2), new Point(Bounds.Width, Bounds.Height / 2));
                 return;
             }
@@ -68,19 +67,6 @@ namespace SLSKDONET.Views.Avalonia.Controls
             var height = Bounds.Height;
             var mid = height / 2;
 
-            // "Max Ultra" Tri-Color Rendering
-            // 1. RMS Body (Blue/Cyan) - Shows average energy/loudness
-            // 2. Peak Spikes (White) - Shows transient detail
-            // 3. Progress Overlay - Dimmed vs Bright
-
-            var rmsPen = new Pen(new SolidColorBrush(Color.Parse("#00BFFF")), 1); // Deep Sky Blue
-            var peakPen = new Pen(Brushes.White, 1);
-            var playedOverlayBrush = new SolidColorBrush(Colors.Black, 0.5); // Dim played sections? Or maybe just color differently.
-            
-            // Actually, standard DJ look:
-            // Played: Bright Blue/White
-            // Unplayed: Dim Blue/Gray
-            
             var unplayedRmsPen = new Pen(new SolidColorBrush(Color.Parse("#4000BFFF")), 1); // Dim Blue
             var unplayedPeakPen = new Pen(new SolidColorBrush(Color.Parse("#80FFFFFF")), 1); // Dim White
             
@@ -89,13 +75,13 @@ namespace SLSKDONET.Views.Avalonia.Controls
 
             if (data.PeakData == null || data.RmsData == null) return;
 
-            int samples = Math.Min(data.PeakData.Length, data.RmsData.Length);
+            bool hasRgb = data.LowData != null && data.LowData.Length > 0 &&
+                          data.MidData != null && data.MidData.Length > 0 &&
+                          data.HighData != null && data.HighData.Length > 0;
+
+            int samples = data.PeakData.Length;
             double step = width / samples;
 
-            // If too many samples for pixels, we can decimate or skip, but drawing lines is fast enough usually
-            // Optimization: If samples > width, we should average to pixel width to avoid overdraw
-            
-            // Drawing loop
             for (int i = 0; i < samples; i++)
             {
                 double x = i * step;
@@ -103,28 +89,68 @@ namespace SLSKDONET.Views.Avalonia.Controls
 
                 bool isPlayed = (float)i / samples <= Progress;
 
-                // Normalized height (0.0 - 1.0)
                 float peakVal = data.PeakData[i] / 255f;
                 float rmsVal = data.RmsData[i] / 255f;
 
                 double peakH = peakVal * mid;
                 double rmsH = rmsVal * mid;
 
-                // Select Pens
-                var currentRmsPen = isPlayed ? playedRmsPen : unplayedRmsPen;
-                var currentPeakPen = isPlayed ? playedPeakPen : unplayedPeakPen;
-
-                // Draw RMS (Thicker/Body)
-                // Offset x slightly if needed, or draw line
-                context.DrawLine(currentRmsPen, new Point(x, mid - rmsH), new Point(x, mid + rmsH));
-
-                // Draw Peak (Tips) - Only if peak > rms (it usually is)
-                if (peakH > rmsH)
+                if (hasRgb)
                 {
-                     // Top spike
-                     context.DrawLine(currentPeakPen, new Point(x, mid - peakH), new Point(x, mid - rmsH));
-                     // Bottom spike
-                     context.DrawLine(currentPeakPen, new Point(x, mid + rmsH), new Point(x, mid + peakH));
+                    // RGB Rendering
+                    float low = data.LowData[i] / 255f;
+                    float midB = data.MidData[i] / 255f;
+                    float high = data.HighData[i] / 255f;
+
+                    // Mix Colors: Red (Bass), Green (Mid), Blue (High)
+                    // We sum them and normalize to get the color mix
+                    float total = low + midB + high;
+                    Color waveColor;
+                    
+                    if (total > 0.05f)
+                    {
+                        // Normalize colors but keep brightness based on total energy
+                        float r = low / total;
+                        float g = midB / total;
+                        float b = high / total;
+                        
+                        // Scale by intensity (RMS or total)
+                        float intensity = Math.Min(1.0f, total * 1.5f);
+                        
+                        byte rByte = (byte)(r * 255 * intensity);
+                        byte gByte = (byte)(g * 255 * intensity);
+                        byte bByte = (byte)(b * 255 * intensity);
+                        
+                        waveColor = Color.FromRgb(rByte, gByte, bByte);
+                    }
+                    else
+                    {
+                        waveColor = Color.Parse("#00BFFF"); // Fallback to blue for very quiet parts
+                    }
+
+                    var rgbPen = new Pen(new SolidColorBrush(waveColor, isPlayed ? 1.0 : 0.4), 1);
+                    context.DrawLine(rgbPen, new Point(x, mid - rmsH), new Point(x, mid + rmsH));
+                    
+                    if (peakH > rmsH)
+                    {
+                        var peakRgbPen = new Pen(new SolidColorBrush(isPlayed ? Colors.White : Color.Parse("#80FFFFFF"), 0.8), 1);
+                        context.DrawLine(peakRgbPen, new Point(x, mid - peakH), new Point(x, mid - rmsH));
+                        context.DrawLine(peakRgbPen, new Point(x, mid + rmsH), new Point(x, mid + peakH));
+                    }
+                }
+                else
+                {
+                    // Classic Blue/White Rendering
+                    var currentRmsPen = isPlayed ? playedRmsPen : unplayedRmsPen;
+                    var currentPeakPen = isPlayed ? playedPeakPen : unplayedPeakPen;
+
+                    context.DrawLine(currentRmsPen, new Point(x, mid - rmsH), new Point(x, mid + rmsH));
+
+                    if (peakH > rmsH)
+                    {
+                        context.DrawLine(currentPeakPen, new Point(x, mid - peakH), new Point(x, mid - rmsH));
+                        context.DrawLine(currentPeakPen, new Point(x, mid + rmsH), new Point(x, mid + peakH));
+                    }
                 }
             }
         }

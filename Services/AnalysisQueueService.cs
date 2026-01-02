@@ -567,6 +567,9 @@ public class AnalysisWorker : BackgroundService
         {
             track.WaveformData = result.WaveformData.PeakData;
             track.RmsData = result.WaveformData.RmsData;
+            track.LowData = result.WaveformData.LowData;
+            track.MidData = result.WaveformData.MidData;
+            track.HighData = result.WaveformData.HighData;
         }
         
         if (result.MusicalResult != null)
@@ -608,6 +611,9 @@ public class AnalysisWorker : BackgroundService
         {
             entry.WaveformData = result.WaveformData.PeakData;
             entry.RmsData = result.WaveformData.RmsData;
+            entry.LowData = result.WaveformData.LowData;
+            entry.MidData = result.WaveformData.MidData;
+            entry.HighData = result.WaveformData.HighData;
         }
         if (result.MusicalResult != null)
         {

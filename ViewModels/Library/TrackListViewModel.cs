@@ -666,7 +666,7 @@ public class TrackListViewModel : ReactiveObject
             if (track.Model != null)
             {
                 // Queue for Spotify metadata lookup and tag writing
-                await _enrichmentOrchestrator.QueueForEnrichmentAsync(track.Model.Id, track.Model.PlaylistId);
+                await _enrichmentOrchestrator.QueueForEnrichmentAsync(track.Model.TrackUniqueHash, track.Model.PlaylistId);
                 _logger.LogDebug("Queued {Artist} - {Title} for re-enrichment", track.Artist, track.Title);
             }
         }

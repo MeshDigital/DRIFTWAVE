@@ -48,7 +48,21 @@ public class WaveformAnalysisService
 
         var peakPoints = new List<byte>();
         var rmsPoints = new List<byte>();
+        var lowPoints = new List<byte>();
+        var midPoints = new List<byte>();
+        var highPoints = new List<byte>();
+
         long totalSamples = 0;
+
+        // Filter states (EMA)
+        float lowState = 0;
+        float highState = 0;
+        
+        // Alphas for 44.1kHz
+        // Low Pass ~300Hz (Bass)
+        const float alphaLow = 0.04f; 
+        // High Pass ~4000Hz (Treble)
+        const float alphaHigh = 0.6f;
 
         Process? process = null;
 
@@ -87,27 +101,55 @@ public class WaveformAnalysisService
 
                 float maxPeak = 0;
                 double sumSquares = 0;
+                double sumLow = 0;
+                double sumMid = 0;
+                double sumHigh = 0;
                 
                 for (int i = 0; i < sampleCount; i++)
                 {
                     // Read 16-bit sample (signed)
                     short sampleValue = BitConverter.ToInt16(buffer, i * 2);
-                    
-                    // Fix: Math.Abs(short.MinValue) throws OverflowException.
-                    // Convert to float FIRST to handle the asymmetry of signed 16-bit integers (-32768 to 32767)
-                    float sample = sampleValue;
-                    float normalized = Math.Abs(sample) / 32768f; 
+                    float sample = sampleValue / 32768f; 
+                    float absSample = Math.Abs(sample);
 
-                    if (normalized > maxPeak) maxPeak = normalized;
-                    sumSquares += normalized * normalized;
+                    if (absSample > maxPeak) maxPeak = absSample;
+                    sumSquares += (double)sample * sample;
+
+                    // --- Frequency Filters ---
+                    
+                    // Low Pass: y[n] = alpha * x[n] + (1 - alpha) * y[n-1]
+                    lowState = alphaLow * absSample + (1 - alphaLow) * lowState;
+                    float lowVal = lowState;
+
+                    // High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
+                    // Simple EMA HP approximation: x[n] - LowPass(x[n])
+                    // But we want it filtered properly.
+                    // Alternative: x[n] filtered by alphaHigh.
+                    highState = alphaHigh * (highState + sample - (i > 0 ? (BitConverter.ToInt16(buffer, (i-1)*2)/32768f) : sample));
+                    float highVal = Math.Abs(highState);
+
+                    // Mid: Everything else
+                    float midVal = Math.Max(0, absSample - lowVal - highVal);
+
+                    sumLow += (double)lowVal * lowVal;
+                    sumMid += (double)midVal * midVal;
+                    sumHigh += (double)highVal * highVal;
                 }
 
-                // Calculate metrics
+                // Calculate RMS metrics
                 float rms = (float)Math.Sqrt(sumSquares / sampleCount);
+                float rmsLow = (float)Math.Sqrt(sumLow / sampleCount);
+                float rmsMid = (float)Math.Sqrt(sumMid / sampleCount);
+                float rmsHigh = (float)Math.Sqrt(sumHigh / sampleCount);
 
                 // Scale to byte (0-255)
                 peakPoints.Add((byte)(Math.Clamp(maxPeak * 255, 0, 255)));
                 rmsPoints.Add((byte)(Math.Clamp(rms * 255, 0, 255)));
+                
+                // Boost bands slightly for visual prominence if needed, but keeping it linear for now
+                lowPoints.Add((byte)(Math.Clamp(rmsLow * 255 * 1.5f, 0, 255))); // Bass often needs a boost
+                midPoints.Add((byte)(Math.Clamp(rmsMid * 255, 0, 255)));
+                highPoints.Add((byte)(Math.Clamp(rmsHigh * 255 * 2.0f, 0, 255))); // Highs often very small
 
                 totalSamples += sampleCount;
             }
@@ -118,6 +160,9 @@ public class WaveformAnalysisService
             {
                 PeakData = peakPoints.ToArray(),
                 RmsData = rmsPoints.ToArray(),
+                LowData = lowPoints.ToArray(),
+                MidData = midPoints.ToArray(),
+                HighData = highPoints.ToArray(),
                 PointsPerSecond = pointsPerSecond,
                 DurationSeconds = (double)totalSamples / 44100.0
             };

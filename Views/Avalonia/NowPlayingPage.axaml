@@ -124,14 +124,10 @@
                 <!-- Waveform & Slider -->
                 <Grid Grid.Column="1" VerticalAlignment="Center" Height="40">
                     <!-- Background Waveform -->
-                    <!-- TEMPORARILY DISABLED: Build error AVLN2200 (Unknown Type)
                     <controls:WaveformControl WaveformData="{Binding WaveformData}"
                                             Progress="{Binding Position}"
-                                            Foreground="#404040"
-                                            Background="Transparent"
                                             VerticalAlignment="Stretch"
                                             HorizontalAlignment="Stretch"/>
-                    -->
                     
                     <!-- Interactive Slider (Transparent Track) -->
                     <Slider Minimum="0" 

@@ -22,6 +22,10 @@ public class WaveformAnalysisData
     /// </summary>
     public byte[] RmsData { get; set; } = Array.Empty<byte>();
 
+    public byte[] LowData { get; set; } = Array.Empty<byte>();
+    public byte[] MidData { get; set; } = Array.Empty<byte>();
+    public byte[] HighData { get; set; } = Array.Empty<byte>();
+
     /// <summary>
     /// The number of data points per second of audio.
     /// Default is usually 100 (10ms resolution).

@@ -11,7 +11,7 @@ public class EnrichmentTaskEntity
     public Guid Id { get; set; }
 
     [Required]
-    public Guid TrackId { get; set; }
+    public string TrackId { get; set; } = string.Empty;
 
     public Guid? AlbumId { get; set; }
 

@@ -180,6 +180,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     { 
         PeakData = Model.WaveformData ?? Array.Empty<byte>(), 
         RmsData = Model.RmsData ?? Array.Empty<byte>(),
+        LowData = Model.LowData ?? Array.Empty<byte>(),
+        MidData = Model.MidData ?? Array.Empty<byte>(),
+        HighData = Model.HighData ?? Array.Empty<byte>(),
         DurationSeconds = (Model.CanonicalDuration ?? 0) / 1000.0
     };
     

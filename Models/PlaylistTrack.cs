@@ -101,6 +101,9 @@ public class PlaylistTrack
     public string? AlbumArtUrl { get; set; }
     public byte[] WaveformData { get; set; } = Array.Empty<byte>(); // Peak Data
     public byte[] RmsData { get; set; } = Array.Empty<byte>();
+    public byte[] LowData { get; set; } = Array.Empty<byte>();
+    public byte[] MidData { get; set; } = Array.Empty<byte>();
+    public byte[] HighData { get; set; } = Array.Empty<byte>();
     public string? ArtistImageUrl { get; set; }
     public string? Genres { get; set; }
     public int? Popularity { get; set; }

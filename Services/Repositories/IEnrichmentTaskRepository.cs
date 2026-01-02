@@ -6,7 +6,7 @@ namespace SLSKDONET.Services.Repositories;
 
 public interface IEnrichmentTaskRepository
 {
-    Task QueueTaskAsync(Guid trackId, Guid? albumId = null);
+    Task QueueTaskAsync(string trackId, Guid? albumId = null);
     Task<EnrichmentTaskEntity?> GetNextPendingTaskAsync();
     Task MarkProcessingAsync(Guid taskId);
     Task MarkCompletedAsync(Guid taskId);

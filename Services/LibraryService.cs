@@ -727,6 +727,10 @@ public class LibraryService : ILibraryService
             SpotifyArtistId = entity.SpotifyArtistId,
             AlbumArtUrl = entity.AlbumArtUrl,
             WaveformData = entity.WaveformData ?? Array.Empty<byte>(),
+            RmsData = entity.RmsData ?? Array.Empty<byte>(),
+            LowData = entity.LowData ?? Array.Empty<byte>(),
+            MidData = entity.MidData ?? Array.Empty<byte>(),
+            HighData = entity.HighData ?? Array.Empty<byte>(),
             ArtistImageUrl = entity.ArtistImageUrl,
             Genres = entity.Genres,
             Popularity = entity.Popularity,
@@ -792,6 +796,10 @@ public class LibraryService : ILibraryService
             SpotifyArtistId = track.SpotifyArtistId,
             AlbumArtUrl = track.AlbumArtUrl,
             WaveformData = track.WaveformData,
+            RmsData = track.RmsData,
+            LowData = track.LowData,
+            MidData = track.MidData,
+            HighData = track.HighData,
             ArtistImageUrl = track.ArtistImageUrl,
             Genres = track.Genres,
             Popularity = track.Popularity,
@@ -852,6 +860,12 @@ public class LibraryService : ILibraryService
             MusicalKey = entity.MusicalKey,
             IsEnriched = entity.IsEnriched,
             
+            WaveformData = entity.WaveformData ?? Array.Empty<byte>(),
+            RmsData = entity.RmsData ?? Array.Empty<byte>(),
+            LowData = entity.LowData ?? Array.Empty<byte>(),
+            MidData = entity.MidData ?? Array.Empty<byte>(),
+            HighData = entity.HighData ?? Array.Empty<byte>(),
+            
             // Dual-Truth
             SpotifyBPM = entity.SpotifyBPM,
             SpotifyKey = entity.SpotifyKey,
@@ -880,6 +894,12 @@ public class LibraryService : ILibraryService
         entity.BPM = entry.BPM;
         entity.MusicalKey = entry.MusicalKey;
         entity.IsEnriched = entry.IsEnriched;
+        
+        entity.WaveformData = entry.WaveformData;
+        entity.RmsData = entry.RmsData;
+        entity.LowData = entry.LowData;
+        entity.MidData = entry.MidData;
+        entity.HighData = entry.HighData;
         
         // Dual-Truth
         entity.SpotifyBPM = entry.SpotifyBPM;

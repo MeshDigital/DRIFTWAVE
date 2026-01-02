@@ -17,7 +17,7 @@ public class EnrichmentTaskRepository : IEnrichmentTaskRepository
         _logger = logger;
     }
 
-    public async Task QueueTaskAsync(Guid trackId, Guid? albumId = null)
+    public async Task QueueTaskAsync(string trackId, Guid? albumId = null)
     {
         try
         {

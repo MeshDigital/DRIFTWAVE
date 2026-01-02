@@ -65,6 +65,12 @@ public class LibraryEntry
     public int? Popularity { get; set; }
     public int? CanonicalDuration { get; set; }
     public DateTime? ReleaseDate { get; set; }
+    
+    public byte[] WaveformData { get; set; } = Array.Empty<byte>();
+    public byte[] RmsData { get; set; } = Array.Empty<byte>();
+    public byte[] LowData { get; set; } = Array.Empty<byte>();
+    public byte[] MidData { get; set; } = Array.Empty<byte>();
+    public byte[] HighData { get; set; } = Array.Empty<byte>();
 
     // Musical Intelligence
     public string? MusicalKey { get; set; }

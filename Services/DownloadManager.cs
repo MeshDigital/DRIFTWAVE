@@ -455,7 +455,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 // 2. [NEW] Queue Enrichment Tasks for all tracks
                 foreach (var track in job.PlaylistTracks)
                 {
-                    await _enrichmentTaskRepository.QueueTaskAsync(track.Id, job.Id);
+                    await _enrichmentTaskRepository.QueueTaskAsync(track.Id.ToString(), job.Id);
                 }
                 _logger.LogInformation("Queued enrichment tasks for {Count} tracks", job.PlaylistTracks.Count);
             }
@@ -516,7 +516,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                         existingCtx.NextRetryTime = null;
                         existingCtx.FailureReason = null;
                         
-                        _ = _enrichmentTaskRepository.QueueTaskAsync(existingCtx.Model.Id, existingCtx.Model.PlaylistId);
+                        _ = _enrichmentTaskRepository.QueueTaskAsync(existingCtx.Model.Id.ToString(), existingCtx.Model.PlaylistId);
                         queued++; 
                         continue;
                     }
@@ -547,7 +547,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 
                 if (ctx.State == PlaylistTrackState.Pending || ctx.State == PlaylistTrackState.Searching)
                 {
-                    _ = _enrichmentTaskRepository.QueueTaskAsync(ctx.Model.Id, ctx.Model.PlaylistId);
+                    _ = _enrichmentTaskRepository.QueueTaskAsync(ctx.Model.Id.ToString(), ctx.Model.PlaylistId);
                 }
             }
         }
@@ -2018,7 +2018,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 // Phase 3.1: Finalize with Metadata Service (Tagging)
                 // [Fixed] Finalization is now handled by persistent enrichment pipeline
                 // await _enrichmentOrchestrator.FinalizeDownloadedTrackAsync(ctx.Model);
-                await _enrichmentOrchestrator.QueueForEnrichmentAsync(ctx.Model.Id, ctx.Model.PlaylistId);
+                await _enrichmentOrchestrator.QueueForEnrichmentAsync(ctx.Model.TrackUniqueHash, ctx.Model.PlaylistId);
             }
             catch (Exception renameEx)
             {

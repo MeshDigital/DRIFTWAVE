@@ -60,10 +60,10 @@ public class MetadataEnrichmentOrchestrator : IDisposable
     /// <summary>
     /// Queues a track for metadata enrichment (Persistent).
     /// </summary>
-    public async Task QueueForEnrichmentAsync(Guid trackId, Guid? albumId = null)
-    {
-        await _taskRepository.QueueTaskAsync(trackId, albumId);
-    }
+    public async Task QueueForEnrichmentAsync(string trackId, Guid? albumId = null)
+ {
+     await _taskRepository.QueueTaskAsync(trackId, albumId);
+ }
 
     private async Task ProcessQueueLoop(CancellationToken token)
     {
@@ -114,8 +114,7 @@ public class MetadataEnrichmentOrchestrator : IDisposable
         try
         {
             // Fetch Track from DB to get Artist/Title
-            // Assuming DatabaseService has a method to get entity by ID
-            var trackEntity = await _databaseService.FindTrackAsync(task.TrackId.ToString());
+            var trackEntity = await _databaseService.FindTrackAsync(task.TrackId);
             
             if (trackEntity == null)
             {

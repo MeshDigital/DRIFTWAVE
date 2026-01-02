@@ -193,7 +193,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool UseSpotifyApi
+    public bool SpotifyUseApi
     {
         get => _config.SpotifyUseApi;
         set
@@ -210,13 +210,13 @@ public class SettingsViewModel : INotifyPropertyChanged
     public string SpotifyClientId
     {
         get => _config.SpotifyClientId ?? "";
-        set { _config.SpotifyClientId = value; OnPropertyChanged(); }
+        set { _config.SpotifyClientId = value; OnPropertyChanged(); SaveSettings(); }
     }
     
     public string SpotifyClientSecret
     {
         get => _config.SpotifyClientSecret ?? "";
-        set { _config.SpotifyClientSecret = value; OnPropertyChanged(); }
+        set { _config.SpotifyClientSecret = value; OnPropertyChanged(); SaveSettings(); }
     }
 
     public bool ClearSpotifyOnExit
@@ -697,7 +697,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         
         if (isAuthenticated)
         {
-            UseSpotifyApi = true;
+            SpotifyUseApi = true;
         }
     }
 
@@ -859,7 +859,7 @@ public class SettingsViewModel : INotifyPropertyChanged
                 // Update display based on new auth state
                 SpotifyState = _spotifyAuthService.IsAuthenticated ? SpotifyAuthStatus.Connected : SpotifyAuthStatus.Disconnected;
                 SpotifyDisplayName = IsSpotifyConnected ? "Connected" : "Not Connected";
-                UseSpotifyApi = true; // Auto-enable API usage on success
+                SpotifyUseApi = true; // Auto-enable API usage on success
                 _config.SpotifyUseApi = true; // Ensure backing field is also set
                 _configManager.Save(_config); // Save the enabled state
             }
@@ -902,7 +902,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         await _spotifyAuthService.SignOutAsync();
         SpotifyState = SpotifyAuthStatus.Disconnected;
         SpotifyDisplayName = "Not Connected";
-        UseSpotifyApi = false; // Optional: Auto-disable? Maybe let user decide.
+        SpotifyUseApi = false; // Optional: Auto-disable? Maybe let user decide.
     }
 
     private async Task TestSpotifyConnectionAsync()
@@ -1054,7 +1054,7 @@ public class SettingsViewModel : INotifyPropertyChanged
                 // Update display based on new auth state
                 SpotifyState = _spotifyAuthService.IsAuthenticated ? SpotifyAuthStatus.Connected : SpotifyAuthStatus.Disconnected;
                 SpotifyDisplayName = IsSpotifyConnected ? "Connected" : "Not Connected";
-                UseSpotifyApi = true;
+                SpotifyUseApi = true;
                 _configManager.Save(_config);
                 _logger.LogInformation("✓ Revoke & Re-auth completed successfully");
             }

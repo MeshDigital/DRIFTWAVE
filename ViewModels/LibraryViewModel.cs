@@ -532,6 +532,9 @@ public class LibraryViewModel : INotifyPropertyChanged
             _logger.LogInformation("Refreshing library...");
             await Projects.LoadProjectsAsync();
             
+            // Phase 6: Sync "All Tracks" index before reloading
+            await _libraryService.SyncLibraryEntriesFromTracksAsync().ConfigureAwait(false);
+            
             // If a project is selected, reload its tracks
             if (SelectedProject != null)
             {
