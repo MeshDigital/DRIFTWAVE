@@ -6,31 +6,27 @@ using SLSKDONET.Services;
 
 namespace SLSKDONET.Services.Ranking;
 
-/// <summary>
-/// Defines the quality tiers for search results.
-/// </summary>
 public enum TrackTier
 {
-    Diamond = 1,    // Perfect Match (The "One")
-    Gold = 2,       // Excellent Quality & Match
-    Silver = 3,     // Good / Acceptable
-    Bronze = 4,     // Fallback / Low Quality
-    Trash = 5       // Should have been gated, but kept at bottom
+    Diamond = 1,
+    Gold = 2,
+    Silver = 3,
+    Bronze = 4,
+    Trash = 5
 }
 
-/// <summary>
-/// Deterministic comparator that ranks tracks based on a tiered strategy.
-/// Replaces the legacy weight-based scoring system.
-/// </summary>
 public class TieredTrackComparer : IComparer<Track>
 {
     private readonly SearchPolicy _policy;
     private readonly Track _searchTrack;
+    private readonly bool _enableForensics; // [CHANGE 1] Config field
 
-    public TieredTrackComparer(SearchPolicy policy, Track searchTrack)
+    // [CHANGE 2] Update Constructor
+    public TieredTrackComparer(SearchPolicy policy, Track searchTrack, bool enableForensics = true)
     {
         _policy = policy ?? SearchPolicy.QualityFirst();
         _searchTrack = searchTrack;
+        _enableForensics = enableForensics;
     }
 
     public int Compare(Track? x, Track? y)
@@ -39,22 +35,15 @@ public class TieredTrackComparer : IComparer<Track>
         if (x == null) return 1;
         if (y == null) return -1;
 
-        // 1. Determine Tiers
         var tierX = CalculateTier(x);
         var tierY = CalculateTier(y);
 
-        // Lower tier number is better (Diamond < Gold)
         int tierComparison = tierX.CompareTo(tierY);
         if (tierComparison != 0) return tierComparison;
 
-        // 2. Intra-Tier Tie-Breakers
         return CompareWithinTier(x, y);
     }
 
-    /// <summary>
-    /// Calculates the visual rank score (0-1) for UI compatibility.
-    /// Diamond = 1.0, Gold = 0.85, Silver = 0.6, Bronze = 0.4.
-    /// </summary>
     public double CalculateRankScore(Track track)
     {
         var tier = CalculateTier(track);
@@ -77,25 +66,23 @@ public class TieredTrackComparer : IComparer<Track>
             TrackTier.Gold => "🥇 GOLD TIER\n• Great Quality\n• Good Availability",
             TrackTier.Silver => "🥈 SILVER TIER\n• Acceptable Match",
             TrackTier.Bronze => "🥉 BRONZE TIER\n• Low Quality/Availability",
+            TrackTier.Trash => "🗑️ TRASH TIER\n• Forensic Mismatch (Fake?)", // Updated Label
             _ => "📉 LOW TIER"
         };
     }
 
     private TrackTier CalculateTier(Track track)
     {
-        // 0. FORENSIC GATEKEEPING (New in Phase 14)
-        var config = ResultSorter.GetCurrentConfig();
-        if (config?.EnableVbrFraudDetection ?? true)
+        // [CHANGE 3] THE FORENSIC CORE INTEGRATION
+        // If enabled, we verify the file integrity before anything else.
+        if (_enableForensics && MetadataForensicService.IsFake(track))
         {
-            if (MetadataForensicService.IsFake(track))
-            {
-                return TrackTier.Trash; // Immediate demotion for mathematical fakes
-            }
+            return TrackTier.Trash;
         }
 
-        // 1. Availability Check (Dead End?)
+        // 1. Availability Check
         if (track.HasFreeUploadSlot == false && track.QueueLength > 500)
-            return TrackTier.Bronze; // Effectively unavailable
+            return TrackTier.Bronze;
 
         // 2. Quality Checks
         bool isLossless = track.Format?.ToLower() == "flac" || track.Format?.ToLower() == "wav";
@@ -107,33 +94,24 @@ public class TieredTrackComparer : IComparer<Track>
         bool hasKey = !string.IsNullOrEmpty(track.MusicalKey);
 
         // --- POLICY EVALUATION ---
-
-        // 4. Integrity/Duration Check (Demote suspicious files)
         if (_policy.EnforceDurationMatch && _searchTrack.Length.HasValue && track.Length.HasValue)
         {
              if (Math.Abs(_searchTrack.Length.Value - track.Length.Value) > _policy.DurationToleranceSeconds)
                  return TrackTier.Bronze; 
         }
 
-        // Check for BPM Match (only if search track has BPM defined)
         bool bpmMatches = !_searchTrack.BPM.HasValue || (track.BPM.HasValue && Math.Abs(_searchTrack.BPM.Value - track.BPM.Value) < 3);
 
         if (_policy.Priority == SearchPriority.DjReady)
         {
-            // DJ Mode: Needs BPM/Key and decent quality
-            // MUST MATCH BPM if specified
             if (hasBpm && bpmMatches && isHighRes && track.HasFreeUploadSlot) return TrackTier.Diamond;
             if ((hasBpm || hasKey) && bpmMatches && isMidRes) return TrackTier.Gold;
-            
-            // Mismatch but good quality -> Silver
             if (isMidRes) return TrackTier.Silver;
             return TrackTier.Bronze;
         }
-        else // Quality First (Audiophile)
+        else 
         {
-            // Quality Mode: Needs Bitrate
             bool perfectFormat = isLossless || track.Bitrate == 320;
-            
             if (perfectFormat && track.HasFreeUploadSlot) return TrackTier.Diamond;
             if (isHighRes) return TrackTier.Gold;
             if (isMidRes) return TrackTier.Silver;
@@ -143,21 +121,15 @@ public class TieredTrackComparer : IComparer<Track>
 
     private int CompareWithinTier(Track x, Track y)
     {
-        // 1. Queue/Availability (Immediate gratification wins tie-breaks)
         if (x.HasFreeUploadSlot != y.HasFreeUploadSlot)
-            return x.HasFreeUploadSlot ? -1 : 1; // Free slot wins
+            return x.HasFreeUploadSlot ? -1 : 1; 
 
-        // 2. Bitrate (Higher is better)
         if (Math.Abs(x.Bitrate - y.Bitrate) > _policy.SignificantBitrateGap)
-            return y.Bitrate.CompareTo(x.Bitrate); // Higher wins
+            return y.Bitrate.CompareTo(x.Bitrate); 
 
-        // 3. Queue Length (Shorter is better)
         if (Math.Abs(x.QueueLength - y.QueueLength) > _policy.SignificantQueueGap)
-            return x.QueueLength.CompareTo(y.QueueLength); // Shorter wins
+            return x.QueueLength.CompareTo(y.QueueLength); 
 
-        // 4. Filename Aesthetics (Shorter often cleaner, unless too short)
-        // Prefer "Artist - Title.mp3" over "Artist_-_Title_(www.site.com).mp3"
-        // Heuristic: Shorter length usually implies less junk
         int lenX = x.Filename?.Length ?? 1000;
         int lenY = y.Filename?.Length ?? 1000;
         return lenX.CompareTo(lenY);

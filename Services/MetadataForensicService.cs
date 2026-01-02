@@ -5,13 +5,14 @@ using SLSKDONET.Models;
 
 namespace SLSKDONET.Services
 {
-    // [AUDIT FIX: Enforce Static Utility]
+    // [CHANGE 1] Class must be static
     public static class MetadataForensicService
     {
         private static readonly Regex VbrRegex = new Regex(@"V\d+|VBR", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex LosslessRegex = new Regex(@"\.(flac|wav|aiff|alac)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex SuspiciousExtensions = new Regex(@"\.(wma|ogg|wmv)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        // [CHANGE 2] Method must be static
         public static int CalculateTrustScore(Track result)
         {
             int score = 50; // Base score
@@ -19,14 +20,12 @@ namespace SLSKDONET.Services
             // 1. Bitrate Check
             if (result.Bitrate > 0)
             {
-                if (result.Bitrate >= 320)
-                    score += 10;
-                else if (result.Bitrate < 128)
-                    score -= 20;
+                if (result.Bitrate >= 320) score += 10;
+                else if (result.Bitrate < 128) score -= 20;
             }
 
             // 2. Format Trust
-            if (string.IsNullOrEmpty(result.Filename)) return score; // Safety
+            if (string.IsNullOrEmpty(result.Filename)) return score;
 
             var ext = System.IO.Path.GetExtension(result.Filename)?.ToLower();
             if (LosslessRegex.IsMatch(result.Filename))
@@ -43,39 +42,20 @@ namespace SLSKDONET.Services
                     }
                 }
             }
-            else if (ext == ".mp3" || ext == ".m4a")
-            {
-                score += 5;
-            }
-            else if (SuspiciousExtensions.IsMatch(result.Filename))
-            {
-                score -= 10;
-            }
+            else if (ext == ".mp3" || ext == ".m4a") score += 5;
+            else if (SuspiciousExtensions.IsMatch(result.Filename)) score -= 10;
 
             // 3. Compression Mismatch (The Fake Detector)
-            // Expected Size (Bytes) = (Bitrate (kbps) * 1000 / 8) * Duration (Seconds)
             if (result.Bitrate > 0 && result.Length.HasValue && result.Length > 0 && result.Size.HasValue)
             {
-                // Strict check for 320kbps MP3s
                 if (result.Bitrate >= 320 && (ext == ".mp3"))
                 {
                     double expectedBytes = (result.Bitrate * 1000.0 / 8.0) * result.Length.Value;
                     double actualBytes = result.Size.Value;
 
-                    // If file is < 70% of expected size, it's mathematically impossible to be CBR 320
-                    if (actualBytes < (expectedBytes * 0.70))
-                    {
-                        score -= 50; // HEAVY PENALTY
-                    }
-                    // If file is > 130% of expected size, it might include huge art or be mislabeled
-                    else if (actualBytes > (expectedBytes * 1.3))
-                    {
-                        score -= 5; // Slight penalty for bloat
-                    }
-                    else
-                    {
-                        score += 10; // Mathematical match verified
-                    }
+                    if (actualBytes < (expectedBytes * 0.70)) score -= 50; // HEAVY PENALTY (Fake)
+                    else if (actualBytes > (expectedBytes * 1.3)) score -= 5;
+                    else score += 10;
                 }
             }
 
@@ -93,42 +73,23 @@ namespace SLSKDONET.Services
             
             var ext = System.IO.Path.GetExtension(result.Filename)?.ToLower();
 
-            // Fake Check
             if (result.Bitrate >= 320 && result.Length.HasValue && (ext == ".mp3") && result.Size.HasValue)
             {
                 double expectedBytes = (result.Bitrate * 1000.0 / 8.0) * result.Length.Value;
                 if (result.Size.Value < (expectedBytes * 0.70))
-                {
                     notes.Add("⚠️ SIZE MISMATCH: Use caution. File is too small for 320kbps.");
-                }
                 else if (result.Size.Value > (expectedBytes * 0.95) && result.Size.Value < (expectedBytes * 1.05))
-                {
                     notes.Add("✅ VERIFIED: Size matches bitrate perfectly.");
-                }
             }
 
-            if (LosslessRegex.IsMatch(result.Filename))
-            {
-                notes.Add("💎 LOSSLESS: High fidelity format.");
-            }
-
-            if (result.HasFreeUploadSlot)
-            {
-                notes.Add("⚡ INSTANT: Slot available now.");
-            }
+            if (LosslessRegex.IsMatch(result.Filename)) notes.Add("💎 LOSSLESS: High fidelity format.");
+            if (result.HasFreeUploadSlot) notes.Add("⚡ INSTANT: Slot available now.");
 
             if (notes.Count == 0) return "Standard Result";
             return string.Join(" | ", notes);
         }
 
-        public static bool IsGoldenMatch(Track result)
-        {
-            return CalculateTrustScore(result) >= 85;
-        }
-
-        public static bool IsFake(Track result)
-        {
-            return CalculateTrustScore(result) < 40;
-        }
+        public static bool IsGoldenMatch(Track result) => CalculateTrustScore(result) >= 85;
+        public static bool IsFake(Track result) => CalculateTrustScore(result) < 40;
     }
 }
