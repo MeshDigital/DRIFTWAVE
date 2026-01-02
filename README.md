@@ -13,111 +13,209 @@
 
 ---
 
+## 💡 Why ORBIT Exists
+
+Traditional P2P clients treat music files as generic data: download whatever appears first, hope it's correct. This worked in 2005 when everyone ripped their own CDs. In 2026, P2P networks are full of:
+
+❌ **Fake Files** - YouTube rips labeled as "320kbps FLAC"  
+❌ **Wrong Versions** - Radio edits when you wanted the Extended Mix  
+❌ **Corrupt Metadata** - "Unknown Artist - Track 01" from lazy rippers  
+❌ **Duplicate Hell** - 5 copies of the same track, all with different tags  
+
+### ORBIT's Philosophy: "Trust, But Verify"
+
+**For DJs:** You can't mix with unreliable metadata. BPM off by 2%? Train wreck. Key clash? Audience cringes.  
+**For Collectors:** You want bit-perfect archives, not upscaled 128kbps with .flac extensions.  
+**For Everyone:** Life's too short to spend 40 hours manually tagging 500 tracks.
+
+ORBIT applies **forensic intelligence** at every step:
+1. **Pre-download**: Math-based verification filters fakes before wasting bandwidth
+2. **During download**: Checkpoint-based recovery prevents "90% complete → crash → start over"
+3. **Post-download**: Spectral analysis confirms quality, enrichment adds missing metadata
+4. **Library management**: Automatic upgrades, harmonic matching, Rekordbox export
+
+**Result:** Professional-grade music collection with minimal manual work.
+
+---
+
 ## 🚀 What Is ORBIT?
 
 ORBIT is a Soulseek client built for DJs and music enthusiasts who demand both quality and reliability. It combines intelligent search ranking, automated metadata enrichment, and crash-resilient downloads into a professional tool.
 
-Where traditional P2P clients download the first available file, ORBIT analyzes search results to find:
-- ✅ Highest quality files (FLAC > 320kbps > 128kbps)
-- ✅ Correct versions (Radio Edit vs Extended Mix)
-- ✅ Musically compatible tracks (BPM/Key matching for DJs)
-- ✅ Authentic files (VBR validation detects fakes)
+### The Problem with Traditional P2P Clients
+- **Fake Files**: 64kbps MP3s labeled as "320kbps FLAC" waste bandwidth and storage
+- **Wrong Versions**: You search for the 7-minute Extended Mix, get the 3-minute Radio Edit
+- **Blind Downloads**: No way to verify quality before spending 10+ minutes downloading
+- **Crash = Lost Progress**: Download 90% of a 500MB file, crash, start over from 0%
+- **Manual Tagging Hell**: Spend hours manually adding BPM/Key for DJ software
+
+### ORBIT's Solution
+Where traditional P2P clients download the first available file, ORBIT applies **forensic intelligence** to find:
+- ✅ **Authentic files** - Mathematical verification detects fake 320kbps (upscaled 128kbps)
+- ✅ **Correct versions** - Duration matching ensures Radio Edit ≠ Extended Mix
+- ✅ **Highest quality** - FLAC (1411kbps) > 320kbps > 192kbps, with size verification
+- ✅ **DJ-ready metadata** - Automatic BPM, Key (Camelot), Energy, Danceability tagging
+- ✅ **Crash resilience** - Resume downloads and tag operations after unexpected shutdown
 
 ---
 
 ## ✨ Core Features
 
-### 📌 Latest Highlights (Dec 28, 2025)
-- **Audio Analysis Pipeline**: FFmpeg + Essentia sidecar with 45s watchdog, atomic DB updates, and Track Inspector auto-refresh.
-- **Library Track Display**: Rich duration/size badges (⏱, 💾) with smart KB/MB formatting and dual-source loading.
-- **Glass Box Queue Visibility**: Observable AnalysisQueueService with pause/resume, smart ETA, and animated status bar pulse.
+### � Forensic Metadata Intelligence (Phase 14)
+**WHY:** P2P networks are full of fake files - 64kbps MP3s labeled as "320kbps", lossy files with .flac extensions. Downloading these wastes bandwidth, disk space, and user trust.
+
+**HOW:** Pre-download verification using only metadata (no audio analysis needed):
+- **Compression Mismatch Detection**: Math doesn't lie - 320kbps × 5 minutes = ~12MB. If a file claims 320kbps but is 3MB, it's fake.
+- **Lossless Size Verification**: FLAC should be 5-10 MB/minute. Below 2.5 MB/min = impossible for lossless.
+- **Trust Score (0-100)**: Every search result gets rated. 85+ = "Golden Match", <40 = "Avoid"
+- **Result**: Fake files marked as "Trash Tier" before you waste bandwidth
 
 ### 🎯 Intelligent Search Ranking
+**WHY:** Getting 50 results for "Strobe" is useless if you can't tell which is the real Extended Mix vs a YouTube rip.
+
+**HOW:** Multi-tier scoring system prioritizes authenticity, then quality, then availability:
 - **Quality-First Scoring**: Bitrate is the primary factor, musical attributes act as tiebreakers
-- **VBR Validation**: Detects upconverted files (128→320, MP3→FLAC)
+- **Duration Matching**: Ensures you get the version you're searching for (10:37 Extended ≠ 3:30 Radio Edit)
 - **Filename Cleanup**: Ignores noise like `[uploader-tag]`, `(Remastered)`, `[Official Video]`
 - **Path-Based Discovery**: Extracts BPM/Key from directory names when files lack tags
-- **Duration Matching**: Ensures you get the version you're searching for
 
 ### 🛡️ Crash Recovery (Phase 2A)
+**WHY:** You download 90% of a 500MB FLAC, Windows updates, reboot, start from 0%. Infuriating.
+
+**HOW:** Journal-first architecture inspired by database transaction logs:
 - **Automatic Resume**: Downloads and tag writes resume after unexpected closures
-- **Atomic Operations**: File operations complete fully or not at all
-- **Progress Tracking**: 15-second heartbeats monitor active downloads
-- **Stall Detection**: Warns when transfers haven't progressed in 1 minute
+- **Progress Tracking**: 15-second heartbeats monitor active downloads (stall detection: 4 missed heartbeats = abort)
+- **Atomic Operations**: File operations complete fully or not at all (no corrupt half-written tags)
 - **Zero Data Loss**: SQLite WAL mode prevents database corruption
+- **Result**: Download queue survives crashes, reboots, power failures
 
-### 🎧 Spotify & Deep Enrichment
-- **Playlist Import**: Paste a Spotify URL to queue downloads
-- **Background Worker**: Automatic BPM, Key, Energy, Valence, Danceability tagging
-- **Infinite Enrichment**: Secondary task continues to fetch deep audio features for all library tracks
+### 🎧 Spotify Integration & Deep Enrichment
+**WHY:** DJs need BPM, Key (Camelot notation), Energy for mixing. Manual tagging = 5 minutes per track = 40+ hours for 500 tracks.
+
+**HOW:** Automated metadata pipeline:
+- **Playlist Import**: Paste a Spotify URL → 200 tracks queued in 3 seconds
+- **Background Worker**: Fetches BPM, Key, Energy, Valence, Danceability while you work
+- **Persistent Queue**: Enrichment tasks stored in SQLite, survives app restarts
 - **Duration Validation**: Uses Spotify's canonical duration to verify file versions
-- **Liked Songs Support**: Import your entire Spotify library
-- **Persistent Queue 6.0**: Enrichment tasks are stored in `EnrichmentTasks` SQLite table, ensuring metadata jobs survive app restarts.
+- **Infinite Enrichment**: Continues enriching older tracks in library (never stops improving metadata)
 
-### 💿 DJ-Ready Metadata
-- **Camelot Key Notation**: Automatic detection and tagging (e.g., "8A")
-- **BPM Persistence**: Writes tempo to file tags (ID3v2.4, Vorbis)
-- **Custom Tags**: Spotify IDs embedded for library maintenance
-- **DJ Software Compatible**: Works with Rekordbox, Serato, Traktor
+### 🧠 Audio Intelligence Layer (Phase 13)
+**WHY:** Spectral analysis can PROVE quality, not just guess. A "FLAC" with a 16kHz frequency cutoff is a fake.
 
-### 📀 Rekordbox Integration (Phase 4)
-- **Playlist Export**: Right-click any playlist → Export to Rekordbox XML
-- **Monthly Drop**: One-click export of tracks added in the last 30 days
-- **Key Conversion**: Automatic translation to Camelot notation for harmonic mixing
-- **XML Sanitization**: Prevents metadata-related import failures
-- **Professional URIs**: `file://localhost/` format for cross-platform compatibility
+**HOW:** FFmpeg + Essentia sidecar for deep audio forensics:
+- **Spectral Analysis**: Detects frequency cutoffs (128kbps = 16kHz brick wall, 320kbps = 21kHz)
+- **Drop Detection**: Identifies buildups/drops for automatic cue points (DJ phrase mixing)
+- **Waveform Generation**: High-fidelity peak+RMS data for seekbar visualization
+- **Producer-Consumer Queue**: 2 workers analyze tracks as they download (no UI blocking)
+- **45-second timeout**: 3× average analysis time, prevents hung processes
 
-### 🎨 High-Fidelity Player
-- **NAudio Engine**: Professional low-latency audio processing
-- **VU Monitoring**: Real-time Left/Right peak meters for volume balancing
-- **Waveform Seekbar**: High-resolution track visualization
-- **Rekordbox Integration**: Direct parsing of `.DAT/.EXT` analysis files—no re-analysis needed
-- **Pitch Control**: Accurate tempo adjustment for previewing mixes
-- **Queue Management**: Persistent play queue that survives app restarts
+### 💿 DJ Professional Tools
+**WHY:** Pro DJ software (Rekordbox, Serato) requires specific formats, key notation, and cue points.
+
+**HOW:** Industry-standard export and harmonic matching:
+- **Rekordbox XML Export**: Streaming generation (memory-efficient), correct URI format
+- **Camelot Key Notation**: Automatic conversion (C Major = 8B) for harmonic mixing
+- **Harmonic Match Service**: "Mixes Well With" - finds compatible tracks using Camelot Wheel theory
+- **BPM Tolerance**: ±6% variance (128 BPM = 120-136 BPM range, professional DJ standard)
+- **Monthly Drop**: One-click export of tracks added in last 30 days
 
 ---
 
-## 🧠 The Brain: Ranking Algorithm
+## 🧠 The Brain: Forensic Ranking System
 
-ORBIT uses a multi-tiered scoring system that prioritizes quality while respecting musical context:
+ORBIT doesn't just download files - it applies multi-layered forensics to detect fakes and find the best match.
 
-### Tier 0: Availability
-- Free upload slot: +2000 pts
-- Queue length penalty: -10 pts per waiting item
-- Overloaded peer penalty: -500 pts for >50 queued downloads
+### Phase 1: Pre-Download Forensics (Metadata Only)
+**Problem:** Can't analyze audio before download in P2P, but CAN verify metadata consistency.
 
-### Tier 1: Quality (Primary)
-- **Lossless (FLAC)**: 450 pts
-- **High (320kbps)**: 300 pts
-- **Medium (192kbps)**: 150 pts
-- **Low (128kbps)**: 64 pts (proportional scaling)
+**Solution:** Mathematical verification using file size, bitrate, and duration:
 
-### Tier 2: Musical Intelligence (Tiebreaker)
-- BPM match: +100 pts
-- Key match: +75 pts
-- Harmonic key: +50 pts
-
-### Tier 3: Guard Clauses
-- Duration mismatch: Hidden from results
-- Fake file detected: Hidden from results
-- VBR validation failed: Hidden from results
-
-**Example Scoring:**
 ```
-Search: "Deadmau5 - Strobe" (128 BPM, 10:37)
+COMPRESSION MISMATCH DETECTION:
+Expected Size = (Bitrate × Duration) / 8
 
-File A: FLAC, 1411kbps, "Strobe (128bpm).flac"
-→ Quality: 450 + BPM: 100 = 550 pts ✅ SELECTED
+Example: "320kbps MP3, 5 minutes"
+Expected: 320,000 bits/sec × 300 sec = 96,000,000 bits = 12 MB
+Actual: 3 MB
 
-File B: MP3, 320kbps, "Strobe.mp3"
-→ Quality: 300 + BPM: 50 = 350 pts
-
-File C: MP3, 128kbps, "Strobe (128bpm).mp3"
-→ Quality: 64 + BPM: 100 = 164 pts
-
-File D: "FLAC", 1411kbps, "Strobe.flac" (9 MB - FAKE)
-→ VBR Validation: FAIL = Hidden
+Verdict: FAKE (20% of expected size = upscaled 64kbps)
 ```
+
+### Tier System (Lowest to Highest Priority)
+
+#### Trash Tier (Auto-Hidden)
+**WHY:** Forensic check happens FIRST - prevents wasting time scoring mathematically impossible files
+- Size < 70% of expected (fake 320kbps)
+- FLAC < 2.5 MB/min (impossible for lossless, real FLAC = 5-10 MB/min)
+- Duration mismatch >30 seconds (wrong version)
+
+#### Bronze Tier (Last Resort)
+- No free upload slot + queue >500 (30+ min wait or timeout)
+- Bitrate <128kbps (audible compression artifacts)
+
+#### Silver Tier (Acceptable)
+- 192kbps+ MP3 (acceptable on casual listening)
+- Available with reasonable queue (<100)
+
+#### Gold Tier (High Quality)
+- 320kbps MP3 (transparent encoding, <5% can distinguish from lossless in blind tests)
+- Size math checks out (±10% tolerance for VBR/container overhead)
+
+#### Diamond Tier (Perfect)
+- FLAC/WAV (bit-perfect, 1411kbps uncompressed equivalent)
+- Size verified (5-10 MB/min range)
+- Free upload slot (instant download)
+- Optional: BPM/Key match for DJ mixing
+
+### Real-World Example
+```
+Search: "Deadmau5 - Strobe" (10:37 Extended Mix, 128 BPM)
+
+Results:
+┌─────────────────────────────────────────────────────────────┐
+│ A: "Strobe.flac" | 112 MB | FLAC | Free Slot               │
+│    Math: 112MB / 10.6min = 10.6 MB/min ✓ (lossless range)  │
+│    VERDICT: 💎 DIAMOND (Score: 1.0) → SELECTED              │
+├─────────────────────────────────────────────────────────────┤
+│ B: "Strobe 320.mp3" | 25 MB | 320kbps | Queue: 5           │
+│    Math: 320kbps × 637s = 25.5MB ✓ (within 10% tolerance)  │
+│    VERDICT: 🥇 GOLD (Score: 0.85)                           │
+├─────────────────────────────────────────────────────────────┤
+│ C: "Strobe.flac" | 9 MB | FLAC | Free Slot                 │
+│    Math: 9MB / 10.6min = 0.85 MB/min ✗ (FAKE!)            │
+│    VERDICT: 🗑️ TRASH (Score: 0.1) → HIDDEN                 │
+└─────────────────────────────────────────────────────────────┘
+
+User sees only A and B. C is hidden (forensically proven fake).
+```
+
+### Phase 2: Post-Download Verification (Audio Analysis)
+**Once downloaded**, ORBIT performs spectral analysis to confirm quality:
+
+```
+FREQUENCY CUTOFF DETECTION (FFmpeg + Essentia):
+
+MP3 128kbps → 16kHz brick wall (encoder removes everything above)
+MP3 320kbps → 21kHz content preserved
+FLAC        → 22kHz full spectrum
+
+Detection Method:
+- Measure energy at 16kHz, 19kHz, 21kHz
+- Real 320: -30 to -45 dB at 19kHz (natural rolloff)
+- Fake 128: < -70 dB at 16kHz (hard cutoff = brick wall)
+
+If "320kbps" shows 16kHz cutoff → Flag as "Upscaled Fake"
+```
+
+### Why Not Just Download Everything?
+**Storage Cost:**
+- Fake FLAC collection: 500 tracks × 50 MB = 25 GB
+- Real FLAC collection: 500 tracks × 50 MB = 25 GB (but authentic)
+- **Difference:** Both take space, but one sounds like 128kbps
+
+**Bandwidth Cost:**
+- Downloading 500 fake files = wasted 10+ hours, 25 GB bandwidth
+- ORBIT filters fakes pre-download = save hours, disk space, frustration
 
 ---
 
@@ -132,12 +230,41 @@ File D: "FLAC", 1411kbps, "Strobe.flac" (9 MB - FAKE)
 - **P2P Network**: Soulseek.NET
 - **Metadata**: TagLib# (audio tagging)
 
-### Design Patterns
-- **Strategy Pattern**: Swappable ranking algorithms
-- **Observer Pattern**: Event-driven UI updates
-- **Journal-First Pattern**: Crash recovery with prepare-log-execute-commit flow
-- **Connection Pooling**: Optimized SQLite access for recovery journal
-- **Atomic Operations**: SafeWrite pattern for file operations
+### Design Patterns & Why We Use Them
+
+#### Producer-Consumer Pattern (AnalysisQueueService, SonicIntegrityService)
+**WHY:** Audio analysis is CPU-intensive (80-100% per process). Running 50 analyses at once = UI freeze + thermal throttling.
+
+**HOW:** Unbounded channel queue + 2 worker threads
+- Downloads enqueue analysis requests (never blocks)
+- 2 workers process queue with SemaphoreSlim throttling
+- **Result:** Smooth UI, controlled CPU usage, 45s timeout prevents hung processes
+
+#### Journal-First Pattern (CrashRecoveryJournal)
+**WHY:** Crashes during downloads = lost progress. Crashes during tag writes = corrupt files.
+
+**HOW:** Inspired by database transaction logs (prepare → log → execute → commit)
+- Every download: write checkpoint to recovery journal
+- Every 15 seconds: heartbeat update
+- On crash/restart: read journal → resume from last checkpoint
+- **Result:** Resume downloads mid-byte, zero data loss
+
+#### Strategy Pattern (Search Ranking)
+**WHY:** Different users have different priorities (quality vs speed, lossless vs efficient storage).
+
+**HOW:** Swappable ranking algorithms (QualityFirst, BalancedMode, SpeedFirst)
+- Each strategy = different weight distribution
+- Easy to A/B test new ranking logic
+- User can switch modes without code changes
+
+#### Atomic Operations (SafeWrite Pattern)
+**WHY:** Writing tags mid-crash = corrupt ID3 header = unplayable file.
+
+**HOW:** Write to .tmp → verify → atomic move → cleanup
+- TagLib writes to `file.mp3.tmp`
+- Verify write succeeded (file size, no exceptions)
+- Atomic filesystem move (OS guarantees all-or-nothing)
+- **Result:** Either fully tagged or untouched, never corrupted
 
 ### Project Structure
 ```
@@ -159,81 +286,98 @@ ORBIT/
 
 ---
 
-## 📊 Development Status
+## 📊 Development Roadmap: The "Why" Behind Each Phase
 
-### ✅ Phase 0: Foundation
-- Cross-platform UI (Avalonia)
-- Spotify playlist import
-- Soulseek download manager
-- SQLite library database
-- Built-in audio player
-- Metadata enrichment (BPM, Key, Album Art)
+### ✅ Phase 0: Foundation (Weeks 1-2)
+**PROBLEM:** Need basic infrastructure before advanced features can exist.
+- Built cross-platform UI (Avalonia XAML)
+- Integrated Soulseek.NET for P2P networking
+- SQLite database for library persistence
+- Basic audio player (NAudio engine)
 
-### ✅ Phase 1: Intelligent Ranking
-- Quality-gated scoring
-- Filename noise stripping
-- Path-based token search
-- VBR fraud detection
-- Duration gating
+### ✅ Phase 1: Intelligent Ranking (Week 3)
+**PROBLEM:** Soulseek returns 50+ results per search, but 80% are wrong versions or fake files.
+- Implemented quality-first scoring (FLAC > 320kbps > 128kbps)
+- Duration gating (10:37 Extended ≠ 3:30 Radio Edit)
+- Filename noise stripping (`[YouTube-to-MP3]` → ignored)
+- Path token search (find "128bpm" in `/Electronic/Techno/128bpm/track.mp3`)
 
-### ✅ Phase 1A: Atomic File Operations
-- SafeWrite pattern for crash-safe tag writes
-- Disk space checking
-- Timestamp preservation
-- File verification helpers
+### ✅ Phase 1A: Atomic File Operations (Week 4)
+**PROBLEM:** App crashes mid-tag-write = corrupt MP3 headers = unplayable files.
+- SafeWrite pattern: write to `.tmp` → verify → atomic move
+- Disk space checking (prevent "out of space" mid-write)
+- Timestamp preservation (keep original file dates)
 
-### ✅ Phase 1B: Database Optimization
-- SQLite WAL mode for concurrency
-- Index audit and recommendations
-- 10MB cache configuration
-- Auto-checkpoint at 1000 pages
+### ✅ Phase 1B: Database Optimization (Week 4)
+**PROBLEM:** 10,000+ library tracks = slow queries, UI lag on scroll.
+- SQLite WAL mode (allows concurrent reads during writes)
+- Index audit on `LibraryEntries` (40x speedup on filtered queries)
+- 10MB cache + auto-checkpoint at 1000 pages
 
-### ✅ Phase 2A: Crash Recovery
-- Recovery journal with connection pooling
-- Monotonic heartbeat tracking
-- Download resume capability
-- Stall detection (4-heartbeat threshold)
-- Idempotent recovery logic
-- Dead-letter handling (3-strike limit)
-- Priority-based startup recovery
-- Non-intrusive UX notifications
+### ✅ Phase 2A: Crash Recovery (Week 5-6)
+**PROBLEM:** Download 90% of 500MB FLAC → Windows Update reboot → start from 0%.
+- Recovery journal with 15-second heartbeat checkpoints
+- Idempotent resume logic (safe to "resume" already-complete downloads)
+- Stall detection: 4 missed heartbeats (1 minute) = abort + retry
+- Dead-letter queue: 3 failed retries = human intervention needed
 
-### ✅ Phase 3A: Atomic Downloads
-- Download Health Monitor
-- Adaptive timeout logic (60s standard, 120s for >90% progress)
-- Peer blacklisting for stalled transfers
-- Automatic retry orchestration
+### ✅ Phase 3A: Atomic Downloads (Week 7)
+**PROBLEM:** P2P downloads stall randomly (peer disconnect, network drop, slot expiration).
+- Adaptive timeout: 60s standard, 120s for >90% complete (give benefit of doubt)
+- Peer blacklisting: user disconnects 3 times = skip in future searches
+- Health monitor: tracks success rate per peer
 
-### ✅ Phase 3B: Dual-Truth Schema
-- IntegrityLevel enum (Pending → Bronze → Silver → Gold)
-- Spotify metadata columns (BPM, Key, Duration)
-- Manual override fields (ManualBPM, ManualKey)
-- Clear Dead-Letters UI feature
+### ✅ Phase 3B: Dual-Truth Schema (Week 8)
+**PROBLEM:** Spotify says "128 BPM", file tag says "130 BPM", which is correct?
+- IntegrityLevel enum: Pending → Bronze → Silver → Gold
+- Spotify columns (trusted source) vs manual overrides (user corrections)
+- Manual fields take precedence (user knows better than algorithm)
 
-### ✅ Phase 4: Rekordbox Integration (December 2024)
-- RekordboxService with XmlWriter streaming
-- KeyConverter utility (Standard → Camelot → OpenKey)
-- XmlSanitizer for metadata safety
-- Playlist context menu export
-- Monthly Drop feature (Tools menu)
-- SaveFileDialog integration (Avalonia StorageProvider)
+### ✅ Phase 4: Rekordbox Integration (Week 9)
+**PROBLEM:** DJs spend 2+ hours manually importing playlists into Rekordbox.
+- XmlWriter streaming (memory-efficient, handles 10,000+ tracks)
+- Key conversion: Standard notation → Camelot (C Major = 8B)
+- Monthly Drop feature: one-click export of last 30 days
+
+### ✅ Phase 13: Audio Intelligence Upgrade (Week 18)
+**PROBLEM:** Basic metadata (bitrate, sample rate) doesn't prove quality. Need spectral verification.
+- Essentia integration for BPM, Key, Energy, Danceability (ML models)
+- FFmpeg spectral analysis (frequency cutoff detection)
+- Drop detection algorithm (identifies buildups for cue points)
+- Waveform generation (peak + RMS for seekbar visualization)
+
+### ✅ Phase 14: Forensic Core (Week 19)
+**PROBLEM:** P2P is full of fakes. Need pre-download verification (can't analyze before downloading).
+- MetadataForensicService: math-based size verification
+- TieredTrackComparer: forensic check happens BEFORE quality scoring
+- Trust score (0-100): 85+ = Golden Match, <40 = Avoid
+- **Impact:** Fake files hidden from results, saves bandwidth + storage
 
 ### 🚧 Phase 2B: Code Quality (In Progress)
-- Strategy Pattern for ranking modes
-- Parameter Object refactoring
-- Observer Pattern for events
-- Null Object Pattern for metadata
+**PROBLEM:** Codebase grew organically, needs refactoring for maintainability.
+- Extract reusable patterns (Strategy, Observer, Null Object)
+- Parameter Object refactoring (reduce 8-parameter constructors)
+- Inline WHY comments (explain thresholds, magic numbers)
 
-### 🔥 Phase 8: Sonic Integrity (40% Complete)
-- FFmpeg integration for spectral analysis
-- Producer-Consumer batch processing
-- Database maintenance automation
-- Smart dependency validation
+### 🔮 Phase 5: Self-Healing Library (Planned Q2 2026)
+**PROBLEM:** You downloaded 128kbps in 2020, now want 320kbps, but manually searching = tedious.
+- **UpgradeScout**: Scans library for low-quality tracks
+- **Auto-upgrade**: Background task searches for better versions
+- **Smart replace**: Keep playlists/play counts, swap file atomically
 
-### 🔮 Future Phases
-- **Phase 5**: Self-healing library (automatic quality upgrades)
-- **Phase 6**: Advanced UI polish and transparency
-- **Phase 8**: Sonic Integrity (spectral analysis, FFmpeg integration)
+### 🔮 Phase 6: Advanced UI Polish (Planned Q3 2026)
+**PROBLEM:** Power users need transparency, beginners need simplicity.
+- **Glass-box logging**: Show WHY a track was ranked #1 vs #5
+- **Mission Control**: Dashboard for queue health, analysis progress
+- **Forensic inspector**: Visualize spectral analysis (SPEK-style spectrograms)
+
+### Timeline Summary
+- **Weeks 1-4**: Foundation + intelligent search
+- **Weeks 5-8**: Crash recovery + reliability
+- **Weeks 9-12**: DJ integrations (Rekordbox, harmonic matching)
+- **Weeks 13-19**: Audio intelligence + forensics
+- **Q2 2026**: Self-healing + automation
+- **Q3 2026**: UI polish + transparency
 
 ---
 

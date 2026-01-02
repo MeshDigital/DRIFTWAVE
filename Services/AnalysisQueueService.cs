@@ -19,6 +19,26 @@ using Avalonia.Threading; // For UI thread safety
 
 namespace SLSKDONET.Services;
 
+/// <summary>
+/// Phase 4: Musical Brain Queue - Producer-Consumer pattern for audio analysis.
+/// 
+/// ARCHITECTURE:
+/// Producer: DownloadManager enqueues tracks as they complete
+/// Queue: Unbounded channel (never blocks producers)
+/// Consumer: 2 worker threads call EssentiaAnalyzerService
+/// 
+/// WHY THIS DESIGN:
+/// 1. Decoupling: Downloads don't wait for analysis (10-15 second operation)
+/// 2. Throttling: 2 workers prevent CPU saturation (Essentia uses 80-100% per process)
+/// 3. Priority: High-value tracks (just played) can jump the queue
+/// 4. Resilience: Worker crash doesn't kill the queue
+/// 5. Visibility: UI shows "3 tracks analyzing, 47 queued, 2h ETA"
+/// 
+/// WORKER STRATEGY:
+/// - 2 workers = sweet spot for 4+ core CPUs (leaves room for UI/downloads)
+/// - SemaphoreSlim(2) ensures only 2 Essentia processes run concurrently
+/// - More workers = faster analysis but UI lag and thermal throttling
+/// </summary>
 public class AnalysisQueueService : INotifyPropertyChanged
 {
     private readonly Channel<AnalysisRequest> _channel;
@@ -95,7 +115,11 @@ public class AnalysisQueueService : INotifyPropertyChanged
     {
         _eventBus = eventBus;
         _logger = logger;
-        // Unbounded channel to prevent blocking producers (downloads)
+        // WHY: Unbounded channel instead of bounded:
+        // - Producer (DownloadManager) should NEVER block on enqueue
+        // - Analysis is non-critical: if queue grows to 1000, it just takes longer
+        // - Bounded channel would cause downloads to pause (unacceptable UX)
+        // - Memory cost: ~100 bytes per request = 10,000 queued = 1MB (negligible)
         _channel = Channel.CreateUnbounded<AnalysisRequest>();
     }
 

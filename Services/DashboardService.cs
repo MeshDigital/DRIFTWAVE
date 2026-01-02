@@ -12,6 +12,20 @@ using System.Threading.Tasks;
 
 namespace SLSKDONET.Services;
 
+/// <summary>
+/// Aggregates library health metrics for the dashboard/mission control.
+/// 
+/// WHY: Centralized health tracking provides:
+/// 1. User visibility into collection quality (Gold/Silver/Bronze counts)
+/// 2. Performance optimization (cached stats vs. live queries every render)
+/// 3. Storage management (proactive warning before disk full)
+/// 4. Upgrade planning ("200 tracks still at 192kbps - start replacing?")
+/// 
+/// CACHING STRATEGY:
+/// - Stats stored in LibraryHealth table (single row, Id=1)
+/// - Recalculated on demand (expensive query) or background worker
+/// - UI reads cached value (instant, no DB queries per frame)
+/// </summary>
 public class DashboardService
 {
     private readonly ILogger<DashboardService> _logger;
@@ -53,8 +67,26 @@ public class DashboardService
             
             // Query the global LibraryEntries table for high-level health metrics
             var totalTracks = await context.LibraryEntries.CountAsync();
+            
+            // THREE-TIER QUALITY MODEL:
+            // WHY: Reflects real-world audio engineering and user expectations
+            
+            // GOLD: Lossless formats (FLAC, WAV)
+            // - Bit-perfect digital copy (1411 kbps uncompressed equivalent)
+            // - No generational loss if re-encoded
+            // - Archival quality: 5-10 MB/minute storage cost
             var goldTracks = await context.LibraryEntries.CountAsync(t => t.Format.ToLower() == "flac" || t.Format.ToLower() == "wav");
+            
+            // SILVER: High-bitrate lossy (320kbps MP3)
+            // - "Transparent" encoding: blind tests show <5% can distinguish from lossless
+            // - Practical quality: sounds perfect on 99% of systems
+            // - Efficient: ~2.5 MB/minute storage
             var silverTracks = await context.LibraryEntries.CountAsync(t => t.Bitrate >= 320 && t.Format.ToLower() != "flac" && t.Format.ToLower() != "wav");
+            
+            // BRONZE: Acceptable lossy (<320kbps)
+            // - Audible compression on critical listening (cymbals, vocals)
+            // - Fine for discovery, car audio, background music
+            // - Candidates for upgrade hunting
             var bronzeTracks = await context.LibraryEntries.CountAsync(t => t.Bitrate < 320 && t.Bitrate > 0);
             
             // For older pending tracks/upgrades, we can still check PlaylistTracks

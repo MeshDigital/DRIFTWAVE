@@ -27,7 +27,21 @@ public class SonicAnalysisResult
 
 /// <summary>
 /// Service for validating audio fidelity using spectral analysis (headless FFmpeg).
+/// 
+/// WHY: Detects transcoded/fake lossless files that pass size checks:
+/// - Upscaled MP3s claiming to be FLAC
+/// - 128kbps files re-encoded to "320kbps"
+/// - Lossy files with frequency cutoffs (16kHz brick wall)
+/// 
+/// HOW: FFmpeg spectral analysis extracts frequency data without decoding full audio.
+/// We look for the "cutoff frequency" where content stops (MP3 encoders cut high freqs).
+/// 
 /// Phase 8 Enhancement: Producer-Consumer pattern for batch processing to prevent CPU/IO spikes.
+/// 
+/// ARCHITECTURE:
+/// - Producer: Analysis requests queued to unbounded channel (never blocks caller)
+/// - Consumers: 2 worker threads (configurable) process queue with FFmpeg
+/// - WHY only 2 workers: FFmpeg is CPU-heavy (80-100% per process), 2 = balance speed/overhead
 /// </summary>
 public class SonicIntegrityService : IDisposable
 {
@@ -37,7 +51,7 @@ public class SonicIntegrityService : IDisposable
     
     // Producer-Consumer pattern for batch analysis
     private readonly Channel<AnalysisRequest> _analysisQueue;
-    private readonly int _maxConcurrency = 2; // Limit to 2 concurrent FFmpeg processes
+    private readonly int _maxConcurrency = 2; // WHY: 2 = sweet spot for 4+ core CPUs
     private readonly CancellationTokenSource _cts = new();
     private readonly List<Task> _workerTasks = new();
     private bool _isInitialized = false;
@@ -182,7 +196,21 @@ public class SonicIntegrityService : IDisposable
             _logger.LogInformation("Starting sonic integrity analysis for: {File}", Path.GetFileName(filePath));
             _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, "Starting spectral energy distribution scan");
 
+            // SPECTRAL ANALYSIS SCIENCE:
+            // WHY these specific frequencies:
+            // - MP3 encoders use "psychoacoustic" cutoffs to save space
+            // - 16kHz = 128kbps cutoff (most humans can't hear above this)
+            // - 19kHz = 256kbps cutoff ("transparent" for most music)
+            // - 21kHz = 320kbps/lossless preserves near-ultrasonic content
+            // 
+            // HOW we detect fakes:
+            // - Real 320kbps: energy at 19kHz+ is -30 to -45 dB
+            // - Upscaled 128kbps: energy at 16kHz+ is < -70 dB (brick wall)
+            // - The "brick wall" is unmistakable - it's like a cliff in the spectrogram
+            
             // Stage 1: Check energy above 16kHz (Cutoff for 128kbps)
+            // WHY: 128kbps MP3 hard-cuts everything above ~16kHz to save bits
+            // If energy < -55dB here, it's either 128kbps or an upscale
             double energy16k = await GetEnergyAboveFrequencyAsync(filePath, 16000, ct);
             
             // Stage 2: Check energy above 19kHz (Cutoff for 256k/320k)
@@ -202,11 +230,16 @@ public class SonicIntegrityService : IDisposable
             bool trustworthy = true;
             string details = "";
 
+            // FORENSIC EVALUATION:
+            // WHY -55dB threshold:
+            // - Natural music content at 16kHz: -20 to -40 dB (cymbals, hi-hats)
+            // - MP3 128kbps cutoff: -70 to -90 dB (encoder removed everything)
+            // - -55dB = midpoint where we're confident it's a cutoff, not just quiet music
             if (energy16k < -55)
             {
                 cutoff = 16000;
-                confidence = 0.3; // Very likely an upscale if reported as FLAC/320k
-                trustworthy = energy16k > -70; // If it's -90, it's a hard cutoff (fake)
+                confidence = 0.3; // 30% trustworthy = "probably fake"
+                trustworthy = energy16k > -70; // WHY: -90dB = absolute zero (hard fake)
                 details = "FAKED: Low-quality upscale (128kbps profile)";
                 _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "Severe high-frequency cutoff detected (16kHz)");
             }

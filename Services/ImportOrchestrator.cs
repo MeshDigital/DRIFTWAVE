@@ -61,6 +61,15 @@ public class ImportOrchestrator
                 try
                 {
                      // Phase 7: Deterministic ID / Deduplication
+                     // WHY: Prevents duplicate imports of same playlist:
+                     // - User re-pastes Spotify URL -> should update existing, not create duplicate
+                     // - Algorithm: Hash(normalized URL) = consistent GUID for same source
+                     // - Fallback: Check by URL string match if hash fails (legacy imports)
+                     // 
+                     // BENEFITS:
+                     // - Idempotent imports (safe to retry)
+                     // - "Refresh" feature (re-import updates metadata)
+                     // - Storage efficiency (no duplicate playlist entries)
                      var newJobId = Utils.GuidGenerator.CreateFromUrl(input);
                      _logger.LogInformation("Generated Job ID: {Id} for input: {Input}", newJobId, input);
                      

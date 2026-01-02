@@ -46,18 +46,35 @@ public class DownloadDiscoveryService
 
     /// <summary>
     /// Searches for a track and returns the single best match based on user preferences.
-    /// </summary>
-    /// <summary>
-    /// Searches for a track and returns the single best match based on user preferences.
     /// Phase T.1: Refactored to accept PlaylistTrack model (decoupled from UI).
     /// Phase 12: Updated to use streaming search logic.
     /// Phase 3B: Added support for peer blacklisting (Health Monitor).
+    /// 
+    /// WHY "THE SEEKER":
+    /// This service encapsulates the "find the best file" intelligence:
+    /// 1. Constructs optimal search query ("Artist Title" vs "Artist - Title [Remix]")
+    /// 2. Applies user preferences (formats, bitrate minimums)
+    /// 3. Ranks results using forensic metadata validation
+    /// 4. Returns SINGLE best match (not 50 options - paralysis of choice)
+    /// 
+    /// PHILOSOPHY:
+    /// "Smart defaults, user overrides" - respect per-track overrides (PreferredFormats)
+    /// "Trust but verify" - use forensics to filter fakes before presenting to user
     /// </summary>
     public async Task<DiscoveryResult> FindBestMatchAsync(PlaylistTrack track, CancellationToken ct, HashSet<string>? blacklistedUsers = null)
     {
         var log = new SearchAttemptLog { QueryString = $"{track.Artist} - {track.Title}" };
 
-        // Connectivity Gating: Wait for Soulseek connection before starting search
+        // CONNECTIVITY GATING:
+        // WHY: Prevent search spam during reconnect storms
+        // - Soulseek disconnects are common (NAT timeout, server restart)
+        // - Searches while disconnected queue up and spam on reconnect
+        // - This gate waits up to 10 seconds for connection before aborting
+        // 
+        // BENEFIT:
+        // - Reduces failed search count in logs
+        // - Prevents rate-limiting from server (max 5 searches/10 sec)
+        // - Cleaner error messages ("not connected" vs "search timeout")
         if (!_searchOrchestrator.IsConnected)
         {
             _logger.LogInformation("Waiting for Soulseek connection before searching for {Title}...", track.Title);

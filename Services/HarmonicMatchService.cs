@@ -21,6 +21,28 @@ public class HarmonicMatchService
     private readonly ILogger<HarmonicMatchService> _logger;
     private readonly DatabaseService _databaseService;
 
+    // CAMELOT WHEEL MUSIC THEORY:
+    // WHY: Professional DJs use harmonic mixing to create seamless transitions
+    // 
+    // THEORY:
+    // - Songs in compatible keys "blend" without dissonance
+    // - Compatible = same key, ±1 semitone, or relative major/minor
+    // - Clashing keys (e.g., C major into F# major) sound "wrong" to listeners
+    // 
+    // NOTATION:
+    // - "A" suffix = Minor keys (darker, melancholic)
+    // - "B" suffix = Major keys (brighter, uplifting)
+    // - Number = Position on circle of fifths (1-12)
+    // 
+    // MIXING RULES:
+    // - Same number = Perfect energy match (8A -> 8B = minor to major lift)
+    // - ±1 number = Smooth transition (8A -> 7A or 9A)
+    // - Same letter, different number = Risky (8A -> 10A = big key jump)
+    // 
+    // EXAMPLES:
+    // - 8A (C Minor) mixes perfectly with 8B (C Major), 7A (G Minor), 9A (D Minor)
+    // - Track in 8A followed by 1A (F Minor) = train wreck (distant keys)
+    // 
     // Camelot Wheel: Maps each key to its compatible neighbors
     private static readonly Dictionary<string, HashSet<string>> CamelotWheel = new()
     {
@@ -64,8 +86,17 @@ public class HarmonicMatchService
     /// </summary>
     /// <param name="seedTrackId">The track to find matches for</param>
     /// <param name="limit">Maximum number of results</param>
-    /// <param name="includeBpmRange">Allow ±6% BPM variance for beatmatching</param>
-    /// <param name="includeEnergyMatch">Factor in Spotify energy/valence for vibe matching</param>
+    /// <param name="includeBpmRange">Allow ±6% BPM variance for beatmatching
+    ///     WHY 6%: Professional DJ standard tolerance
+    ///     - Pitch faders typically ±6-8% range
+    ///     - 128 BPM ± 6% = 120-136 BPM (still danceable)
+    ///     - Beyond 8% sounds "chipmunk" or "dragging"
+    /// </param>
+    /// <param name="includeEnergyMatch">Factor in Spotify energy/valence for vibe matching
+    ///     WHY: Harmonic compatibility doesn't guarantee good flow
+    ///     - C Minor ballad (energy=0.2) into C Minor banger (energy=0.9) = jarring
+    ///     - Energy matching = gradual build/cooldown (DJ storytelling)
+    /// </param>
     /// <returns>List of compatible tracks with compatibility scores</returns>
     public async Task<List<HarmonicMatchResult>> GetHarmonicMatchesAsync(
         Guid seedTrackId, 
