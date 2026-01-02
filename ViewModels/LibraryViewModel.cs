@@ -30,6 +30,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     private readonly HarmonicMatchService _harmonicMatchService; // Phase 8: DJ Features
     private readonly AnalysisQueueService _analysisQueueService; // Analysis queue control
     private readonly Services.Library.SmartSorterService _smartSorterService; // Phase 16: Smart Sorter
+    private readonly Services.AI.PersonalClassifierService _personalClassifier;
     private readonly IServiceProvider _serviceProvider;
     private System.Threading.Timer? _selectionDebounceTimer; // Debounce for harmonic matching
     private System.Threading.CancellationTokenSource? _matchLoadCancellation; // Phase 9B: Cancel overlapping operations
@@ -149,6 +150,7 @@ public class LibraryViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand AnalyzeTrackCommand { get; } // Queue track for analysis
     public System.Windows.Input.ICommand ExportPlaylistCommand { get; } // Export to Rekordbox XML
     public System.Windows.Input.ICommand AutoSortCommand { get; } // Phase 16.1: Smart Sort
+    public System.Windows.Input.ICommand FindSonicTwinsCommand { get; } // Phase 16.2: Vibe Match
     public System.Windows.Input.ICommand LoadDeletedProjectsCommand { get; } // NEW
     public System.Windows.Input.ICommand RestoreProjectCommand { get; } // NEW
 
@@ -212,8 +214,6 @@ public class LibraryViewModel : INotifyPropertyChanged
         _notificationService = notificationService;
         _spotifyEnrichmentService = spotifyEnrichmentService;
         _harmonicMatchService = harmonicMatchService;
-        _analysisQueueService = analysisQueueService;
-        _smartSorterService = smartSorterService;
         _analysisQueueService = analysisQueueService;
         _smartSorterService = smartSorterService;
         _personalClassifier = serviceProvider.GetService(typeof(Services.AI.PersonalClassifierService)) as Services.AI.PersonalClassifierService 
