@@ -45,6 +45,13 @@
 *   **Atomic Swaps**: Checkpointed 8-step swap process (Lock -> Search -> Download -> Clone -> Swap).
 *   **Metadata Cloning**: Preserving ratings and play counts during upgrades.
 
+### ✅ Phase 15: Style Lab (Sonic Taxonomy)
+**Goal**: User-defined musical classification.
+*   **Style Buckets**: Users define "Neo-Trance" or "Liquid" by example tracks.
+*   **Personal Classifier**: ML.NET + LightGBM engine trains *locally* on your examples.
+*   **Auto-Tagging**: Library tracks are automatically assigned a `DetectedSubGenre` with confidence scores.
+*   **Dynamic Filtering**: Instant style chips in the Library UI.
+
 ---
 
 ## 🚧 Active Development
@@ -70,6 +77,12 @@
 *   **Phase 13C: AI Layer**
     *   **Deep Learning**: TensorFlow models (`.pb`) for Vocal Detection and Mood.
     *   **Active Suggestions**: "Mixes Well With" panel and "Vibe Radar".
+
+### 🚧 Phase 16: Applied Intelligence (The Cognitive Librarian)
+**Goal**: Automate management using ML predictions.
+*   **Auto-Sorter**: Physical file organization based on `PredictedStyle`.
+*   **Smart Curation**: "Vibe Match" playlist generation via Cosine Similarity.
+*   **Imposter Detector**: Flagging metadata mismatches (Genre vs Vibe).
 
 ---
 

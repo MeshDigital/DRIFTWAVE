@@ -602,6 +602,15 @@ public partial class App : Application
         services.AddSingleton<Services.Musical.CueGenerationEngine>();
         services.AddSingleton<Services.Musical.ManualCueGenerationService>(); // User-triggered batch cue processing
         
+        // Phase 15: Style Lab (Sonic Taxonomy)
+        services.AddSingleton<Services.AI.PersonalClassifierService>();
+        services.AddSingleton<Services.AI.IStyleClassifierService, Services.AI.StyleClassifierService>();
+        services.AddTransient<ViewModels.StyleLabViewModel>();
+
+        // Phase 16: Applied Intelligence (Autonomy)
+        services.AddSingleton<Services.Library.SmartSorterService>();
+        services.AddTransient<ViewModels.Tools.SortPreviewViewModel>();
+        
         // Phase 0: ViewModel Refactoring - Library child ViewModels
         services.AddTransient<ViewModels.Library.ProjectListViewModel>();
         services.AddTransient<ViewModels.Library.TrackListViewModel>(sp => 
@@ -642,6 +651,7 @@ public partial class App : Application
         services.AddTransient<Views.Avalonia.UpgradeScoutView>();
         services.AddTransient<Views.Avalonia.InspectorPage>();
         services.AddTransient<Views.Avalonia.AnalysisQueuePage>();
+        services.AddTransient<Views.Avalonia.StyleLabPage>();
         
         // Singleton ViewModels
         services.AddSingleton<ViewModels.TrackInspectorViewModel>();

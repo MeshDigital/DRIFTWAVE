@@ -146,10 +146,28 @@ public class AnalysisQueueViewModel : ReactiveObject
     public ReactiveCommand<AnalysisJobViewModel, Unit> InspectTrackCommand { get; }
     public ReactiveCommand<Unit, Unit> RunBrainTestCommand { get; }
 
+    // Operation "All-Seeing Eye": Forensic Lab Mode
+    private bool _isLabModeActive;
+    public bool IsLabModeActive
+    {
+        get => _isLabModeActive;
+        set => this.RaiseAndSetIfChanged(ref _isLabModeActive, value);
+    }
+
+    private ForensicLabViewModel? _labViewModel;
+    public ForensicLabViewModel? LabViewModel
+    {
+        get => _labViewModel;
+        set => this.RaiseAndSetIfChanged(ref _labViewModel, value);
+    }
+
+    public ReactiveCommand<Unit, Unit> CloseLabCommand { get; }
+
     // Mission Control: Live Forensic Stream
     public ObservableCollection<LiveLogViewModel> LiveForensicLogs { get; } = new();
     private const int MaxLogHistory = 100;
-    private readonly IForensicLogger _forensicLogger; // Add this field
+    private readonly IForensicLogger _forensicLogger;
+    private readonly ILibraryService _libraryService; // For Forensic Lab
 
     public AnalysisQueueViewModel(
         ILogger<AnalysisQueueViewModel> logger,
@@ -158,7 +176,8 @@ public class AnalysisQueueViewModel : ReactiveObject
         LibraryViewModel libraryViewModel,
         AnalysisQueueService queueService,
         MusicalBrainTestService testService,
-        IForensicLogger forensicLogger) // Inject interface
+        IForensicLogger forensicLogger,
+        ILibraryService libraryService) // For Forensic Lab
     {
         _logger = logger;
         _eventBus = eventBus;
@@ -167,9 +186,16 @@ public class AnalysisQueueViewModel : ReactiveObject
         _queueService = queueService;
         _testService = testService;
         _forensicLogger = forensicLogger;
+        _libraryService = libraryService;
 
         InspectTrackCommand = ReactiveCommand.Create<AnalysisJobViewModel>(InspectTrack);
         RunBrainTestCommand = ReactiveCommand.CreateFromTask(RunBrainTestAsync);
+        CloseLabCommand = ReactiveCommand.Create(() => 
+        {
+            LabViewModel?.Dispose();
+            LabViewModel = null;
+            IsLabModeActive = false;
+        });
 
         // Subscriptions
         _eventBus.GetEvent<TrackAnalysisStartedEvent>()
@@ -229,6 +255,37 @@ public class AnalysisQueueViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// Opens a track in the Forensic Lab dashboard with smart state management.
+    /// Reuses existing ViewModel if same track to avoid reloading heavy resources.
+    /// </summary>
+    public async Task OpenTrackInLab(string trackHash)
+    {
+        // If already loaded, just show it
+        if (LabViewModel?.TrackUniqueHash == trackHash)
+        {
+            IsLabModeActive = true;
+            return;
+        }
+
+        // Dispose previous heavy resources (bitmaps, etc.)
+        LabViewModel?.Dispose();
+
+        // Create and load new ViewModel
+        var vm = new ForensicLabViewModel(_eventBus, _libraryService);
+        
+        try
+        {
+            await vm.LoadTrackAsync(trackHash);
+            LabViewModel = vm;
+            IsLabModeActive = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load track in Forensic Lab: {Hash}", trackHash);
+            vm.Dispose();
+        }
+    }
 
     private void OnAnalysisStarted(TrackAnalysisStartedEvent evt)
     {

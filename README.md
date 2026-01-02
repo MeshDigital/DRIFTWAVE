@@ -69,6 +69,12 @@ Where traditional P2P clients download the first available file, ORBIT applies *
 - **Lossless Size Verification**: FLAC should be 5-10 MB/minute. Below 2.5 MB/min = impossible for lossless.
 - **Trust Score (0-100)**: Every search result gets rated. 85+ = "Golden Match", <40 = "Avoid"
 - **Result**: Fake files marked as "Trash Tier" before you waste bandwidth
+### 📌 Latest Highlights (Jan 2, 2026)
+- **ML.NET Engine**: Upgraded recommendation engine to use **LightGBM** (Machine Learning) instead of simple vector math.
+- **The Style Lab**: Train your own personalized genre classifiers by simply dragging and dropping track examples.
+- **Audio Analysis Pipeline**: FFmpeg + Essentia sidecar with 45s watchdog, atomic DB updates, and Track Inspector auto-refresh.
+- **Library Track Display**: Rich duration/size badges (⏱, 💾) with smart KB/MB formatting and dual-source loading.
+- **Glass Box Queue Visibility**: Observable AnalysisQueueService with pause/resume, smart ETA, and animated status bar pulse.
 
 ### 🎯 Intelligent Search Ranking
 **WHY:** Getting 50 results for "Strobe" is useless if you can't tell which is the real Extended Mix vs a YouTube rip.
@@ -449,6 +455,7 @@ Contributions are welcome! Whether you're fixing bugs, adding features, or impro
 
 ## 🔧 Built With
 
+- [Microsoft ML.NET](https://dotnet.microsoft.com/en-us/apps/machinelearning-ai/ml-dotnet) - On-device machine learning
 - [Avalonia UI](https://avaloniaui.net/) - Cross-platform XAML framework
 - [Entity Framework Core](https://docs.microsoft.com/ef/) - Object-relational mapping
 - [Soulseek.NET](https://github.com/jpdillingham/Soulseek.NET) - P2P networking
