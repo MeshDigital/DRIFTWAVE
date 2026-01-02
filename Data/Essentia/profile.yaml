@@ -1,6 +1,6 @@
 outputFormat: json
 analysisSampleRate: 44100
-minDuration: 1
+minDuration: 30 # Increased to ensure sufficient data for deep learning
 
 lowlevel:
     frameSize: 2048
@@ -8,13 +8,24 @@ lowlevel:
     zeroPadding: 0
     windowType: blackmanharris62
     silentFrames: noise
-    stats: ["mean", "var", "min", "max"]
+    stats: ["mean", "var", "min", "max", "dmean", "dvar"] # Added derivatives for texture analysis
+
+    # Phase 13A: Forensic Librarian
+    # Enables dynamic range analysis (Sausage Fattening detection)
+    # and EBU R128 loudness (Industry standard)
+    computeDynamicComplexity: true
+    computeLoudnessEBUR128: true
 
 rhythm:
     method: degara
     minBpm: 40
     maxBpm: 250
     stats: ["mean", "var"]
+    
+    # Phase 13A: Drift Detection
+    # Returns a list of BPM candidates. If widespread, track is drifting (Live drummer/Vinyl rip)
+    computeBpmHistogram: true 
+    computeBeatPositions: true # Required for beat grids
 
 tonal:
     frameSize: 4096
@@ -22,3 +33,19 @@ tonal:
     zeroPadding: 0
     windowType: blackmanharris62
     stats: ["mean", "var"]
+    
+    # Phase 13C: Mixes Well With
+    # Extracts chords for advanced harmonic mixing suggestions
+    computeChords: true
+    computeKey: true
+
+# Phase 13C: AI Layer
+# Deep learning model configuration
+highlevel:
+    compute: true
+    svm_models: [] # Legacy, we use TensorFlow
+    tensorflow_models:
+        - "Tools/Models/voice_instrumental-msd-musicnn-1.pb" # Vocal Detection
+        - "Tools/Models/danceability-msd-musicnn-1.pb"       # Vibe Radar
+        - "Tools/Models/mood_happy-msd-musicnn-1.pb"         # Mood
+        - "Tools/Models/mood_aggressive-msd-musicnn-1.pb"    # Energy/Mood

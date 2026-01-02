@@ -132,6 +132,54 @@ public class AudioFeaturesEntity
     public float? CuePhraseStart { get; set; }
 
     // ============================================
+    // Phase 13A: Forensic Librarian (Drift & Dynamics)
+    // ============================================
+
+    /// <summary>
+    /// Measures BPM stability (0.0 - 1.0). 
+    /// Low scores indicate tempo drift (Live drummer, Vinyl rip, or Transition track).
+    /// Derived from Essentia's `bpm_histogram`.
+    /// </summary>
+    public float BpmStability { get; set; } = 1.0f;
+
+    /// <summary>
+    /// True if the track is flagged as "Over-compressed" or "Sausage Master".
+    /// Triggered if DynamicComplexity < 2.0 and Loudness > -7 LUFS.
+    /// </summary>
+    public bool IsDynamicCompressed { get; set; }
+
+    // ============================================
+    // Phase 13C: AI Layer (Vibe & Vocals)
+    // ============================================
+
+    /// <summary>
+    /// Probability that the track is Instrumental (no vocals).
+    /// From 'voice_instrumental-msd-musicnn-1.pb'.
+    /// </summary>
+    public float InstrumentalProbability { get; set; }
+
+    /// <summary>
+    /// "Vibe" classification (Happy, Aggressive, Relaxed, etc.).
+    /// Derived from aggregation of mood model outputs.
+    /// </summary>
+    public string MoodTag { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Probability score for the primary MoodTag.
+    /// </summary>
+    public float MoodConfidence { get; set; }
+
+    // ============================================
+    // Advanced Harmonic Mixing
+    // ============================================
+
+    /// <summary>
+    /// Progression of chords (e.g., "Am | G | F | E").
+    /// Simplifies harmonic mixing planning.
+    /// </summary>
+    public string ChordProgression { get; set; } = string.Empty;
+
+    // ============================================
     // Identity & Metadata
     // ============================================
     
