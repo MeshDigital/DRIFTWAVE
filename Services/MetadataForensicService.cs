@@ -5,7 +5,7 @@ using SLSKDONET.Models;
 
 namespace SLSKDONET.Services
 {
-    public class MetadataForensicService
+    public static class MetadataForensicService
     {
         private static readonly Regex VbrRegex = new Regex(@"V\d+|VBR", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex LosslessRegex = new Regex(@"\.(flac|wav|aiff|alac)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
