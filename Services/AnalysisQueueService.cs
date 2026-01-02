@@ -560,6 +560,20 @@ public class AnalysisWorker : BackgroundService
             track.FrequencyCutoff = result.TechResult.FrequencyCutoff;
             track.IsTrustworthy = !result.TechResult.IsUpscaled;
             track.SpectralHash = result.TechResult.SpectralHash;
+            
+            // Fix: Populate enum for UI Badge
+            if (result.TechResult.IsUpscaled)
+            {
+                track.Integrity = IntegrityLevel.Suspicious;
+            }
+            else if (track.QualityConfidence > 0.8)
+            {
+                track.Integrity = IntegrityLevel.Verified;
+            }
+            else
+            {
+                track.Integrity = IntegrityLevel.None;
+            }
         }
     }
 

@@ -152,17 +152,23 @@ public class DownloadGroupViewModel : ReactiveObject, IDisposable
         
         HasFailures = failed > 0;
 
-        if (completed == Tracks.Count)
+        if (downloading > 0)
         {
-            StatusText = "Completed";
+            StatusText = queued > 0 
+                ? $"{downloading} downloading, {queued} queued" 
+                : $"{downloading} downloading";
         }
-        else if (downloading > 0)
+        else if (queued > 0)
         {
-            StatusText = $"{downloading} downloading, {queued} queued";
+             StatusText = $"{queued} queued";
         }
-        if (HasFailures)
+        else if (HasFailures)
         {
             StatusText = $"{failed} failed";
+        }
+        else if (completed == Tracks.Count && Tracks.Count > 0)
+        {
+            StatusText = "Completed";
         }
         else
         {

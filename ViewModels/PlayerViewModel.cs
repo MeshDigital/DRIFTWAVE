@@ -233,6 +233,7 @@ namespace SLSKDONET.ViewModels
         public ICommand TogglePlayerDockCommand { get; }
         public ICommand ToggleQueueCommand { get; }
         public ICommand ToggleLikeCommand { get; } // Phase 9.3
+        public ICommand SeekCommand { get; } // Phase 12.6: Waveform Seeking
 
         // Phase 5C: UI Throttling
         private DateTime _lastTimeUpdate = DateTime.MinValue;
@@ -291,29 +292,44 @@ namespace SLSKDONET.ViewModels
             // AudioPlayerService initializes lazily, so this check was always failing on startup.
             // We now rely on Play() to trigger init and handle errors there.
             
-            _playerService.PausableChanged += (s, e) => IsPlaying = _playerService.IsPlaying;
-            _playerService.EndReached += OnEndReached;
+            _playerService.PausableChanged += (s, e) => 
+            {
+                Dispatcher.UIThread.Post(() => IsPlaying = _playerService.IsPlaying);
+            };
             
-            _playerService.PositionChanged += (s, pos) => Position = pos;
+            _playerService.EndReached += (s, e) => 
+            {
+                Dispatcher.UIThread.Post(() => OnEndReached(s, e));
+            };
             
-            _playerService.PositionChanged += (s, pos) => Position = pos;
+            _playerService.PositionChanged += (s, pos) => 
+            {
+                Dispatcher.UIThread.Post(() => Position = pos);
+            };
             
             _playerService.TimeChanged += (s, timeMs) => 
             {
                 var now = DateTime.UtcNow;
                 if ((now - _lastTimeUpdate).TotalMilliseconds > 250) // Throttle to 4fps
                 {
-                    CurrentTimeStr = TimeSpan.FromMilliseconds(timeMs).ToString(@"m\:ss");
+                    Dispatcher.UIThread.Post(() => CurrentTimeStr = TimeSpan.FromMilliseconds(timeMs).ToString(@"m\:ss"));
                     _lastTimeUpdate = now;
                 }
             };
             
-            _playerService.LengthChanged += (s, lenMs) => TotalTimeStr = TimeSpan.FromMilliseconds(lenMs).ToString(@"m\:ss");
+            _playerService.LengthChanged += (s, lenMs) => 
+            {
+                Dispatcher.UIThread.Post(() => TotalTimeStr = TimeSpan.FromMilliseconds(lenMs).ToString(@"m\:ss"));
+            };
             
             _playerService.AudioLevelsChanged += (s, e) =>
             {
-                VuLeft = e.Left;
-                VuRight = e.Right;
+                // VU meter updates are high frequency, but binding still needs UI thread
+                Dispatcher.UIThread.Post(() => 
+                {
+                    VuLeft = e.Left;
+                    VuRight = e.Right;
+                });
             };
 
             TogglePlayPauseCommand = new RelayCommand(TogglePlayPause);
@@ -327,7 +343,9 @@ namespace SLSKDONET.ViewModels
             ToggleRepeatCommand = new RelayCommand(ToggleRepeat);
             TogglePlayerDockCommand = new RelayCommand(TogglePlayerDock);
             ToggleQueueCommand = new RelayCommand(ToggleQueue);
+            ToggleQueueCommand = new RelayCommand(ToggleQueue);
             ToggleLikeCommand = new AsyncRelayCommand(ToggleLikeAsync); // Phase 9.3
+            SeekCommand = new RelayCommand<float>(Seek);
             
             // Phase 0: Queue persistence - auto-save on changes
             Queue.CollectionChanged += async (s, e) => await SaveQueueAsync();
@@ -693,15 +711,19 @@ namespace SLSKDONET.ViewModels
 
                 if (!string.IsNullOrEmpty(path))
                 {
-                    // Try to resume
-                    _playerService.Pause(); 
+                    // Case: Track is loaded. Check if we can resume.
+                    // We check if we are significantly into the track and not at the end.
+                    bool canResume = _playerService.Length > 0 && _playerService.Time < _playerService.Length - 100; // 100ms buffer
                     
-                    // Verify if it actually resumed (if it was Stopped, Pause() might fail depending on LibVLC version/state)
-                    // If still not playing, force a full Play()
-                    if (!_playerService.IsPlaying)
+                    if (canResume)
                     {
-                        Console.WriteLine("[PlayerViewModel] Resume failed (was stopped?), restarting track.");
-                        PlayTrack(path, title, artist);
+                        _playerService.Pause(); // Resume
+                        IsPlaying = true; // Assume success
+                    }
+                    else
+                    {
+                       // Track finished or not loaded. Restart.
+                       PlayTrack(path!, CurrentTrack?.Title ?? "Unknown", CurrentTrack?.Artist ?? "Unknown");
                     }
                 }
                 // Case 2: No track loaded, but Queue has items

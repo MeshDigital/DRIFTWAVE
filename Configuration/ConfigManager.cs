@@ -37,7 +37,7 @@ public class ConfigManager
 
         // Fallback to AppData for a more traditional installation.
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var configDir = Path.Combine(appDataPath, "SLSKDONET");
+        var configDir = Path.Combine(appDataPath, "ORBIT");
         Directory.CreateDirectory(configDir);
         return Path.Combine(configDir, "config.ini");
     }

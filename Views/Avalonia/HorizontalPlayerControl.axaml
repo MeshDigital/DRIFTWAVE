@@ -98,7 +98,8 @@
                     <!-- High-Res Waveform Background -->
                     <controls:WaveformControl WaveformData="{Binding WaveformData}" 
                                             Progress="{Binding Position}" 
-                                            Opacity="0.4" 
+                                            Opacity="0.4"
+                                            SeekCommand="{Binding SeekCommand}"
                                             VerticalAlignment="Stretch"/>
                     
                     <!-- Interactive Slider -->

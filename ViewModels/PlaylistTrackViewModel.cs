@@ -188,7 +188,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     public string LoudnessDisplay => Model.QualityConfidence.HasValue ? $"{Model.QualityConfidence:P0} Confidence" : "—";
     
     public string IntegritySymbol => Model.IsTrustworthy == false ? "⚠️" : "✓";
-    public string IntegrityText => Model.IsTrustworthy == false ? "Upscale Detected" : "Clean";
+    public string IntegrityText => Model.IsTrustworthy == false || Model.Integrity == Data.IntegrityLevel.Suspicious 
+        ? "Upscale Detected" 
+        : "Clean";
     // AlbumArtPath and Progress are already present in this class.
 
     // Reference to the underlying model if needed for persistence later
@@ -272,13 +274,16 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         FindNewVersionCommand = new RelayCommand(FindNewVersion, () => CanHardRetry);
         
         // Smart Subscription
-        if (_eventBus != null)
-        {
-            _disposables.Add(_eventBus.GetEvent<TrackStateChangedEvent>().Subscribe(OnStateChanged));
-            _disposables.Add(_eventBus.GetEvent<TrackProgressChangedEvent>().Subscribe(OnProgressChanged));
-            _disposables.Add(_eventBus.GetEvent<Models.TrackMetadataUpdatedEvent>().Subscribe(OnMetadataUpdated));
+            if (_eventBus != null)
+            {
+                _disposables.Add(_eventBus.GetEvent<TrackStateChangedEvent>().Subscribe(OnStateChanged));
+                _disposables.Add(_eventBus.GetEvent<TrackProgressChangedEvent>().Subscribe(OnProgressChanged));
+                _disposables.Add(_eventBus.GetEvent<Models.TrackMetadataUpdatedEvent>().Subscribe(OnMetadataUpdated));
+            }
+
+            // Fire-and-forget artwork load
+            _ = LoadAlbumArtworkAsync();
         }
-    }
 
     public void Dispose()
     {

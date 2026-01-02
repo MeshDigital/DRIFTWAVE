@@ -26,9 +26,32 @@ namespace SLSKDONET.Views.Avalonia.Controls
             set => SetValue(ProgressProperty, value);
         }
 
+        public static readonly StyledProperty<System.Windows.Input.ICommand?> SeekCommandProperty =
+            AvaloniaProperty.Register<WaveformControl, System.Windows.Input.ICommand?>(nameof(SeekCommand));
+
+        public System.Windows.Input.ICommand? SeekCommand
+        {
+            get => GetValue(SeekCommandProperty);
+            set => SetValue(SeekCommandProperty, value);
+        }
+
         static WaveformControl()
         {
             AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty);
+        }
+        
+        protected override void OnPointerPressed(global::Avalonia.Input.PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            
+            var point = e.GetPosition(this);
+            var progress = (float)(point.X / Bounds.Width);
+            progress = Math.Clamp(progress, 0f, 1f);
+            
+            if (SeekCommand != null && SeekCommand.CanExecute(progress))
+            {
+                SeekCommand.Execute(progress);
+            }
         }
 
         public override void Render(DrawingContext context)
@@ -64,7 +87,9 @@ namespace SLSKDONET.Views.Avalonia.Controls
             var playedRmsPen = new Pen(new SolidColorBrush(Color.Parse("#00BFFF")), 1); // Bright Blue
             var playedPeakPen = new Pen(Brushes.White, 1);
 
-            int samples = data.PeakData.Length;
+            if (data.PeakData == null || data.RmsData == null) return;
+
+            int samples = Math.Min(data.PeakData.Length, data.RmsData.Length);
             double step = width / samples;
 
             // If too many samples for pixels, we can decimate or skip, but drawing lines is fast enough usually

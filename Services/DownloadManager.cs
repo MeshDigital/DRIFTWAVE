@@ -2120,50 +2120,45 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         List<DownloadContext> eligibleTracks,
         Dictionary<int, int> activeByPriority)
     {
-        // Sort by Priority (ascending), then AddedAt (FIFO within priority)
+        // Sort by Priority (ascending = High -> Low), then AddedAt (FIFO)
+        // Priority 0 = High (Lane A)
+        // Priority 1 = Standard (Lane B)
+        // Priority 10+ = Background (Lane C)
         var sortedTracks = eligibleTracks
             .OrderBy(t => t.Model.Priority)
             .ThenBy(t => t.Model.AddedAt)
             .ToList();
 
+        // Since the Semaphore (_downloadSemaphore) already enforces the rigorous global limit (MaxActiveDownloads),
+        // we do NOT need to enforce artificial caps on specific lanes (e.g. "Only 2 High Priority tracks").
+        // This was causing the "Max 4 Downloads" bug where having 20 slots open but no Background tracks meant only 4 slots were used.
+        
+        // The logic is now:
+        // 1. Pick the highest priority track available.
+        // 2. The Semaphore prevents us from exceeding the global limit.
+        
         foreach (var track in sortedTracks)
         {
             var priority = track.Model.Priority;
-            var currentCount = activeByPriority.GetValueOrDefault(priority, 0);
-
-            // Check lane limits
-            if (priority == 0) // High Priority
+            
+            // Log selection for debugging lane behavior
+            if (priority == 0)
             {
-                if (currentCount < HIGH_PRIORITY_SLOTS)
-                {
-                    _logger.LogDebug("Selected High Priority track: {Title} (Lane A: {Count}/2)",
-                        track.Model.Title, currentCount + 1);
-                    return track;
-                }
+                 _logger.LogDebug("Selected High Priority track: {Title} (Lane A)", track.Model.Title);
             }
-            else if (priority == 1) // Standard
+            else if (priority == 1)
             {
-                if (currentCount < STANDARD_PRIORITY_SLOTS)
-                {
-                    _logger.LogDebug("Selected Standard Priority track: {Title} (Lane B: {Count}/2)",
-                        track.Model.Title, currentCount + 1);
-                    return track;
-                }
+                 _logger.LogDebug("Selected Standard Priority track: {Title} (Lane B)", track.Model.Title);
             }
-            else // Background (Priority 10+)
+            else
             {
-                // Background can use any remaining slots
-                var totalActive = activeByPriority.Values.Sum();
-                if (totalActive < 4) // MAX_CONCURRENT_DOWNLOADS
-                {
-                    _logger.LogDebug("Selected Background Priority track: {Title} (Lane C)",
-                        track.Model.Title);
-                    return track;
-                }
+                 _logger.LogDebug("Selected Background Priority track: {Title} (Lane C)", track.Model.Title);
             }
+            
+            return track;
         }
 
-        return null; // All lanes at capacity
+        return null; // No eligible tracks
     }
 
     /// <summary>

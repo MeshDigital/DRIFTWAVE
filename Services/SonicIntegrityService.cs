@@ -297,6 +297,62 @@ public class SonicIntegrityService : IDisposable
         return -91.0; // Assume silence if parsing fails
     }
 
+    /// <summary>
+    /// Generates a visual spectrogram using FFmpeg's showspectrumpic filter.
+    /// Phase 8/13B: Visual Truth.
+    /// </summary>
+    /// <param name="inputPath">Path to source audio file.</param>
+    /// <param name="outputPath">Target path for the PNG image.</param>
+    /// <returns>True if successful.</returns>
+    public async Task<bool> GenerateSpectrogramAsync(string inputPath, string outputPath)
+    {
+        if (!_isInitialized) return false;
+
+        try
+        {
+            // SPEK-style visualization:
+            // - s=1024x512: Resolution
+            // - mode=separate: Separate channels? No, combined is usually better for quick checks, but separate shows stereo width. Let's use combined for cleaner UI.
+            // - color=rainbow: Classic heatmap
+            // - scale=log: Logarithmic intensity
+            // - legend=1: Show frequency/time axes (Critical for verification)
+            var args = $"-y -i \"{inputPath}\" -lavfi showspectrumpic=s=1024x512:mode=combined:color=rainbow:scale=log:legend=1 \"{outputPath}\"";
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = _ffmpegPath,
+                Arguments = args,
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardError = true
+            };
+
+            using var process = new Process { StartInfo = startInfo };
+            
+            // Capture errors just in case
+            var errorOutput = new StringBuilder();
+            process.ErrorDataReceived += (s, e) => { if (e.Data != null) errorOutput.AppendLine(e.Data); };
+            
+            process.Start();
+            process.BeginErrorReadLine();
+            
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0)
+            {
+                _logger.LogError("Spectrogram generation failed (Exit {Code}): {Error}", process.ExitCode, errorOutput);
+                return false;
+            }
+
+            return File.Exists(outputPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Spectrogram generation failed for {File}", inputPath);
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         _cts.Cancel();

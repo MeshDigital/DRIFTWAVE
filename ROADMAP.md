@@ -1,249 +1,98 @@
-# ORBIT (formerly SLSKDONET): v1.0 Stabilization Roadmap
+# ORBIT (formerly SLSKDONET): v1.0 Feature Roadmap
 
-**Last Updated**: December 30, 2025  
-**Repository**: https://github.com/MeshDigital/ORBIT  
-> **Current Phase**: Phase 5 Stabilization & Code Polish
-
-> [!IMPORTANT]
-> **Status Update**: Phase 4 "Rekordbox Integration" is COMPLETE. ORBIT now features professional DJ export tools including playlist export and Monthly Drop functionality. Focus shifts to **Phase 5: Self-Healing Library**.
+**Last Updated**: January 2026
+**Repository**: https://github.com/MeshDigital/ORBIT
+**Current Status**: Phase 5 (Stabilization) / Phase 8 (Sonic Integrity backend)
 
 ---
 
-### Phase 3C: Advanced Queue Orchestration - COMPLETE
-**Impact**: Solves "Traffic Jam" issues where large imports block single downloads.
-- **Multi-Lane Priority Engine**:
-  - **Lane A (Express)**: Priority 0 (2 guaranteed slots).
-  - **Lane B (Standard)**: Priority 1 (2 max slots).
-  - **Lane C (Background)**: Priority 10+ (Background fill).
-- **Preemption Logic**: High priority downloads automatically pause lowest-priority active tasks.
-- **Persistence**: Priority levels (even single-track overrides) are persisted to DB to survive restarts.
-- **Lazy Hydration (Waiting Room)**: 
-  - Only hydrates top 100 pending tracks to RAM.
-  - Automatic DB refill when buffer is low.
-  - Reduces memory usage for 2000+ track queues.
-- **Project Prioritization**: "VIP Pass" logic to bump entire playlists to Priority 0.
+## 🗺️ Completed Phases (Foundations)
 
-## ✅ Recently Completed (December 2025)
+### ✅ Phase 0: Foundation & Connectivity
+**Goal**: Core infrastructure and secure connectivity.
+*   **P2P Engine**: Robust Soulseek client (`SoulseekAdapter.cs`) handling search, download, and connection management.
+*   **Spotify Integration**: OAuth 2.0 with PKCE (`SpotifyAuthService.cs`) and secure token storage (DPAPI/Keychain).
+*   **Database**: SQLite with Write-Ahead Logging (WAL) for high concurrency (`AppDbContext.cs`).
+*   **Atomic Operations**: ACID-compliant file operations (`SafeWriteService.cs`) preventing corruption.
 
-### Phase 5: Industrial Grade Stability - COMPLETE
-- **Goal**: Hardening, reliability, and "Industrial Grade" stability.
-- **Phase 5A: Self-Healing Library (Completed Dec 2025)**
-  - **Ghost File Prevention**: Pre-flight spin-wait locks & Safe Deferrals (5min cooldown).
-  - **Atomic Swaps**: Cross-volume verified copy+delete transactions.
-  - **Crash Recovery**: Journaling of interrupted upgrades (`.journal`).
-- **Phase 5B: High Fidelity Audio (Completed Dec 2025)**
-  - **Audio Engine**: NAudio integration with ASIO/WASAPI support.
-  - **Rekordbox Analysis Preservation**: Binary parsing of `.DAT/.EXT` files.
-  - **Real-time Waveforms**: GPU-accelerated rendering of `PWAV` data.
-  - **VU Meters**: Exponential decay peak meters.
-  - **Background Enrichment**: Batch-fetching (100 tracks) of Spotify Energy/Valence/Danceability.
-- **Phase 3C.4: Threshold Trigger (Completed Dec 2025)**
-  - **Instant Downloads**: Starts download immediately if score > 92%.
-  - **Real-Time Scoring**: Evaluates stream instead of buffering.
-- **Phase 3C.5: Speculative Start (Completed Dec 2025)**
-  - **Silver Match Default**: If no Gold match in 5s, start best available (>70%).
-  - **Time-to-Music**: Guarantees max 5s wait for available tracks.
-- **Phase 3C.3: Multi-Lane UI Integration (See TODO)**
-  - **Visual Swimlanes**: Express (Gold), Standard (Blue), Background (Dimmed).
-  - **Quality Badges**: Gold (>92%), Silver (Pulsing 70%), Bronze (<70%).
-  - **VIP Pass**: "God Mode" right-click override with Priority Debt limits.
-- **Phase 3C.6: Concurrency Control (Completed Dec 2025)**
-  - **Dynamic Semaphore**: Real-time adjustment of active download slots (1-20).
-  - **Queue Visibility**: Expanded buffer to 5000 items ensuring playlist integrity.
-  - **User Control**: UI Slider in Download Center for "Cruise Control".
-- **Phase 5C: Industrial Hardening (Completed Dec 2025)**
-  - **Security**: Windows DPAPI encryption for Spotify tokens (replacing Base64).
-  - **Resource Mgmt**: Explicit process killing for FFmpeg (Anti-Zombie).
-  - **Database**: `PRAGMA wal_checkpoint(FULL)` on shutdown to prevent corruption.
-  - **Concurrency**: Deadlock timeouts (10s) on Auth Semaphores.
-  - **UI Performance**: Throttled playback timers (4fps) to prevent dispatcher flooding.
-- **Atomic Tag Writes**: ACID-compliant metadata updates (`SafeWriteService`).
-- **Resilient Downloads**: Thread-safe heartbeat monitoring with stall detection.
-- **Automatic Recovery**: Self-healing on startup (checks journal, resumes operations, notifies user).
-- **Performance**: <1% CPU overhead, <500ms startup delay.
+### ✅ Phase 1: "The Brain" (Ranking & Search)
+**Goal**: Intelligent result curation.
+*   **Scoring Engine**: Strategy-based ranking (`QualityFirstStrategy`) weighing Bitrate, BPM, and Availability.
+*   **Search Normalization**: Stripping noise ("Official Video", "Lyrics") for accurate matching.
+*   **Contextual Search**: Adjusting ranking based on intent (e.g., "DJ Mode").
 
-### ✅ Phase 6: Mission Control Dashboard - COMPLETE
-**Goal**: Transform "Home" into a proactive command center with "Industrial Grade" performance.
-- [x] **Tier 1: Aggregator Facade**: `MissionControlService` for throttled (4 FPS) UI updates.
-- [x] **Tier 2: Materialized Intelligence**: `DashboardSnapshot` DTO with hash-based caching.
-- [x] **Live Operations Grid**: "Glass Cockpit" view of transfers using `ItemsRepeater` virtualization.
-- [x] **System Health**: Real-time Zombie Process detection and Recovery stats.
-- [ ] **One-Click Missions**: "Monthly Drop", "Sonic Audit" via Command Pattern (Deferred).
-- [ ] **Vibe Search**: Natural language query expansion ("Late night 124bpm") (Deferred).
+### ✅ Phase 2: Crash Resilience
+**Goal**: Zero data loss.
+*   **Recovery Journal**: Logs file operations to `CrashRecoveryJournal.cs` for startup recovery.
+*   **Dead Letter Queue**: Quarantines repeat-crash causing files.
 
-### Phase 7: Mobile Companion App (Q2 2026)
-### Phase 1B: Database Optimization - COMPLETE
-**Impact**: 50-100x faster query performance.
-- **WAL Mode**: Write-Ahead Logging for high concurrency.
-- **Index Optimization**: Added critical covering indexes for library queries.
-- **Connection Pooling**: Dedicated connection for high-frequency journal writes.
+### ✅ Phase 3: Advanced Orchestration (Traffic Control)
+**Goal**: Traffic Jam prevention.
+*   **Multi-Lane Queue**: Express (P0), Standard (P1), Background (P10) lanes (`DownloadOrchestrationService`).
+*   **Stall Detection**: `DownloadHealthMonitor` auto-retries stalled peers (>60s).
+*   **Preemption**: High-priority tasks pause background downloads.
 
-### Phase 8: Architectural Foundations - COMPLETE
-**Impact**: Infrastructure for future sonic integrity features.
-- **Producer-Consumer Pattern**: Non-blocking batch analysis architecture.
-- **Dependency Validation**: Smart FFmpeg detection with graceful degradation.
-- **Maintenance Tasks**: Automated database vacuuming and backup cleanup.
+### ✅ Phase 4: Pro DJ Tools
+**Goal**: Rekordbox/Serato Competitor.
+*   **Harmonic Mixing**: Camelot Wheel integration (`HarmonicMatchService`) for Key/BPM compatibility.
+*   **Rekordbox Export**: Streaming XML generation for Pioneer CDJs (`RekordboxService`).
+*   **Monthly Drop**: Automated recent-tracks playlist generation.
+*   **Binary Parsing**: Analyzing `.DAT/.EXT` files for beat grids and waveforms (`AnlzFileParser`).
 
-### Phase 0-1: Core Features - COMPLETE
-- **Intelligent Ranking**: "The Brain" scoring system (Bitrate > BPM > Availability).
-- **Spotify Integration**: PKCE Auth, Playlist import, Metadata enrichment.
-- **Modern UI**: Dark-themed Avalonia interface with "Bento Grid" layout.
-- **P2P Engine**: Robust Soulseek client implementation.
+### ✅ Phase 5: Self-Healing Library
+**Goal**: Automated quality upgrades.
+*   **Upgrade Orchestrator**: State machine for finding FLAC upgrades for 128kbps files.
+*   **Atomic Swaps**: Checkpointed 8-step swap process (Lock -> Search -> Download -> Clone -> Swap).
+*   **Metadata Cloning**: Preserving ratings and play counts during upgrades.
 
 ---
 
-## Phase 3A: Atomic Resumability & UI Transparency - COMPLETE ✅
-- **Impact**: No redownloading files after a crash; "Value Gap" bridged.
-- **Atomic Downloads**: Full `.part` file workflow integrated with Recovery Journal.
-- **Health Dashboard**: Backend recovery status visible on Home Screen.
-- **Schema Expansion**: "Dual-Truth" audio features (Spotify vs Manual) added to TrackEntity.
+## 🚧 Active Development
 
-## Phase 3B: Download Health Monitor - COMPLETE ✅
-**Phase Goal**: Automated self-healing for network instability.
-- **Stall Detection**: Adaptive timeout logic (60s standard, 120s for >90% progress)
-- **Auto-Retry**: Automatic peer switching for stalled transfers
-- **Peer Blacklisting**: Temporary blacklist for problematic peers
-- **Dual-Truth Schema**: IntegrityLevel enum (Pending → Bronze → Silver → Gold)
-- **Clear Dead-Letters**: UI feature for manual recovery
+### 🚧 Phase 8: Sonic Integrity (Backend Ready)
+**Goal**: True Audio Quality Verification.
+*   **Spectral Forensics**: Headless FFmpeg analysis (`SonicIntegrityService`) detecting frequency cutoffs (16k/19k/21k).
+*   **Essentia Firehose**: `EssentiaAnalyzerService` extracting BPM, Key, Energy.
+*   **Drop Detection**: `DropDetectionEngine` for finding mixing points.
 
-## Phase 4: Rekordbox Integration - COMPLETE ✅
-**Phase Goal**: Professional DJ export functionality.
-- **RekordboxService**: Streaming XML generation using XmlWriter
-- **KeyConverter**: Musical key normalization (Standard → Camelot → OpenKey)
-- **XmlSanitizer**: Metadata safety for Rekordbox compatibility
-- **Playlist Export**: Context menu on playlist items
-  - ✅ **Database Sync**: Synced Spotify features between `LibraryEntry` and `PlaylistTrack`.
-- ✅ **Phase 3C: Advanced Queue Orchestration**:
-  - ✅ **Multi-Lane Priority**: Express (0), Standard (1), Background (10) lanes.
-  - ✅ **Preemption**: High priority tasks pause lower priority downloads when slots are full.
-  - ✅ **Persistence**: Priority levels saved to DB for crash resilience.s (last 30 days)
-- **SaveFileDialog**: Integrated using Avalonia StorageProvider
+### 🚧 Phase 12: UX 2.0 (Search & Curation)
+**Goal**: "Curation Assistant" UI.
+*   **Visual Hierarchy**: Gold/Silver/Bronze badges, heatmaps.
+*   **Forensic Inspector**: UI for verifying Upscaled vs Native files.
 
-## ✅ Phase 5A: Self-Healing Library - COMPLETE
-**Phase Goal**: Automatic quality upgrades for library tracks.
-
-### Core Components
-- ✅ **LibraryScanner**: Batch processing with yield return (50 tracks/batch)
-- ✅ **MetadataCloner**: Cross-format metadata transfer (ID3 ↔ Vorbis ↔ APE)
-- ✅ **UpgradeScout**: P2P search with ±2s duration matching
-- ✅ **FileLockMonitor**: Dual-layer safety (PlayerViewModel + OS-level exclusive lock)
-- ✅ **UpgradeOrchestrator**: 8-step atomic swap with state machine
-
-### Features
-- **8-Step Transactional Swap**: Lock check, P2P search, shadow download, metadata clone, journal checkpoint, backup, swap, database update
-- **State Machine**: 9 states with rollback logic (Pending → Downloading → CloningMetadata → ReadyToSwap → BackingUp → Swapping → UpdatingDatabase → Completed/Failed)
-- **FLAC-Only Mode**: Conservative upgrade strategy (128/192kbps MP3 → FLAC)
-- **7-Day Scan Cooldown**: Prevents redundant rescanning
-- **7-Day Backup Retention**: Timestamped folders for rollback safety
-- **Gold Status Exclusion**: Respects user-verified tracks
-- **Quality Gain Tracking**: Bitrate delta + percent improvement for UI gamification
-- **Crash Recovery**: Journal integration for mid-swap safety
-- **Shadow Downloads**: Isolated `.orbit/tmp/upgrades` directory
-- **Cross-Volume Detection**: MFT atomic update vs verified copy+delete
-
-## ✅ Phase 5B: Rekordbox Analysis Preservation (RAP) - COMPLETE
-**Phase Goal**: Preserve Rekordbox analysis during file upgrades.
-- ✅ **Binary ANLZ Parsing**: Read beat grids, waveforms, hot cues from `.DAT/.EXT` files
-- ✅ **XOR Descrambling**: Decrypted PSSI song structure phrases (Intro/Verse/Chorus/Outro)
-- ✅ **High-Fidelity Player**: NAudio-based engine with VU meters and real-time waveforms
-- ✅ **Companion Probing**: Automatic lookup of analysis data in `ANLZ` subfolders or USB structures
-
-### ANLZ Tags Supported
-- ✅ `PQTZ` - Beat Grid (quantized tick markers)
-- ✅ `PCOB` - Cue Points and Hot Cues
-- ✅ `PWAV` - Waveform Preview
-- ✅ `PSSI` - Song Structure (XOR-encrypted phrases)
-
-## ✅ Phase 12.6: Search & UX 2.0 - COMPLETE
-**Phase Goal**: "Curation Assistant" Search UI and transparent Downloads UX.
-- ✅ **Visual Hierarchy**: Gold/Silver/Bronze badges and heatmaps for search results
-- ✅ **Multi-Line Templates**: Dense metadata display (Artist - Title / Technical Details)
-- ✅ **Bi-Directional Sync**: Search tokens match Filter HUD state automatically
-- ✅ **Downloads Transparency**: Failure reasons visible in UI, Force Retry support
-- ✅ **Forensic Inspector**: Frequency Cutoff display with "Native vs Upscaled" detection.
-
-### High-Fidelity Infrastructure
-- **NAudio Backend**: Replaced LibVLC for better control over audio buffers and threading
-- **MeteringSampleProvider**: Real-time VU meter data (Left/Right peak)
-- **WaveformControl**: Custom Avalonia component for professional Waveform rendering
-- **Pitch UI**: Real-time tempo adjustment (0.9x to 1.1x)
-
-
-## 🎯 Archived Priority: UI Placeholder Refactor (Completed Phase 3A)
-
-With the backend hardened, we must align the frontend reality with user expectations.
-
-### 1. Health Dashboard Integration
-- **Goal**: Visualize the `CrashRecoveryJournal` status in the UI.
-- **Implementation**:
-    - Update `HomeViewModel` to query `DeadLetter` status.
-    - Active "System Health" widget on Dashboard (Green/Orange/Red).
-    - "Review Manual Fixes" action for dead-lettered files.
-
-### 2. UI Transparency Audit
-- **Goal**: Eliminate "dead clicks".
-- **Implementation**:
-    - Disable buttons for `Rekordbox Export` and `Spectral Analysis`.
-    - Add "Coming v1.1" tooltips.
-    - Connect `TrackInspector` spectral fields to actual data sources (or hide if empty).
+### ✅ Phase 13: Audio Intelligence (The "Active" Upgrade)
+**Goal**: From Passive Analyzer to Active DJ Assistant.
+*   **Phase 13A: Forensic Librarian**
+    *   **Dynamic Range**: Detecting over-compressed ("Sausage") masters via `dynamic_complexity`.
+    *   **Drift Detection**: Warning about variable tempo via `bpm_histogram`.
+*   **Phase 13B: Visual Truth**
+    *   **Spectrogram UI**: SPEK-style frequency visualization.
+*   **Phase 13C: AI Layer**
+    *   **Deep Learning**: TensorFlow models (`.pb`) for Vocal Detection and Mood.
+    *   **Active Suggestions**: "Mixes Well With" panel and "Vibe Radar".
 
 ---
 
 ## 🔮 Future Phases
 
-### Month 2: UI Transparency & Speed (January 2026)
+### Phase 6: Mission Control Dashboard
+**Goal**: Proactive command center.
+- [ ] Tier 1: Aggregator Facade (`MissionControlService`).
+- [ ] Live Operations Grid.
+- [ ] System Health Monitoring (Zombie Processes).
 
-#### 1. UI Refactor: "The Transparency Phase" (Highest Priority)
-- **Goal**: Connect placeholder UI elements to real logic or clearly mark as "Coming Soon".
-- **Features**:
-    - **Health Dashboard**: Live status of Crash Journal (DeadLetters) & API Health.
-    - **Logic Connection**: Hook up "Spectral Analysis" and "Export" buttons.
-    - **Disabled States**: Prevent "dead clicks" on unimplemented features.
-
-#### 2. UI Virtualization (Critical)
-- **Goal**: Support libraries with 50,000+ tracks.
-- **Tech**: VirtualizingStackPanel, lazy-loading viewmodels.
-- **Metric**: 60 FPS scrolling at 10k items.
-
-#### 1. Upgrade Scout
-- **Goal**: Automatically find better versions of existing tracks.
-- **Logic**: If Library has 128kbps MP3 → Search P2P for FLAC matching duration/metadata → Background Download → Atomic Swap.
-
-#### 2. Sonic Integrity (Phase 8 Implementation)
-- **Goal**: Verify true audio quality.
-- **Tech**: FFmpeg spectral analysis to detect "transcoded" fake lossless files.
+### Phase 7: Mobile Companion App (Q2 2026)
+**Goal**: Remote management.
 
 ### Phase 9: Hardware Export
-- **Goal**: Sync to DJ hardware.
-- **Target**: Rekordbox XML export, FAT32 USB sync for Denon/Pioneer.
+**Goal**: Direct USB Sync.
+- [ ] FAT32 USB syncing for Denon/Pioneer hardware.
 
 ---
 
-## 📊 Performance Targets vs Reality
-
-| Metric | Target | Current Status |
+## 📊 Performance Targets
+| Metric | Target | Current |
 | :--- | :--- | :--- |
-| **Startup Time** | < 2s | **~1.5s** (Excellent) |
-| **Crash Recovery** | 100% | **100%** (Verified Phase 2A) |
-| **UI Responsiveness** | 60 FPS | **30 FPS** (Needs Virtualization) |
-| **Search Speed** | < 5s | **~2-4s** (Good) |
-| **Memory Usage** | < 500MB | **~300-600MB** (Variable) |
-
----
-
-## 🐛 Known Issues (Backlog)
-
-### High Priority
-- **UI Scalability**: Large playlists cause UI stuttering (Phase 6C TreeDataGrid required).
-- **N+1 Queries**: Some UI views trigger redundant database fetches.
-- **Soft Deletes**: Deleting projects is currently destructive (needs Audit Trail).
-
-### Medium Priority
-- **Duplicate Detection**: Batch imports sometimes miss duplicates within the same batch.
-- **Drag-and-Drop**: Positioning issues on high-DPI displays.
-
----
-
-**Last Updated**: December 24, 2025  
-**Maintained By**: MeshDigital & AI Agents  
-**License**: GPL-3.0
+| **Startup** | < 2s | **~1.5s** |
+| **Crash Recovery** | 100% | **100%** |
+| **Search Speed** | < 5s | **~2-4s** |

@@ -28,6 +28,9 @@ public class SearchOrchestrationService
     private readonly ISafetyFilterService _safetyFilter; // Week 2: Gatekeeper
     private readonly AppConfig _config;
     
+    // Throttling: Prevent getting banned by issuing too many searches at once
+    private readonly SemaphoreSlim _searchSemaphore;
+    
     public SearchOrchestrationService(
         ILogger<SearchOrchestrationService> logger,
         ISoulseekAdapter soulseek,
@@ -42,6 +45,9 @@ public class SearchOrchestrationService
         _searchNormalization = searchNormalization;
         _safetyFilter = safetyFilter;
         _config = config;
+        
+        // Initialize simple signaling semaphore
+        _searchSemaphore = new SemaphoreSlim(Math.Max(1, _config.MaxConcurrentSearches));
     }
     
     public bool IsConnected => _soulseek.IsConnected;
@@ -59,10 +65,19 @@ public class SearchOrchestrationService
         bool isAlbumSearch, // Kept for API compatibility, but grouping is now consumer responsibility
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        Interlocked.Increment(ref _activeSearchCount);
-        try
+        // Throttling Check
+        bool acquired = false;
+        try 
         {
-            _logger.LogInformation("Streaming search started for: {Query}", query);
+            // Try to acquire slot immediately or wait briefly
+            // This prevents queueing 500 searches that will execute 10 minutes later
+            await _searchSemaphore.WaitAsync(cancellationToken);
+            acquired = true;
+
+            Interlocked.Increment(ref _activeSearchCount);
+
+            _logger.LogInformation("Streaming search started for: {Query} (Slots free: {Count})", 
+                query, _searchSemaphore.CurrentCount);
         
         // Phase 4.6 HOTFIX: Use new SearchNormalizationService instead of aggressive parenthesis stripping
         // OLD (BROKEN): Removes ALL parentheses including (VIP), (feat. X), (Remix)
@@ -116,7 +131,11 @@ public class SearchOrchestrationService
         }
         finally
         {
-            Interlocked.Decrement(ref _activeSearchCount);
+            if (acquired)
+            {
+                Interlocked.Decrement(ref _activeSearchCount);
+                _searchSemaphore.Release();
+            }
         }
     }
     

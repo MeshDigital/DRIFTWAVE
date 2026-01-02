@@ -24,7 +24,7 @@ public class AppDbContext : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         var appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
-        var dbPath = Path.Combine(appData, "SLSKDONET", "library.db");
+        var dbPath = Path.Combine(appData, "ORBIT", "library.db");
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
         
         // Phase 1B: Enable WAL Mode for better concurrency

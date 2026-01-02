@@ -62,10 +62,19 @@ public class ImportOrchestrator
                 {
                      // Phase 7: Deterministic ID / Deduplication
                      var newJobId = Utils.GuidGenerator.CreateFromUrl(input);
-                     _logger.LogInformation("Generated Job ID: {Id}", newJobId);
+                     _logger.LogInformation("Generated Job ID: {Id} for input: {Input}", newJobId, input);
                      
                      // Retrieve existing job if any (Deduplication)
                      var existingJob = await _libraryService.FindPlaylistJobAsync(newJobId);
+
+                     if (existingJob != null)
+                     {
+                         _logger.LogInformation("Found duplicate playlist by ID match: {Title} ({Id})", existingJob.SourceTitle, existingJob.Id);
+                     }
+                     else
+                     {
+                         _logger.LogInformation("No duplicate found by ID match for {Id}. Checking URL fallback...", newJobId);
+                     }
 
                      // Fallback: Check by normalized URL if strict ID match failed
                      if (existingJob == null)
@@ -74,6 +83,10 @@ public class ImportOrchestrator
                          if (existingJob != null)
                          {
                              _logger.LogInformation("Found duplicate playlist by URL match: {Title}", existingJob.SourceTitle);
+                         }
+                         else
+                         {
+                             _logger.LogInformation("No duplicate found by URL match for input: {Input}", input);
                          }
                      }
                      

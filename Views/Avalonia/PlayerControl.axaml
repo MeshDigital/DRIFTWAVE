@@ -132,6 +132,7 @@
                     <controls:WaveformControl WaveformData="{Binding WaveformData}" 
                                             Progress="{Binding Position}"
                                             Opacity="0.6"
+                                            SeekCommand="{Binding SeekCommand}"
                                             VerticalAlignment="Stretch"
                                             HorizontalAlignment="Stretch"/>
                     

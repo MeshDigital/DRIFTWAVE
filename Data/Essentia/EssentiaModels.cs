@@ -10,6 +10,9 @@ public class EssentiaOutput
 
     [JsonPropertyName("tonal")]
     public TonalData? Tonal { get; set; }
+
+    [JsonPropertyName("lowlevel")]
+    public LowLevelData? LowLevel { get; set; }
 }
 
 public class RhythmData
@@ -19,6 +22,9 @@ public class RhythmData
 
     [JsonPropertyName("danceability")]
     public float Danceability { get; set; }
+
+    [JsonPropertyName("onset_rate")]
+    public float OnsetRate { get; set; }
 }
 
 public class TonalData
@@ -40,4 +46,25 @@ public class KeyData
 
     [JsonPropertyName("strength")]
     public float Strength { get; set; }
+}
+
+public class LowLevelData
+{
+    [JsonPropertyName("average_loudness")]
+    public float AverageLoudness { get; set; }
+
+    [JsonPropertyName("dynamic_complexity")]
+    public float DynamicComplexity { get; set; }
+
+    [JsonPropertyName("spectral_centroid")]
+    public StatsData? SpectralCentroid { get; set; }
+    
+    [JsonPropertyName("spectral_complexity")]
+    public StatsData? SpectralComplexity { get; set; }
+}
+
+public class StatsData
+{
+    [JsonPropertyName("mean")]
+    public float Mean { get; set; }
 }

@@ -16,6 +16,7 @@ public class AppConfig
     public bool UseUPnP { get; set; } = false;
     public int ConnectTimeout { get; set; } = 20000; // ms
     public int SearchTimeout { get; set; } = 6000; // ms
+    public int MaxConcurrentSearches { get; set; } = 4; // Throttling to prevent bans
     public string? DownloadDirectory { get; set; }
     public string? SharedFolderPath { get; set; }
     public int MaxConcurrentDownloads { get; set; } = 5; // Optimized: was 2, increased for better throughput

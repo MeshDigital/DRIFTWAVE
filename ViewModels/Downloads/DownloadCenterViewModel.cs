@@ -153,11 +153,10 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
             var failedItems = FailedDownloads.ToList();
             foreach (var item in failedItems)
             {
-                if (item.RetryCommand.CanExecute(null))
-                {
-                    item.RetryCommand.Execute(null);
-                }
+                // Fix: Call manager directly to ensure execution and avoid ReactiveCommand subscription issues
+                _downloadManager.HardRetryTrack(item.GlobalId);
             }
+            await Task.CompletedTask;
         }, this.WhenAnyValue(x => x.FailedCount, count => count > 0));
         
         // Initialize DynamicData Pipelines

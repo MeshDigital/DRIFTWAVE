@@ -338,17 +338,43 @@ public class LibraryService : ILibraryService
         {
             var entities = await _databaseService.LoadAllPlaylistJobsAsync().ConfigureAwait(false);
             
-            // Normalize searching URL (simple: strip query params and trailing slashes)
-            var cleanSearch = sourceUrl.Split('?')[0].TrimEnd('/');
-            
+            // Normalize searching URL: 
+            // 1. Trim whitespace
+            // 2. Replace backslashes with forward slashes
+            // 3. Remove query parameters
+            // 4. Remove trailing slashes
+            // 5. ToLower
+            string Normalize(string input)
+            {
+                if (string.IsNullOrEmpty(input)) return string.Empty;
+                var s = input.Trim().Replace('\\', '/');
+                if (s.Contains('?')) s = s.Split('?')[0];
+                return s.TrimEnd('/').ToLowerInvariant();
+            }
+
+            var cleanSearch = Normalize(sourceUrl);
+            _logger.LogInformation("Checking for duplicate job with normalized URL: '{Normalized}' (Original: '{Original}')", cleanSearch, sourceUrl);
+
             // Search logic
             return entities
                 .Select(EntityToPlaylistJob)
                 .FirstOrDefault(job => 
                 {
                     if (string.IsNullOrEmpty(job.SourceUrl)) return false;
-                    var cleanSource = job.SourceUrl.Split('?')[0].TrimEnd('/');
-                    return string.Equals(cleanSearch, cleanSource, StringComparison.OrdinalIgnoreCase);
+                    var cleanSource = Normalize(job.SourceUrl);
+                    var match = string.Equals(cleanSearch, cleanSource, StringComparison.OrdinalIgnoreCase);
+                    
+                    if (match)
+                    {
+                        _logger.LogInformation("MATCH: Job '{Title}' ({Id}) matches normalized URL", job.SourceTitle, job.Id);
+                    }
+                    else if (cleanSource.Contains(cleanSearch) || cleanSearch.Contains(cleanSource))
+                    {
+                         // Partial match debug logging
+                         _logger.LogDebug("Partial Mismatch: '{Search}' vs '{Source}'", cleanSearch, cleanSource);
+                    }
+                    
+                    return match;
                 });
         }
         catch (Exception ex)

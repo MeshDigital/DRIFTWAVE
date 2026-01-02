@@ -11,6 +11,9 @@ using SLSKDONET.Data.Entities;
 using SLSKDONET.Models;
 using Microsoft.Extensions.Logging;
 
+using Avalonia.Media.Imaging;
+using System.IO;
+
 namespace SLSKDONET.ViewModels
 {
     public class TrackInspectorViewModel : INotifyPropertyChanged, IDisposable
@@ -19,10 +22,20 @@ namespace SLSKDONET.ViewModels
         private readonly Services.AnalysisQueueService _analysisQueue;
         private readonly Services.IEventBus _eventBus;
         private readonly Services.DownloadDiscoveryService _discoveryService;
+        private readonly Services.SonicIntegrityService _sonicIntegrityService;
+        private readonly Services.HarmonicMatchService _harmonicMatchService;
+        private readonly Services.ILibraryService _libraryService;
         private readonly ILogger<TrackInspectorViewModel> _logger;
         private readonly CompositeDisposable _disposables = new();
         private Data.Entities.AudioAnalysisEntity? _analysis;
+        public AudioFeaturesEntity? AudioFeatures => _audioFeatures;
         private Data.Entities.AudioFeaturesEntity? _audioFeatures; // Phase 4: Musical Intelligence
+        
+        private void OnTrackChanged()
+        {
+             // Trigger async Pro DJ load
+             _ = LoadProDjFeaturesAsync();
+        } // Phase 4: Musical Intelligence
         
         private bool _isAnalyzing;
         public bool IsAnalyzing
@@ -46,22 +59,52 @@ namespace SLSKDONET.ViewModels
 
         public bool IsProgressModalVisible => ProgressModal != null;
 
-        // Phase 3: Interactive Commands
+        private Bitmap? _spectrogramBitmap;
+        public Bitmap? SpectrogramBitmap
+        {
+            get => _spectrogramBitmap;
+            set => SetProperty(ref _spectrogramBitmap, value);
+        }
+
+        private bool _isGeneratingSpectrogram;
+        public bool IsGeneratingSpectrogram
+        {
+            get => _isGeneratingSpectrogram;
+            set => SetProperty(ref _isGeneratingSpectrogram, value);
+        }
+
+        // Pro DJ Features
+        public ObservableCollection<Services.HarmonicMatchResult> MixesWellMatches { get; } = new();
+        public ObservableCollection<PlaylistTrack> OtherVersions { get; } = new();
+        
+        // Vibe Radar Data (0-100 scale for UI)
+        public double VibeEnergy => (Track?.Energy ?? 0) * 100;
+        public double VibeDance => (AudioFeatures?.Danceability ?? 0) * 100;
+        public double VibeMood => (AudioFeatures?.KeyConfidence ?? 0) * 100; // Proxy for now
+        
+        public bool HasProDjFeatures => HasAnalysis && !string.IsNullOrEmpty(CamelotKey);
         public System.Windows.Input.ICommand ForceReAnalyzeCommand { get; }
         public System.Windows.Input.ICommand ExportLogsCommand { get; }
         public System.Windows.Input.ICommand ReFetchUpgradeCommand { get; }
+        public System.Windows.Input.ICommand GenerateSpectrogramCommand { get; }
 
         public TrackInspectorViewModel(
             Services.IAudioAnalysisService audioAnalysisService, 
             Services.AnalysisQueueService analysisQueue,
             Services.IEventBus eventBus,
             Services.DownloadDiscoveryService discoveryService,
+            Services.SonicIntegrityService sonicIntegrityService,
+            Services.HarmonicMatchService harmonicMatchService,
+            Services.ILibraryService libraryService,
             ILogger<TrackInspectorViewModel> logger)
         {
             _audioAnalysisService = audioAnalysisService;
             _analysisQueue = analysisQueue;
             _eventBus = eventBus;
             _discoveryService = discoveryService;
+            _sonicIntegrityService = sonicIntegrityService;
+            _harmonicMatchService = harmonicMatchService;
+            _libraryService = libraryService;
             _logger = logger;
 
             // Phase 12.6: Listen for global track selection
@@ -186,6 +229,85 @@ namespace SLSKDONET.ViewModels
                         ProgressPercent: 0));
                 }
             });
+
+            GenerateSpectrogramCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (Track == null || string.IsNullOrEmpty(Track.ResolvedFilePath)) return;
+                
+                try 
+                {
+                    IsGeneratingSpectrogram = true;
+                    var cacheDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ORBIT", "Spectrograms");
+                    Directory.CreateDirectory(cacheDir);
+                    
+                    var outputPath = Path.Combine(cacheDir, $"{Track.TrackUniqueHash}.png");
+                    
+                    if (!File.Exists(outputPath))
+                    {
+                        await _sonicIntegrityService.GenerateSpectrogramAsync(Track.ResolvedFilePath, outputPath);
+                    }
+                    
+                    if (File.Exists(outputPath))
+                    {
+                         // Basic load. For production, consider async loading to avoid UI freeze on large images
+                         SpectrogramBitmap = new Bitmap(outputPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to generate spectrogram");
+                }
+                finally
+                {
+                    IsGeneratingSpectrogram = false;
+                }
+            });
+        }
+
+        private async Task LoadProDjFeaturesAsync()
+        {
+            if (Track == null || string.IsNullOrEmpty(Track.TrackUniqueHash)) return;
+
+            MixesWellMatches.Clear();
+            OtherVersions.Clear();
+
+            try
+            {
+                // 1. Mixes Well With (Harmonic Matches)
+                // We need the LibraryEntry ID. Since PlaylistTrack might not have it directly populated or might differ,
+                // we'll try to find the LibraryEntry by Hash first.
+                var libraryEntry = await _libraryService.FindLibraryEntryAsync(Track.TrackUniqueHash);
+                if (libraryEntry != null)
+                {
+                    var matches = await _harmonicMatchService.GetHarmonicMatchesAsync(libraryEntry.Id, limit: 5);
+                    foreach (var match in matches)
+                    {
+                        MixesWellMatches.Add(match);
+                    }
+                }
+
+                // 2. Other Versions (Same Title + Artist, different Hash)
+                var allTracks = await _libraryService.GetAllPlaylistTracksAsync();
+                var versions = allTracks
+                    .Where(t => t.Artist.Equals(Track.Artist, StringComparison.OrdinalIgnoreCase) 
+                             && t.Title.Equals(Track.Title, StringComparison.OrdinalIgnoreCase)
+                             && t.TrackUniqueHash != Track.TrackUniqueHash)
+                    .Take(5)
+                    .ToList();
+
+                foreach (var v in versions)
+                {
+                    OtherVersions.Add(v);
+                }
+                
+                OnPropertyChanged(nameof(HasProDjFeatures));
+                OnPropertyChanged(nameof(VibeEnergy));
+                OnPropertyChanged(nameof(VibeDance));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load Pro DJ features");
+            }
         }
 
         private PlaylistTrack? _track;
@@ -212,8 +334,8 @@ namespace SLSKDONET.ViewModels
                     
                     // Reset analysis
                     _analysis = null;
-                    _analysis = null;
                     _audioFeatures = null; // Phase 4
+                    SpectrogramBitmap = null; // Reset spectrogram
                     ForensicLogs.Clear(); // Phase 4.7
                     NotifyAnalysisProperties();
                     NotifyMusicalIntelligenceProperties(); // Phase 4
@@ -224,6 +346,7 @@ namespace SLSKDONET.ViewModels
                         LoadAnalysisAsync(value.TrackUniqueHash);
                         LoadAudioFeaturesAsync(value.TrackUniqueHash); // Phase 4
                         LoadForensicLogsAsync(value.TrackUniqueHash); // Phase 4.7
+                        OnTrackChanged(); // Trigger Pro DJ features load
                     }
                 }
             }
@@ -335,6 +458,7 @@ namespace SLSKDONET.ViewModels
             OnPropertyChanged(nameof(TruePeakLabel));
             OnPropertyChanged(nameof(DynamicRangeLabel));
             OnPropertyChanged(nameof(TechDetailsLabel));
+            OnPropertyChanged(nameof(FileSizeLabel));
             
             // Integrity Scout
             OnPropertyChanged(nameof(IntegrityStatusText));
@@ -345,7 +469,13 @@ namespace SLSKDONET.ViewModels
             // Phase 2: Status properties
             OnPropertyChanged(nameof(HasAnalysis));
             OnPropertyChanged(nameof(AnalysisAge));
-            OnPropertyChanged(nameof(StatusBadgeText));
+            
+            // Re-notify Vibe Radar
+            OnPropertyChanged(nameof(VibeEnergy));
+            OnPropertyChanged(nameof(VibeDance));
+            OnPropertyChanged(nameof(VibeMood));
+            
+            // Phase 4: Musical Intelligence Properties Notification
         }
         
         // Phase 4: Musical Intelligence Properties Notification
@@ -361,6 +491,10 @@ namespace SLSKDONET.ViewModels
             OnPropertyChanged(nameof(CuePhraseStart));
             OnPropertyChanged(nameof(HasMusicalIntelligence));
             OnPropertyChanged(nameof(HasCuePoints));
+            
+            // Re-notify main properties to pick up intelligence data if available
+            OnPropertyChanged(nameof(CamelotKey));
+            OnPropertyChanged(nameof(BpmLabel));
         }
 
         public double Energy => Track?.Energy ?? 0;
@@ -372,6 +506,19 @@ namespace SLSKDONET.ViewModels
         public string TruePeakLabel => _analysis != null ? $"{_analysis.TruePeakDb:F1} dBTP" : "--";
         public string DynamicRangeLabel => _analysis != null ? $"{_analysis.DynamicRange:F1} LU" : "--";
         public string TechDetailsLabel => _analysis != null ? $"{_analysis.Codec.ToUpper()} | {_analysis.SampleRate}Hz | {_analysis.Channels}ch" : "Technical analysis pending...";
+        public string FileSizeLabel 
+        {
+            get
+            {
+                if (Track == null || string.IsNullOrEmpty(Track.ResolvedFilePath)) return "-- MB";
+                try
+                {
+                    var fi = new System.IO.FileInfo(Track.ResolvedFilePath);
+                    return $"{fi.Length / 1024.0 / 1024.0:F1} MB";
+                }
+                catch { return "-- MB"; }
+            }
+        }
 
         // Integrity Scout Properties
         public string IntegrityStatusText 
@@ -434,7 +581,7 @@ namespace SLSKDONET.ViewModels
 
         public bool HasTrack => Track != null;
 
-        public string CamelotKey => MapToCamelot(Track?.Key);
+        public string CamelotKey => !string.IsNullOrEmpty(EssentiaCamelotKey) ? EssentiaCamelotKey : MapToCamelot(Track?.Key);
 
         public string BitrateLabel => Track?.Bitrate > 0 ? $"{Track.Bitrate} kbps" : "Unknown Bitrate";
 
@@ -457,7 +604,14 @@ namespace SLSKDONET.ViewModels
         
         // Phase 4: Musical Intelligence Properties (from Essentia via AudioFeaturesEntity)
         public float? EssentiaBpm => _audioFeatures?.Bpm > 0 ? _audioFeatures.Bpm : null;
-        public string BpmLabel => EssentiaBpm.HasValue ? $"{EssentiaBpm.Value:F1} BPM" : "--";
+        public string BpmLabel 
+        {
+            get
+            {
+                if (EssentiaBpm.HasValue) return $"{EssentiaBpm.Value:F1} BPM";
+                return Track?.Bpm > 0 ? $"{Track.Bpm} BPM" : "--";
+            }
+        }
         public float? BpmConfidence => _audioFeatures?.BpmConfidence;
         public string BpmConfidenceLabel => BpmConfidence.HasValue ? $"({BpmConfidence.Value:P0})" : "";
         

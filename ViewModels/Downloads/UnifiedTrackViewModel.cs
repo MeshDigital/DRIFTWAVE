@@ -264,6 +264,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     {
         if (e.TrackGlobalId != GlobalId) return;
         
+        System.Diagnostics.Debug.WriteLine($"[UnifiedTrackVM] {GlobalId} State Changed: {e.State} (Error: {e.Error})");
         State = e.State;
         FailureReason = e.Error;
     }

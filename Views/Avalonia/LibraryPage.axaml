@@ -485,7 +485,7 @@
                                                 Background="#222"
                                                 Opacity="{Binding IsDownloaded, Converter={StaticResource BoolOpacityConverter}, ConverterParameter=0.3}"
                                                 Effect="{Binding IsDownloaded, Converter={StaticResource BoolBlurConverter}}">
-                                            <Image Source="{Binding AlbumArtUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
+                                            <Image Source="{Binding ArtworkBitmap}" Stretch="UniformToFill"/>
                                         </Border>
 
                                         <!-- Line 1: Artist - Title + Integrity -->
@@ -507,12 +507,12 @@
                                                     Effect="{Binding IsDownloaded, Converter={StaticResource BoolBlurConverter}}">
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Text="⏱" FontSize="11" Foreground="#666"/>
-                                                <TextBlock Text="{Binding Bpm, StringFormat='{}{0:F0}'}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
+                                                <TextBlock Text="{Binding BPM, StringFormat='{}{0:F0}'}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
                                             </StackPanel>
                                             
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Text="🎵" FontSize="11" Foreground="#666"/>
-                                                <TextBlock Text="{Binding Key}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
+                                                <TextBlock Text="{Binding MusicalKey}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
                                             </StackPanel>
 
                                             <StackPanel Orientation="Horizontal" Spacing="4">

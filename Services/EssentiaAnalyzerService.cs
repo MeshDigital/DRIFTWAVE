@@ -151,6 +151,21 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 startInfo.ArgumentList.Add(filePath);
                 startInfo.ArgumentList.Add(tempJsonPath);
 
+                // Phase 13: Advanced Configuration
+                // If a profile exists, pass it to the extractor to control resolution/models
+                // Try two locations: Data/Essentia (Source) or Tools/Essentia (Deployment)
+                var profilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Essentia", "profile.yaml");
+                if (!File.Exists(profilePath))
+                {
+                    profilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "Essentia", "profile.yaml");
+                }
+
+                if (File.Exists(profilePath))
+                {
+                     startInfo.ArgumentList.Add(profilePath);
+                     _logger.LogDebug("Using Essentia profile: {Profile}", profilePath);
+                }
+
                 _forensicLogger.Info(cid, ForensicStage.MusicalAnalysis, "Starting Essentia process...", trackUniqueHash);
 
                 using var process = new Process { StartInfo = startInfo };
@@ -250,9 +265,13 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     CamelotKey = string.Empty, // Will be calculated by KeyConverter in Phase 4.3
                     
                     // Sonic Characteristics
-                    Energy = 0.5f, // Essentia extractor usually provides this in 'lowlevel' or 'rhythm', DTO might be missing it
+                    Energy = data.LowLevel?.AverageLoudness > -10 ? 0.8f : 0.5f, // Rough heuristic until 'energy' model added
                     Danceability = data.Rhythm?.Danceability ?? 0,
-                    LoudnessLUFS = 0, // Essentia provides this but we use FFmpeg EBU R128 usually.
+                    LoudnessLUFS = data.LowLevel?.AverageLoudness ?? 0,
+                    SpectralCentroid = data.LowLevel?.SpectralCentroid?.Mean ?? 0,
+                    SpectralComplexity = data.LowLevel?.SpectralComplexity?.Mean ?? 0,
+                    DynamicComplexity = data.LowLevel?.DynamicComplexity ?? 0,
+                    OnsetRate = data.Rhythm?.OnsetRate ?? 0,
                     
                     // Metadata
                     AnalysisVersion = ANALYSIS_VERSION,
