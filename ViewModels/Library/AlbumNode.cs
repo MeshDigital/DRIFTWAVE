@@ -29,6 +29,8 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
     public int SortOrder => 0;
     public int Popularity => 0;
     public string? Genres => string.Empty;
+    public DateTime AddedAt => DateTime.MinValue;
+    public string? ReleaseYear => Tracks.FirstOrDefault(t => !string.IsNullOrEmpty(t.ReleaseYear))?.ReleaseYear ?? "";
     private string? _albumArtPath;
     public string? AlbumArtPath
     {

@@ -762,6 +762,11 @@ public class LibraryService : ILibraryService
             FrequencyCutoff = entity.FrequencyCutoff,
             QualityDetails = entity.QualityDetails,
             
+            // Phase 17: Technical Audio Analysis
+            Loudness = entity.Loudness,
+            TruePeak = entity.TruePeak,
+            DynamicRange = entity.DynamicRange,
+            
             // Phase 15
             DetectedSubGenre = entity.DetectedSubGenre
         };
@@ -830,7 +835,13 @@ public class LibraryService : ILibraryService
             IsTrustworthy = track.IsTrustworthy,
             QualityConfidence = track.QualityConfidence,
             FrequencyCutoff = track.FrequencyCutoff,
-            QualityDetails = track.QualityDetails
+
+            QualityDetails = track.QualityDetails,
+            
+            // Phase 17: Technical Audio Analysis
+            Loudness = track.Loudness,
+            TruePeak = track.TruePeak,
+            DynamicRange = track.DynamicRange
         };
     }
 
@@ -858,7 +869,13 @@ public class LibraryService : ILibraryService
             Valence = entity.Valence,
             BPM = entity.BPM,
             MusicalKey = entity.MusicalKey,
+
             IsEnriched = entity.IsEnriched,
+            
+            // Phase 17: Technical Audio Analysis
+            Loudness = entity.Loudness,
+            TruePeak = entity.TruePeak,
+            DynamicRange = entity.DynamicRange,
             
             WaveformData = entity.WaveformData ?? Array.Empty<byte>(),
             RmsData = entity.RmsData ?? Array.Empty<byte>(),
@@ -894,6 +911,11 @@ public class LibraryService : ILibraryService
         entity.BPM = entry.BPM;
         entity.MusicalKey = entry.MusicalKey;
         entity.IsEnriched = entry.IsEnriched;
+        
+        // Phase 17: Technical Audio Analysis
+        entity.Loudness = entry.Loudness;
+        entity.TruePeak = entry.TruePeak;
+        entity.DynamicRange = entry.DynamicRange;
         
         entity.WaveformData = entry.WaveformData;
         entity.RmsData = entry.RmsData;

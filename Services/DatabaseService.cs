@@ -315,6 +315,14 @@ public class DatabaseService
             // Phase 15: Style Lab
             if (!existingColumns.Contains("DetectedSubGenre"))
                 columnsToAdd.Add(("DetectedSubGenre", "DetectedSubGenre TEXT NULL"));
+            
+            // Phase 17: Technical Audio Analysis
+            if (!existingColumns.Contains("Loudness"))
+                columnsToAdd.Add(("Loudness", "Loudness REAL NULL"));
+            if (!existingColumns.Contains("TruePeak"))
+                columnsToAdd.Add(("TruePeak", "TruePeak REAL NULL"));
+            if (!existingColumns.Contains("DynamicRange"))
+                columnsToAdd.Add(("DynamicRange", "DynamicRange REAL NULL"));
 
             foreach (var (name, definition) in columnsToAdd)
             {
@@ -469,6 +477,23 @@ public class DatabaseService
             {
                 _logger.LogWarning("Schema Patch: Adding missing column 'AudioFingerprint' to LibraryEntries");
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN AudioFingerprint TEXT NULL");
+            }
+            
+            // Phase 17: Technical Audio Analysis for LibraryEntries
+            if (!existingColumns.Contains("Loudness"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'Loudness' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN Loudness REAL NULL");
+            }
+            if (!existingColumns.Contains("TruePeak"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'TruePeak' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN TruePeak REAL NULL");
+            }
+            if (!existingColumns.Contains("DynamicRange"))
+            {
+                _logger.LogWarning("Schema Patch: Adding missing column 'DynamicRange' to LibraryEntries");
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryEntries ADD COLUMN DynamicRange REAL NULL");
             }
 
             // Check Tracks table

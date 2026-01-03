@@ -130,6 +130,9 @@
                 <Panel Height="40">
                     <!-- Background Waveform -->
                     <controls:WaveformControl WaveformData="{Binding WaveformData}" 
+                                              LowBand="{Binding LowData}"
+                                              MidBand="{Binding MidData}"
+                                              HighBand="{Binding HighData}"
                                             Progress="{Binding Position}"
                                             Opacity="0.6"
                                             SeekCommand="{Binding SeekCommand}"

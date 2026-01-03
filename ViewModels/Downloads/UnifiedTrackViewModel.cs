@@ -236,6 +236,12 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     
     public string BpmDisplay => Model.BPM.HasValue ? $"{Model.BPM:0}" : "—";
     public string KeyDisplay => Model.MusicalKey ?? "—";
+    
+    // Technical Audio Display
+    public string LoudnessDisplay => Model.Loudness.HasValue ? $"{Model.Loudness:F1} LUFS" : "—";
+    public string TruePeakDisplay => Model.TruePeak.HasValue ? $"{Model.TruePeak:F1} dBTP" : "—";
+    public string DynamicRangeDisplay => Model.DynamicRange.HasValue ? $"{Model.DynamicRange:F1} LU" : "—";
+
     public bool IsEnriched => Model.IsEnriched;
 
     public WaveformAnalysisData WaveformData => new WaveformAnalysisData
@@ -344,12 +350,25 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 Model.RmsData = updatedTrack.RmsData;
                 Model.CanonicalDuration = updatedTrack.CanonicalDuration;
                 
+                // Technical Audio
+                Model.Loudness = updatedTrack.Loudness;
+                Model.TruePeak = updatedTrack.TruePeak;
+                Model.DynamicRange = updatedTrack.DynamicRange;
+                Model.FrequencyCutoff = updatedTrack.FrequencyCutoff;
+                Model.QualityConfidence = updatedTrack.QualityConfidence;
+                Model.SpectralHash = updatedTrack.SpectralHash;
+                Model.IsTrustworthy = updatedTrack.IsTrustworthy;
+                Model.Integrity = updatedTrack.Integrity;
+                
                 this.RaisePropertyChanged(nameof(ArtistName));
                 this.RaisePropertyChanged(nameof(TrackTitle));
                 this.RaisePropertyChanged(nameof(AlbumName));
                 this.RaisePropertyChanged(nameof(AlbumArtUrl));
                 this.RaisePropertyChanged(nameof(BpmDisplay));
                 this.RaisePropertyChanged(nameof(KeyDisplay));
+                this.RaisePropertyChanged(nameof(LoudnessDisplay));
+                this.RaisePropertyChanged(nameof(TruePeakDisplay));
+                this.RaisePropertyChanged(nameof(DynamicRangeDisplay));
                 this.RaisePropertyChanged(nameof(IntegrityScore));
                 this.RaisePropertyChanged(nameof(TechnicalSummary));
                 

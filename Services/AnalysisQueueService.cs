@@ -588,6 +588,11 @@ public class AnalysisWorker : BackgroundService
             track.IsTrustworthy = !result.TechResult.IsUpscaled;
             track.SpectralHash = result.TechResult.SpectralHash;
             
+            // Phase 17: Technical Audio Analysis
+            track.Loudness = result.TechResult.LoudnessLufs;
+            track.TruePeak = result.TechResult.TruePeakDb;
+            track.DynamicRange = result.TechResult.DynamicRange;
+            
             // Fix: Populate enum for UI Badge
             if (result.TechResult.IsUpscaled)
             {
@@ -626,6 +631,11 @@ public class AnalysisWorker : BackgroundService
         {
             entry.Bitrate = result.TechResult.Bitrate;
             entry.Integrity = result.TechResult.IsUpscaled ? IntegrityLevel.Suspicious : IntegrityLevel.Verified;
+            
+            // Phase 17: Technical Audio Analysis
+            entry.Loudness = result.TechResult.LoudnessLufs;
+            entry.TruePeak = result.TechResult.TruePeakDb;
+            entry.DynamicRange = result.TechResult.DynamicRange;
         }
     }
 

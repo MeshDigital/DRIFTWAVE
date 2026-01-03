@@ -641,6 +641,9 @@
                                                 <TextBlock Text="SIGNAL OVERVIEW" FontSize="10" FontWeight="Bold" Foreground="#555" LetterSpacing="1"/>
                                                 <Border Height="100" Background="#111" CornerRadius="4" Padding="4">
                                                     <controls:WaveformControl WaveformData="{Binding WaveformData}"
+                                                                              LowBand="{Binding LowData}"
+                                                                              MidBand="{Binding MidData}"
+                                                                              HighBand="{Binding HighData}"
                                                                               Height="90"
                                                                               VerticalAlignment="Center"/>
                                                 </Border>

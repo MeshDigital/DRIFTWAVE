@@ -197,6 +197,11 @@ public class PlaylistTrackEntity
     public IntegrityLevel Integrity { get; set; } = IntegrityLevel.None; // NEW
     public string? QualityDetails { get; set; }
     
+    // Phase 17: Technical Audio Analysis
+    public double? Loudness { get; set; }
+    public double? TruePeak { get; set; }
+    public double? DynamicRange { get; set; }
+    
     // Queue Orchestration
     public int Priority { get; set; } = 1;
     public Guid? SourcePlaylistId { get; set; }
@@ -280,6 +285,11 @@ public class LibraryEntryEntity
     
     // Dual-Truth Verification
     public IntegrityLevel Integrity { get; set; } = IntegrityLevel.None;
+    
+    // Phase 17: Technical Audio Analysis
+    public double? Loudness { get; set; }
+    public double? TruePeak { get; set; }
+    public double? DynamicRange { get; set; }
     
     public bool IsEnriched { get; set; } = false;
 }

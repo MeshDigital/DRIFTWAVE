@@ -86,4 +86,20 @@ public class LibraryEntry
     public string? ManualKey { get; set; }
     
     public bool IsEnriched { get; set; } = false;
+
+    // Phase 8: Sonic Integrity & Spectral Analysis
+    public string? SpectralHash { get; set; }
+    public double? QualityConfidence { get; set; }
+    public int? FrequencyCutoff { get; set; }
+    public bool? IsTrustworthy { get; set; }
+    public string? QualityDetails { get; set; }
+    public SLSKDONET.Data.IntegrityLevel Integrity { get; set; } = SLSKDONET.Data.IntegrityLevel.None;
+
+    // Phase 17: Technical Audio Analysis
+    public double? Loudness { get; set; }
+    public double? TruePeak { get; set; }
+    public double? DynamicRange { get; set; }
+
+    // Phase 15
+    public string? DetectedSubGenre { get; set; }
 }

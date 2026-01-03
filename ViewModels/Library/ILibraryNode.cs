@@ -13,4 +13,7 @@ public interface ILibraryNode
     string? Genres { get; }
     string? AlbumArtPath { get; }
     double Progress { get; }
+    
+    DateTime AddedAt { get; }
+    string? ReleaseYear { get; }
 }

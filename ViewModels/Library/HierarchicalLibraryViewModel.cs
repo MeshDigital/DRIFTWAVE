@@ -73,9 +73,11 @@ public class HierarchicalLibraryViewModel
             ("Artist", new TextColumn<ILibraryNode, string>("Artist", x => x.Artist ?? string.Empty, width: new GridLength(1, GridUnitType.Star))),
             ("Album", new TextColumn<ILibraryNode, string>("Album", x => x.Album ?? string.Empty, width: new GridLength(1, GridUnitType.Star))),
             ("Duration", new TextColumn<ILibraryNode, string>("Duration", x => x.Duration ?? string.Empty, width: new GridLength(70))),
+            ("Released", new TextColumn<ILibraryNode, string>("Released", x => x.ReleaseYear ?? "", width: new GridLength(60))),
             ("Popularity", new TextColumn<ILibraryNode, int>("🔥", x => x.Popularity, width: new GridLength(40))),
             ("Bitrate", new TextColumn<ILibraryNode, string>("Bitrate", x => x.Bitrate ?? string.Empty, width: new GridLength(60))),
             ("Genres", new TextColumn<ILibraryNode, string>("Genres", x => x.Genres ?? string.Empty, width: new GridLength(100))),
+            ("Added", new TextColumn<ILibraryNode, string>("Added", x => x.AddedAt.ToShortDateString(), width: new GridLength(90))),
             ("Actions", new TemplateColumn<ILibraryNode>("Actions", CreateActionsTemplate(), width: new GridLength(120)))
         };
 

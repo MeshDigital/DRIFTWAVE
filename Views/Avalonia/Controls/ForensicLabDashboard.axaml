@@ -38,6 +38,9 @@
                         Margin="0,8"
                         ClipToBounds="True">
                     <controls:WaveformControl WaveformData="{Binding WaveformData}"
+                                              LowBand="{Binding LowData}"
+                                              MidBand="{Binding MidData}"
+                                              HighBand="{Binding HighData}"
                                                Height="100"
                                                VerticalAlignment="Stretch"
                                                HorizontalAlignment="Stretch"/>

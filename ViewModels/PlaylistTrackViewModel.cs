@@ -28,7 +28,10 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     private Avalonia.Media.Imaging.Bitmap? _artworkBitmap;
 
     private int _sortOrder;
-    public DateTime AddedAt { get; } = DateTime.Now;
+    public DateTime AddedAt => Model?.AddedAt ?? DateTime.MinValue;
+
+    public DateTime? ReleaseDate => Model?.ReleaseDate;
+    public string ReleaseYear => Model?.ReleaseDate?.Year.ToString() ?? "";
 
     public int SortOrder 
     {
@@ -188,7 +191,12 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     
     // Technical Stats
     public int SampleRate => Model.BitrateScore ?? 0; // Or add SampleRate to Model
-    public string LoudnessDisplay => Model.QualityConfidence.HasValue ? $"{Model.QualityConfidence:P0} Confidence" : "—";
+    // Fix: LoudnessDisplay was previously incorrectly bound to QualityConfidence
+    public string ConfidenceDisplay => Model.QualityConfidence.HasValue ? $"{Model.QualityConfidence:P0} Confidence" : "—";
+    
+    public string LoudnessDisplay => Model.Loudness.HasValue ? $"{Model.Loudness:F1} LUFS" : "—";
+    public string TruePeakDisplay => Model.TruePeak.HasValue ? $"{Model.TruePeak:F1} dBTP" : "—";
+    public string DynamicRangeDisplay => Model.DynamicRange.HasValue ? $"{Model.DynamicRange:F1} LU" : "—";
     
     public string IntegritySymbol => Model.IsTrustworthy == false ? "⚠️" : "✓";
     public string IntegrityText => Model.IsTrustworthy == false || Model.Integrity == Data.IntegrityLevel.Suspicious 
@@ -350,6 +358,11 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      Model.QualityConfidence = updatedTrack.QualityConfidence;
                      Model.IsTrustworthy = updatedTrack.IsTrustworthy;
                      
+                     // Technical Audio
+                     Model.Loudness = updatedTrack.Loudness;
+                     Model.TruePeak = updatedTrack.TruePeak;
+                     Model.DynamicRange = updatedTrack.DynamicRange;
+                     
                      // Load artwork if URL is available
                      if (!string.IsNullOrWhiteSpace(updatedTrack.AlbumArtUrl))
                      {
@@ -386,6 +399,16 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              OnPropertyChanged(nameof(IntegritySymbol));
              OnPropertyChanged(nameof(IntegrityText));
              OnPropertyChanged(nameof(Duration));
+
+             OnPropertyChanged(nameof(LoudnessDisplay));
+             OnPropertyChanged(nameof(TruePeakDisplay));
+             OnPropertyChanged(nameof(DynamicRangeDisplay));
+             OnPropertyChanged(nameof(DynamicRangeDisplay));
+             OnPropertyChanged(nameof(ConfidenceDisplay));
+
+             // Dates
+             OnPropertyChanged(nameof(ReleaseDate));
+             OnPropertyChanged(nameof(ReleaseYear));
         });
     }
 
@@ -613,7 +636,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         }
     }
 
-    public string ReleaseYear => Model.ReleaseDate.HasValue ? Model.ReleaseDate.Value.Year.ToString() : string.Empty;
+
 
     /// <summary>
     /// Raw file size in bytes (populated during download via event or from disk for existing files)

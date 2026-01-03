@@ -35,9 +35,36 @@ namespace SLSKDONET.Views.Avalonia.Controls
             set => SetValue(SeekCommandProperty, value);
         }
 
+        public static readonly StyledProperty<byte[]?> LowBandProperty =
+            AvaloniaProperty.Register<WaveformControl, byte[]?>(nameof(LowBand));
+
+        public byte[]? LowBand
+        {
+            get => GetValue(LowBandProperty);
+            set => SetValue(LowBandProperty, value);
+        }
+
+        public static readonly StyledProperty<byte[]?> MidBandProperty =
+            AvaloniaProperty.Register<WaveformControl, byte[]?>(nameof(MidBand));
+
+        public byte[]? MidBand
+        {
+            get => GetValue(MidBandProperty);
+            set => SetValue(MidBandProperty, value);
+        }
+
+        public static readonly StyledProperty<byte[]?> HighBandProperty =
+            AvaloniaProperty.Register<WaveformControl, byte[]?>(nameof(HighBand));
+
+        public byte[]? HighBand
+        {
+            get => GetValue(HighBandProperty);
+            set => SetValue(HighBandProperty, value);
+        }
+
         static WaveformControl()
         {
-            AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty);
+            AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty, LowBandProperty, MidBandProperty, HighBandProperty);
         }
         
         protected override void OnPointerPressed(global::Avalonia.Input.PointerPressedEventArgs e)
@@ -75,9 +102,13 @@ namespace SLSKDONET.Views.Avalonia.Controls
 
             if (data.PeakData == null || data.RmsData == null) return;
 
-            bool hasRgb = data.LowData != null && data.LowData.Length > 0 &&
-                          data.MidData != null && data.MidData.Length > 0 &&
-                          data.HighData != null && data.HighData.Length > 0;
+            var lowData = LowBand ?? data.LowData;
+            var midData = MidBand ?? data.MidData;
+            var highData = HighBand ?? data.HighData;
+
+            bool hasRgb = lowData != null && lowData.Length > 0 &&
+                          midData != null && midData.Length > 0 &&
+                          highData != null && highData.Length > 0;
 
             int samples = Math.Min(data.PeakData.Length, data.RmsData.Length);
             double step = width / samples;
@@ -95,12 +126,12 @@ namespace SLSKDONET.Views.Avalonia.Controls
                 double peakH = peakVal * mid;
                 double rmsH = rmsVal * mid;
 
-                if (hasRgb && i < data.LowData.Length && i < data.MidData.Length && i < data.HighData.Length)
+                if (hasRgb && i < lowData.Length && i < midData.Length && i < highData.Length)
                 {
                     // RGB Rendering
-                    float low = data.LowData[i] / 255f;
-                    float midB = data.MidData[i] / 255f;
-                    float high = data.HighData[i] / 255f;
+                    float low = lowData[i] / 255f;
+                    float midB = midData[i] / 255f;
+                    float high = highData[i] / 255f;
 
                     // Mix Colors: Red (Bass), Green (Mid), Blue (High)
                     // We sum them and normalize to get the color mix

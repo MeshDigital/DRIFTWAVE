@@ -125,6 +125,9 @@
                 <Grid Grid.Column="1" VerticalAlignment="Center" Height="40">
                     <!-- Background Waveform -->
                     <controls:WaveformControl WaveformData="{Binding WaveformData}"
+                                              LowBand="{Binding LowData}"
+                                              MidBand="{Binding MidData}"
+                                              HighBand="{Binding HighData}"
                                             Progress="{Binding Position}"
                                             VerticalAlignment="Stretch"
                                             HorizontalAlignment="Stretch"/>

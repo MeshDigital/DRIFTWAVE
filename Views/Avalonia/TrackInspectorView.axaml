@@ -167,7 +167,7 @@
                                                FontSize="16" 
                                                FontWeight="Bold"
                                                Foreground="#00A3FF"/>
-                                    <TextBlock Text="{Binding EssentiaBpm, StringFormat='BPM: {0:F1}'}" 
+                                    <TextBlock Text="{Binding BpmLabel}" 
                                                FontSize="12" 
                                                Foreground="#888"/>
                                 </StackPanel>
