@@ -119,59 +119,67 @@ namespace SLSKDONET.Views.Avalonia.Controls
                 if (x > width) break;
 
                 bool isPlayed = (float)i / samples <= Progress;
-
-                float peakVal = data.PeakData[i] / 255f;
-                float rmsVal = data.RmsData[i] / 255f;
-
-                double peakH = peakVal * mid;
-                double rmsH = rmsVal * mid;
+                float opacity = isPlayed ? 1.0f : 0.4f;
 
                 if (hasRgb && i < lowData.Length && i < midData.Length && i < highData.Length)
                 {
-                    // RGB Rendering
+                    // --- Layered RGB Rendering ---
                     float low = lowData[i] / 255f;
                     float midB = midData[i] / 255f;
                     float high = highData[i] / 255f;
+                    float peak = data.PeakData[i] / 255f;
 
-                    // Mix Colors: Red (Bass), Green (Mid), Blue (High)
-                    // We sum them and normalize to get the color mix
-                    float total = low + midB + high;
-                    Color waveColor;
-                    
-                    if (total > 0.05f)
+                    double lowH = low * mid;
+                    double midH = midB * mid;
+                    double highH = high * mid;
+                    double peakH = peak * mid;
+
+                    // 1. Red Layer (Bass/Foundation)
+                    if (lowH > 0.5)
                     {
-                        // Normalize colors but keep brightness based on total energy
-                        float r = low / total;
-                        float g = midB / total;
-                        float b = high / total;
-                        
-                        // Scale by intensity (RMS or total)
-                        float intensity = Math.Min(1.0f, total * 1.5f);
-                        
-                        byte rByte = (byte)(r * 255 * intensity);
-                        byte gByte = (byte)(g * 255 * intensity);
-                        byte bByte = (byte)(b * 255 * intensity);
-                        
-                        waveColor = Color.FromRgb(rByte, gByte, bByte);
-                    }
-                    else
-                    {
-                        waveColor = Color.Parse("#00BFFF"); // Fallback to blue for very quiet parts
+                        var bassPen = new Pen(new SolidColorBrush(Color.FromRgb(255, 30, 30), opacity * 0.8f), 1);
+                        context.DrawLine(bassPen, new Point(x, mid - lowH), new Point(x, mid + lowH));
                     }
 
-                    var rgbPen = new Pen(new SolidColorBrush(waveColor, isPlayed ? 1.0 : 0.4), 1);
-                    context.DrawLine(rgbPen, new Point(x, mid - rmsH), new Point(x, mid + rmsH));
-                    
-                    if (peakH > rmsH)
+                    // 2. Green Layer (Mids/Vocals)
+                    if (midH > 0.5)
                     {
-                        var peakRgbPen = new Pen(new SolidColorBrush(isPlayed ? Colors.White : Color.Parse("#80FFFFFF"), 0.8), 1);
-                        context.DrawLine(peakRgbPen, new Point(x, mid - peakH), new Point(x, mid - rmsH));
-                        context.DrawLine(peakRgbPen, new Point(x, mid + rmsH), new Point(x, mid + peakH));
+                        var midPen = new Pen(new SolidColorBrush(Color.FromRgb(30, 255, 30), opacity * 0.7f), 1);
+                        context.DrawLine(midPen, new Point(x, mid - midH), new Point(x, mid + midH));
+                    }
+
+                    // 3. Blue Layer (Highs/Percussion)
+                    if (highH > 0.5)
+                    {
+                        // Accentuate highs with vibrant cyan-blue
+                        var highPen = new Pen(new SolidColorBrush(Color.FromRgb(0, 220, 255), opacity), 1);
+                        context.DrawLine(highPen, new Point(x, mid - highH), new Point(x, mid + highH));
+                        
+                        // "Blue Frosting" - if highs are very strong, add a small glow or sharpen
+                        if (high > 0.6)
+                        {
+                            var glowPen = new Pen(new SolidColorBrush(Colors.White, opacity * 0.4f), 1);
+                             context.DrawLine(glowPen, new Point(x, mid - highH - 1), new Point(x, mid - highH + 1));
+                             context.DrawLine(glowPen, new Point(x, mid + highH - 1), new Point(x, mid + highH + 1));
+                        }
+                    }
+
+                    // 4. Peak Silhouette (Translucent White)
+                    if (peakH > Math.Max(lowH, Math.Max(midH, highH)))
+                    {
+                        var peakPen = new Pen(new SolidColorBrush(Colors.White, opacity * 0.3f), 1);
+                        context.DrawLine(peakPen, new Point(x, mid - peakH), new Point(x, mid + peakH));
                     }
                 }
                 else
                 {
-                    // Classic Blue/White Rendering
+                    // Classic Blue/White Rendering Fallback
+                    float peakVal = data.PeakData[i] / 255f;
+                    float rmsVal = data.RmsData[i] / 255f;
+
+                    double peakH = peakVal * mid;
+                    double rmsH = rmsVal * mid;
+
                     var currentRmsPen = isPlayed ? playedRmsPen : unplayedRmsPen;
                     var currentPeakPen = isPlayed ? playedPeakPen : unplayedPeakPen;
 

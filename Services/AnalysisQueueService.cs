@@ -603,14 +603,32 @@ public class AnalysisWorker : BackgroundService
             track.TruePeak = result.TechResult.TruePeakDb;
             track.DynamicRange = result.TechResult.DynamicRange;
             
-            // Fix: Populate enum for UI Badge
-            if (result.TechResult.IsUpscaled)
+            // --- Phase 9: Spectral Honesty Check ---
+            // If the file claims to be high-quality (320k or Lossless) but the High band (Blue) 
+            // is near-zero, it's a "silent upscale" or a bad transcode.
+            bool isHighQualityClaim = track.Bitrate >= 310 || (result.FilePath != null && result.FilePath.EndsWith(".flac", StringComparison.OrdinalIgnoreCase));
+            bool hasHighFreqEnergy = true;
+            
+            if (result.WaveformData != null && result.WaveformData.HighData.Length > 0)
+            {
+                double avgHigh = result.WaveformData.HighData.Average(b => (int)b);
+                // Threshold of 5 out of 255 is very low; anything below this is effectively a brick wall at 2.5kHz
+                if (avgHigh < 5.0 && isHighQualityClaim)
+                {
+                    hasHighFreqEnergy = false;
+                    _logger.LogWarning("🚩 Spectral Honesty Failure: {Track} has near-zero high frequency energy despite {Bitrate}kbps claim.", track.Title, track.Bitrate);
+                }
+            }
+
+            if (result.TechResult.IsUpscaled || !hasHighFreqEnergy)
             {
                 track.Integrity = IntegrityLevel.Suspicious;
+                track.IsTrustworthy = false;
             }
             else if (track.QualityConfidence > 0.8)
             {
                 track.Integrity = IntegrityLevel.Verified;
+                track.IsTrustworthy = true;
             }
             else
             {
@@ -643,7 +661,25 @@ public class AnalysisWorker : BackgroundService
         if (result.TechResult != null)
         {
             entry.Bitrate = result.TechResult.Bitrate;
-            entry.Integrity = result.TechResult.IsUpscaled ? IntegrityLevel.Suspicious : IntegrityLevel.Verified;
+            
+            // Phase 9: Integrity Logic
+            bool isHighQualityClaim = entry.Bitrate >= 310 || (result.FilePath != null && result.FilePath.EndsWith(".flac", StringComparison.OrdinalIgnoreCase));
+            bool hasHighFreqEnergy = true;
+            
+            if (result.WaveformData != null && result.WaveformData.HighData.Length > 0)
+            {
+                double avgHigh = result.WaveformData.HighData.Average(b => (int)b);
+                if (avgHigh < 5.0 && isHighQualityClaim) hasHighFreqEnergy = false;
+            }
+
+            if (result.TechResult.IsUpscaled || !hasHighFreqEnergy)
+            {
+                entry.Integrity = IntegrityLevel.Suspicious;
+            }
+            else
+            {
+                entry.Integrity = IntegrityLevel.Verified;
+            }
             
             // Phase 17: Technical Audio Analysis
             entry.Loudness = result.TechResult.LoudnessLufs;

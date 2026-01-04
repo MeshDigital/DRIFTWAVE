@@ -25,23 +25,35 @@ public class WaveformAnalysisService
 
     /// <summary>
     /// Generates detailed waveform data for the given audio file.
-    /// Spawns FFmpeg to decode to raw PCM and aggregates samples into Peak/RMS windows.
+    /// Spawns FFmpeg with a complex filtergraph to extract frequency bands (RGB) in a single pass.
     /// </summary>
     /// <param name="filePath">Path to the audio file.</param>
     /// <param name="pointsPerSecond">Resolution of the waveform (default 100).</param>
-    /// <returns>WaveformAnalysisData containing Peak and RMS arrays.</returns>
+    /// <returns>WaveformAnalysisData containing Peak, RMS, and RGB arrays.</returns>
     public async Task<WaveformAnalysisData> GenerateWaveformAsync(string filePath, CancellationToken cancellationToken = default, int pointsPerSecond = 100)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("File not found", filePath);
 
-        // FFmpeg command: Decode to raw s16le PCM, mono, 44100Hz
+        // TRI-BAND FORENSIC EXTRACTION:
+        // We use a complex filtergraph to split the audio into 3 frequency bands + 1 clean mono channel.
+        // Band 1 (Low/Red): < 150Hz
+        // Band 2 (Mid/Green): 150Hz - 2.5kHz
+        // Band 3 (High/Blue): > 2.5kHz
+        // Band 4 (Total): Clean mono for Peak/RMS
+        // The output is merged into a 4-channel PCM stream.
+        var filterGraph = "[0:a]pan=mono|c0=c0,asplit=4[lo][mi][hi][cl]; " +
+                         "[lo]lowpass=f=150[loout]; " +
+                         "[mi]bandpass=f=1325:width=2350[miout]; " +
+                         "[hi]highpass=f=2500[hiout]; " +
+                         "[loout][miout][hiout][cl]amerge=4";
+
         var startInfo = new ProcessStartInfo
         {
             FileName = _ffmpegPath,
-            Arguments = $"-i \"{filePath}\" -f s16le -ac 1 -ar 44100 -vn -",
+            Arguments = $"{SystemInfoHelper.GetFfmpegHwAccelArgs()} -i \"{filePath}\" -filter_complex \"{filterGraph}\" -f s16le -ac 4 -ar 44100 -vn -",
             RedirectStandardOutput = true,
-            RedirectStandardError = true, // To avoid cluttering console
+            RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
@@ -53,17 +65,6 @@ public class WaveformAnalysisService
         var highPoints = new List<byte>();
 
         long totalSamples = 0;
-
-        // Filter states (EMA)
-        float lowState = 0;
-        float highState = 0;
-        
-        // Alphas for 44.1kHz
-        // Low Pass ~300Hz (Bass)
-        const float alphaLow = 0.04f; 
-        // High Pass ~4000Hz (Treble)
-        const float alphaHigh = 0.6f;
-
         Process? process = null;
 
         try
@@ -71,87 +72,80 @@ public class WaveformAnalysisService
             process = new Process { StartInfo = startInfo };
             process.Start();
 
-            // Register cancellation to kill process
+            // Register cancellation
             await using var ctr = cancellationToken.Register(() => 
             {
-                try { process.Kill(); } catch { }
+                try { if (process != null && !process.HasExited) process.Kill(); } catch { }
             });
 
-            // Fire and forget error reader to prevent buffer deadlocks
             _ = Task.Run(async () => 
             {
                 try { await process.StandardError.ReadToEndAsync(cancellationToken); } catch { }
             }, cancellationToken);
 
-            // Stream processing
             // 44100 Hz / 100 points = 441 samples per point
             int samplesPerPoint = 44100 / pointsPerSecond;
-            // 16-bit sample = 2 bytes
-            int bytesPerWindow = samplesPerPoint * 2;
+            // 4 channels, 16-bit (2 bytes) per sample = 8 bytes per frame
+            int bytesPerFrame = 8;
+            int bytesPerWindow = samplesPerPoint * bytesPerFrame;
             
             byte[] buffer = new byte[bytesPerWindow];
             var baseStream = process.StandardOutput.BaseStream;
             int bytesRead;
 
-            while ((bytesRead = await baseStream.ReadAsync(buffer, 0, bytesPerWindow, cancellationToken)) > 0)
+            while ((bytesRead = await ReadFullBufferAsync(baseStream, buffer, cancellationToken)) > 0)
             {
-                // Process the window
-                int sampleCount = bytesRead / 2;
-                if (sampleCount == 0) continue;
+                int frameCount = bytesRead / bytesPerFrame;
+                if (frameCount == 0) continue;
 
                 float maxPeak = 0;
-                double sumSquares = 0;
-                double sumLow = 0;
-                double sumMid = 0;
-                double sumHigh = 0;
+                double sumSqTotal = 0;
+                double sumSqLow = 0;
+                double sumSqMid = 0;
+                double sumSqHigh = 0;
                 
-                for (int i = 0; i < sampleCount; i++)
+                for (int i = 0; i < frameCount; i++)
                 {
-                    // Read 16-bit sample (signed)
-                    short sampleValue = BitConverter.ToInt16(buffer, i * 2);
-                    float sample = sampleValue / 32768f; 
-                    float absSample = Math.Abs(sample);
-
-                    if (absSample > maxPeak) maxPeak = absSample;
-                    sumSquares += (double)sample * sample;
-
-                    // --- Frequency Filters ---
+                    int baseIdx = i * bytesPerFrame;
                     
-                    // Low Pass: y[n] = alpha * x[n] + (1 - alpha) * y[n-1]
-                    lowState = alphaLow * absSample + (1 - alphaLow) * lowState;
-                    float lowVal = lowState;
+                    // Channel 0: Low (Red)
+                    short lowS = BitConverter.ToInt16(buffer, baseIdx);
+                    // Channel 1: Mid (Green)
+                    short midS = BitConverter.ToInt16(buffer, baseIdx + 2);
+                    // Channel 2: High (Blue)
+                    short highS = BitConverter.ToInt16(buffer, baseIdx + 4);
+                    // Channel 3: Total Mono
+                    short totalS = BitConverter.ToInt16(buffer, baseIdx + 6);
 
-                    // High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
-                    // Simple EMA HP approximation: x[n] - LowPass(x[n])
-                    // But we want it filtered properly.
-                    // Alternative: x[n] filtered by alphaHigh.
-                    highState = alphaHigh * (highState + sample - (i > 0 ? (BitConverter.ToInt16(buffer, (i-1)*2)/32768f) : sample));
-                    float highVal = Math.Abs(highState);
+                    float fLow = Math.Abs(lowS / 32768f);
+                    float fMid = Math.Abs(midS / 32768f);
+                    float fHigh = Math.Abs(highS / 32768f);
+                    float fTotal = Math.Abs(totalS / 32768f);
 
-                    // Mid: Everything else
-                    float midVal = Math.Max(0, absSample - lowVal - highVal);
-
-                    sumLow += (double)lowVal * lowVal;
-                    sumMid += (double)midVal * midVal;
-                    sumHigh += (double)highVal * highVal;
+                    if (fTotal > maxPeak) maxPeak = fTotal;
+                    
+                    sumSqTotal += (double)fTotal * fTotal;
+                    sumSqLow += (double)fLow * fLow;
+                    sumSqMid += (double)fMid * fMid;
+                    sumSqHigh += (double)fHigh * fHigh;
                 }
 
-                // Calculate RMS metrics
-                float rms = (float)Math.Sqrt(sumSquares / sampleCount);
-                float rmsLow = (float)Math.Sqrt(sumLow / sampleCount);
-                float rmsMid = (float)Math.Sqrt(sumMid / sampleCount);
-                float rmsHigh = (float)Math.Sqrt(sumHigh / sampleCount);
+                // RMS Calculation per band
+                float rmsTotal = (float)Math.Sqrt(sumSqTotal / frameCount);
+                float rmsLow = (float)Math.Sqrt(sumSqLow / frameCount);
+                float rmsMid = (float)Math.Sqrt(sumSqMid / frameCount);
+                float rmsHigh = (float)Math.Sqrt(sumSqHigh / frameCount);
 
-                // Scale to byte (0-255)
-                peakPoints.Add((byte)(Math.Clamp(maxPeak * 255, 0, 255)));
-                rmsPoints.Add((byte)(Math.Clamp(rms * 255, 0, 255)));
+                // Normalization and Scaling (0-255)
+                // We apply slight boosts to Mid and High to compensate for natural energy drop
+                peakPoints.Add((byte)Math.Clamp(maxPeak * 255, 0, 255));
+                rmsPoints.Add((byte)Math.Clamp(rmsTotal * 255, 0, 255));
                 
-                // Boost bands slightly for visual prominence if needed, but keeping it linear for now
-                lowPoints.Add((byte)(Math.Clamp(rmsLow * 255 * 1.5f, 0, 255))); // Bass often needs a boost
-                midPoints.Add((byte)(Math.Clamp(rmsMid * 255, 0, 255)));
-                highPoints.Add((byte)(Math.Clamp(rmsHigh * 255 * 2.0f, 0, 255))); // Highs often very small
+                lowPoints.Add((byte)Math.Clamp(rmsLow * 255 * 1.5f, 0, 255));
+                midPoints.Add((byte)Math.Clamp(rmsMid * 255 * 1.8f, 0, 255));
+                highPoints.Add((byte)Math.Clamp(rmsHigh * 255 * 2.2f, 0, 255));
 
-                totalSamples += sampleCount;
+                totalSamples += frameCount;
             }
 
             await process.WaitForExitAsync(cancellationToken);
@@ -175,7 +169,7 @@ public class WaveformAnalysisService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to generate waveform for {File}", filePath);
-            return new WaveformAnalysisData(); // Return empty on failure
+            return new WaveformAnalysisData();
         }
         finally
         {
@@ -185,5 +179,20 @@ public class WaveformAnalysisService
             }
             process?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Helper to ensure we read exact window size unless EOF.
+    /// </summary>
+    private async Task<int> ReadFullBufferAsync(Stream stream, byte[] buffer, CancellationToken ct)
+    {
+        int totalRead = 0;
+        while (totalRead < buffer.Length)
+        {
+            int read = await stream.ReadAsync(buffer, totalRead, buffer.Length - totalRead, ct);
+            if (read == 0) break;
+            totalRead += read;
+        }
+        return totalRead;
     }
 }
