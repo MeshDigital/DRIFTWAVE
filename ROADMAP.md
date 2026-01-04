@@ -56,10 +56,10 @@
 
 ## 🚧 Active Development
 
-### 🚧 Phase 8: Sonic Integrity (Backend Ready)
+### ✅ Phase 8: Sonic Integrity (Alpha)
 **Goal**: True Audio Quality Verification.
 *   **Spectral Forensics**: Headless FFmpeg analysis (`SonicIntegrityService`) detecting frequency cutoffs (16k/19k/21k).
-*   **Essentia Firehose**: `EssentiaAnalyzerService` extracting BPM, Key, Energy.
+*   **Essentia Engine**: `EssentiaAnalyzerService` extracting real machine learning metrics (BPM, Key, Energy, BpmConfidence).
 *   **Drop Detection**: `DropDetectionEngine` for finding mixing points.
 
 ### 🚧 Phase 12: UX 2.0 (Search & Curation)
@@ -72,6 +72,7 @@
 *   **Phase 13A: Forensic Librarian**
     *   **Dynamic Range**: Detecting over-compressed ("Sausage") masters via `dynamic_complexity`.
     *   **Drift Detection**: Warning about variable tempo via `bpm_histogram`.
+    *   **Energy Intensity**: Combining RMS and Loudness for real energy mapping.
 *   **Phase 13B: Visual Truth**
     *   **Spectrogram UI**: SPEK-style frequency visualization.
 *   **Phase 13C: AI Layer**

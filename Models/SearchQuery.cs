@@ -97,6 +97,7 @@ public class SearchQuery
     
     // Phase 1: Enrichment
     public bool IsEnriched { get; set; } = false;
+    public bool ForceRefresh { get; set; } = false;
     public string? ISRC { get; set; }
 
     /// <summary>

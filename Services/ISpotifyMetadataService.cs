@@ -10,7 +10,7 @@ public interface ISpotifyMetadataService
     /// <summary>
     /// Smart search for a track with fuzzy matching and confidence scoring.
     /// </summary>
-    Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null);
+    Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null, bool forceRefresh = false);
 
     /// <summary>
     /// Fetches audio features (Key, BPM) for a track.

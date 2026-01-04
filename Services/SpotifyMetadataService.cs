@@ -69,7 +69,7 @@ public class SpotifyMetadataService : ISpotifyMetadataService
     /// <summary>
     /// Smart search for a track with fuzzy matching and confidence scoring.
     /// </summary>
-    public async Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null)
+    public async Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null, bool forceRefresh = false)
     {
         // Check if user is authenticated
         if (!await _authService.IsAuthenticatedAsync())
@@ -78,17 +78,20 @@ public class SpotifyMetadataService : ISpotifyMetadataService
             return null;
         }
 
-        // 1. Check Cache
+        // 1. Check Cache (ONLY if not forced)
         string searchQuery = $"{artist} - {title}";
         string cacheKey = $"search:{StringDistanceUtils.Normalize(searchQuery)}";
         
-        var cached = await GetFromCacheAsync<FullTrack>(cacheKey);
-        if (cached != null) return cached;
+        if (!forceRefresh)
+        {
+            var cached = await GetFromCacheAsync<FullTrack>(cacheKey);
+            if (cached != null) return cached;
+        }
 
         // 2. Execute Search via API
         var track = await SearchSpotifyWithSmartLogicAsync(artist, title, durationMs);
 
-        // 3. Cache Result (or Negative Cache)
+        // 3. Cache Result (Overwrites existing if forceRefresh was true)
         if (track != null)
         {
             await SaveToCacheAsync(cacheKey, track, PositiveCacheDuration);
@@ -163,7 +166,7 @@ public class SpotifyMetadataService : ISpotifyMetadataService
             return false;
         }
 
-        var metadata = await FindTrackAsync(query.Artist, query.Title, query.Length * 1000);
+        var metadata = await FindTrackAsync(query.Artist, query.Title, query.Length * 1000, query.ForceRefresh);
 
         if (metadata == null) return false;
 

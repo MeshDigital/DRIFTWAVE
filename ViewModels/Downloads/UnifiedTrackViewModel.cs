@@ -239,7 +239,29 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
 
     // Curation Hub Properties
     public double IntegrityScore => Model.QualityConfidence ?? 0.0;
-    public bool IsSecure => IntegrityScore > 0.9;
+    public bool IsSecure => IntegrityScore > 0.9 && !string.IsNullOrEmpty(Model.ResolvedFilePath) && System.IO.File.Exists(Model.ResolvedFilePath);
+
+    public string QualityIcon 
+    {
+        get 
+        {
+            if (Model.Bitrate >= 1000 || (Model.Format?.Equals("FLAC", StringComparison.OrdinalIgnoreCase) ?? false)) return "💎";
+            if (Model.Bitrate >= 320) return "✅";
+            if (Model.Bitrate >= 192) return "⚠️";
+            return "❌";
+        }
+    }
+
+    public Avalonia.Media.IBrush QualityColor 
+    {
+        get
+        {
+            if (Model.Bitrate >= 1000 || (Model.Format?.Equals("FLAC", StringComparison.OrdinalIgnoreCase) ?? false)) return Avalonia.Media.Brushes.DeepSkyBlue; // Lossless
+            if (Model.Bitrate >= 320) return Avalonia.Media.Brushes.LimeGreen; // 320kbps
+            if (Model.Bitrate >= 192) return Avalonia.Media.Brushes.Orange; // 192kbps
+            return Avalonia.Media.Brushes.Red; // Low Quality
+        }
+    }
     
     public string BpmDisplay => Model.BPM.HasValue ? $"{Model.BPM:0}" : "—";
     public string KeyDisplay => Model.MusicalKey ?? "—";
@@ -377,6 +399,9 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 this.RaisePropertyChanged(nameof(DynamicRangeDisplay));
                 this.RaisePropertyChanged(nameof(IntegrityScore));
                 this.RaisePropertyChanged(nameof(TechnicalSummary));
+                this.RaisePropertyChanged(nameof(IsSecure));
+                this.RaisePropertyChanged(nameof(QualityIcon));
+                this.RaisePropertyChanged(nameof(QualityColor));
                 
                 // Audio features
                 this.RaisePropertyChanged(nameof(IsEnriched));

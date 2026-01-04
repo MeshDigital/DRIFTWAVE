@@ -21,6 +21,7 @@ public class SpotifyLikedSongsImportProvider : IImportProvider, IStreamingImport
 
     public string Name => "Spotify Liked Songs";
     public string IconGlyph => "❤️";
+    public bool ForceRefresh { get; set; }
 
     public SpotifyLikedSongsImportProvider(
         ILogger<SpotifyLikedSongsImportProvider> logger,
@@ -125,7 +126,8 @@ public class SpotifyLikedSongsImportProvider : IImportProvider, IStreamingImport
             ReleaseDate = !string.IsNullOrEmpty(track.Album.ReleaseDate) ? DateTime.TryParse(track.Album.ReleaseDate, out var d) ? d : null : null,
             CanonicalDuration = track.DurationMs,
             Popularity = track.Popularity,
-            AlbumArtUrl = track.Album.Images?.FirstOrDefault()?.Url
+            AlbumArtUrl = track.Album.Images?.FirstOrDefault()?.Url,
+            ForceRefresh = this.ForceRefresh
         };
     }
 

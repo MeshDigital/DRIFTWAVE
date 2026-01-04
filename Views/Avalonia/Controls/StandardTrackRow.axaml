@@ -158,8 +158,15 @@
                 
                 <TextBlock Text="•" Foreground="#444"/>
                 
-                <!-- Tech Summary -->
-                <TextBlock Text="{Binding TechnicalSummary}" Foreground="#999" FontSize="11" FontFamily="Consolas"/>
+                <!-- Tech Summary & Quality Badge -->
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Border Background="#222" CornerRadius="3" Padding="4,0" 
+                            ToolTip.Tip="{Binding Model.Bitrate, StringFormat='{}Bitrate: {0}kbps'}">
+                        <TextBlock Text="{Binding QualityIcon}" FontSize="12" VerticalAlignment="Center"/>
+                    </Border>
+                    
+                    <TextBlock Text="{Binding TechnicalSummary}" Foreground="#999" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center"/>
+                </StackPanel>
                 
                 <!-- NEW: Duration (only show if completed) -->
                 <TextBlock Text="•" Foreground="#444" IsVisible="{Binding IsCompleted}"/>

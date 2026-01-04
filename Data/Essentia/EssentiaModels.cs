@@ -23,6 +23,9 @@ public class RhythmData
     [JsonPropertyName("bpm")]
     public float Bpm { get; set; }
 
+    [JsonPropertyName("bpm_confidence")]
+    public float BpmConfidence { get; set; }
+
     [JsonPropertyName("danceability")]
     public float Danceability { get; set; }
 
@@ -72,6 +75,9 @@ public class LowLevelData
     
     [JsonPropertyName("spectral_complexity")]
     public StatsData? SpectralComplexity { get; set; }
+
+    [JsonPropertyName("rms")]
+    public StatsData? Rms { get; set; }
 }
 
 public class StatsData

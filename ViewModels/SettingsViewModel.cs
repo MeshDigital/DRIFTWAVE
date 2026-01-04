@@ -31,6 +31,7 @@ public class SettingsViewModel : INotifyPropertyChanged
     private readonly IFileInteractionService _fileInteractionService;
     private readonly SpotifyAuthService _spotifyAuthService;
     private readonly ISpotifyMetadataService _spotifyMetadataService;
+    private readonly DatabaseService _databaseService;
 
     // Hardcoded public client ID provided by user/project
     // Ideally this would be in a secured config, but for this desktop app scenario it's acceptable as a default.
@@ -579,6 +580,7 @@ public class SettingsViewModel : INotifyPropertyChanged
     public ICommand RevokeAndReAuthCommand { get; }
     public ICommand RestartSpotifyAuthCommand { get; }
     public ICommand CheckFfmpegCommand { get; } // Phase 8: Dependency validation
+    public ICommand ResetDatabaseCommand { get; }
 
     // Phase 8: FFmpeg Dependency State
     private bool _isFfmpegInstalled;
@@ -616,7 +618,8 @@ public class SettingsViewModel : INotifyPropertyChanged
         ConfigManager configManager,
         IFileInteractionService fileInteractionService,
         SpotifyAuthService spotifyAuthService,
-        ISpotifyMetadataService spotifyMetadataService)
+        ISpotifyMetadataService spotifyMetadataService,
+        DatabaseService databaseService)
     {
         _logger = logger;
         _config = config;
@@ -624,6 +627,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         _fileInteractionService = fileInteractionService;
         _spotifyAuthService = spotifyAuthService;
         _spotifyMetadataService = spotifyMetadataService;
+        _databaseService = databaseService;
 
         // Ensure default Client ID is set if empty
         if (string.IsNullOrEmpty(_config.SpotifyClientId))
@@ -644,6 +648,7 @@ public class SettingsViewModel : INotifyPropertyChanged
         RevokeAndReAuthCommand = new AsyncRelayCommand(RevokeAndReAuthAsync);
         CheckFfmpegCommand = new AsyncRelayCommand(CheckFfmpegAsync); // Phase 8
         RestartSpotifyAuthCommand = new AsyncRelayCommand(RestartSpotifyAuthAsync, () => IsSpotifyConnecting);
+        ResetDatabaseCommand = new AsyncRelayCommand(ResetDatabaseAsync);
 
         // Explicitly initialize IsAuthenticating to false
         IsAuthenticating = false;
@@ -978,6 +983,21 @@ public class SettingsViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to clear cache via Settings");
+        }
+    }
+
+    private async Task ResetDatabaseAsync()
+    {
+        try
+        {
+            _logger.LogWarning("⚠️ User initiated DATABASE RESET from Settings ⚠️");
+            await _databaseService.ResetDatabaseAsync();
+            _logger.LogInformation("Database reset successful.");
+            // In a real app, we might want to trigger a restart or notification
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reset database via Settings");
         }
     }
 

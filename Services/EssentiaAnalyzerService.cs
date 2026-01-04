@@ -280,14 +280,15 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     
                     // Core Musical Features
                     Bpm = data.Rhythm?.Bpm ?? 0,
-                    BpmConfidence = 0.8f, // Will be updated when full Essentia DTOs available
+                    BpmConfidence = data.Rhythm?.BpmConfidence ?? 0,
                     Key = data.Tonal?.KeyEdma?.Key ?? string.Empty,
                     Scale = data.Tonal?.KeyEdma?.Scale ?? string.Empty,
                     KeyConfidence = data.Tonal?.KeyEdma?.Strength ?? 0,
                     CamelotKey = string.Empty, // Will be calculated by KeyConverter in Phase 4.3
                     
                     // Sonic Characteristics
-                    Energy = data.LowLevel?.AverageLoudness > -10 ? 0.8f : 0.5f, // Rough heuristic until 'energy' model added
+                    // Phase 13A: Improved Energy mapping (combines RMS intensity and Loudness)
+                    Energy = data.LowLevel?.Rms?.Mean * 10 ?? (data.LowLevel?.AverageLoudness > -8 ? 0.9f : (data.LowLevel?.AverageLoudness > -12 ? 0.7f : 0.5f)),
                     Danceability = data.Rhythm?.Danceability ?? 0,
                     LoudnessLUFS = data.LowLevel?.AverageLoudness ?? 0,
                     SpectralCentroid = data.LowLevel?.SpectralCentroid?.Mean ?? 0,

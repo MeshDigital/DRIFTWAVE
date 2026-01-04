@@ -144,11 +144,13 @@
   - ✅ **Database Schema**: Added `DetectedSubGenre` to `TrackEntity`, `PlaylistTrack`, and `AudioFeaturesEntity`.
   - ✅ **Build Resiliency**: Fixed namespace and binding errors across the stack.
 
-### Recent Updates (January 2, 2026) - RGB Waveforms, Stability & Enrichment
-- ✅ **RGB Frequency-Banded Waveforms**: Digital EMA filters in `WaveformAnalysisService` and RGB mixing in `WaveformControl`.
-- ✅ **Infrastructure Stability**: Database auto-schema recovery (missing tables) and concurrency semaphore fix in `DownloadManager`.
-- ✅ **Style Lab UX**: Fixed interactivity (Drag-Drop/Remove) and added workflow validation/auto-selection.
-- ✅ **Spotify Enrichment & Refresh**: Improved Refresh UX (loading status/notifications) and complete metadata persistence.
+### Recent Updates (January 4, 2026) - Database & AI Maintenance
+- ✅ **Database & Maintenance**: Added "Reset Library" functionality to wipe data and re-initialize a fresh schema from Settings.
+- ✅ **Spotify Refresh**: Implemented `ForceRefresh` mechanism to bypass the local metadata cache for fresh data during imports.
+- ✅ **AudioGuard Quality Icons**: Enhanced track list UI with visual badges (💎, ✅, ⚠️, ❌) based on bitrate and format.
+- ✅ **Audio Analysis Fix**: Refactored Essentia integration to use real machine learning data (RMS/BPM Confidence) instead of hardcoded heuristics.
+- ✅ **Integrity Persistence**: Fixed the "Verified" badge to correctly update its status if the physical file is manually deleted.
+- ✅ **Path Harmonization**: Standardized database storage path to `ORBIT` across all services to prevent data fragmentation.
 
 ---
 

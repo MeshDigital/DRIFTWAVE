@@ -2302,6 +2302,43 @@ public class DatabaseService
     }
 
     /// <summary>
+    /// ⚠️ INITIATING DATABASE RESET ⚠️
+    /// Safely deletes the database file and re-initializes a fresh schema.
+    /// This will wipe ALL tracks, projects, and cached data.
+    /// </summary>
+    public async Task ResetDatabaseAsync()
+    {
+        await _writeSemaphore.WaitAsync();
+        try
+        {
+            _logger.LogWarning("⚠️ INITIATING DATABASE RESET ⚠️");
+
+            using var context = new AppDbContext();
+            
+            // 1. Force close any lingering connections
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+            // 2. Delete the database file physically
+            await context.Database.EnsureDeletedAsync();
+            _logger.LogInformation("Database file deleted.");
+
+            // 3. Re-initialize (creates fresh tables)
+            await InitAsync();
+            
+            _logger.LogInformation("Database reset complete. System is fresh.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reset database.");
+            throw;
+        }
+        finally
+        {
+            _writeSemaphore.Release();
+        }
+    }
+
+    /// <summary>
     /// Updates a specific track's engagement metrics (Like status, Rating, PlayCount).
     /// Used by the Media Player UI.
     /// </summary>
@@ -2386,7 +2423,7 @@ public class DatabaseService
     private SqliteConnection GetConnection()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var dbPath = Path.Combine(appData, "SLSKDONET", "library.db");
+        var dbPath = Path.Combine(appData, "ORBIT", "library.db");
         return new SqliteConnection($"Data Source={dbPath}");
     }
 
