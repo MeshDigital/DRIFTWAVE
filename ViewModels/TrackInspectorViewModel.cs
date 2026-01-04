@@ -9,6 +9,8 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using SLSKDONET.Data.Entities;
 using SLSKDONET.Models;
+using System.Linq;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 
 using Avalonia.Media.Imaging;
@@ -77,6 +79,7 @@ namespace SLSKDONET.ViewModels
         // Pro DJ Features
         public ObservableCollection<Services.HarmonicMatchResult> MixesWellMatches { get; } = new();
         public ObservableCollection<PlaylistTrack> OtherVersions { get; } = new();
+        public ObservableCollection<OrbitCue> Cues { get; } = new(); // Phase 10
         
         // Vibe Radar Data (0-100 scale for UI)
         public double VibeEnergy => (AudioFeatures != null && AudioFeatures.Energy > 0 
@@ -97,6 +100,9 @@ namespace SLSKDONET.ViewModels
         public System.Windows.Input.ICommand ReFetchUpgradeCommand { get; }
         public System.Windows.Input.ICommand GenerateSpectrogramCommand { get; }
         public System.Windows.Input.ICommand OpenInLabCommand { get; }
+        public System.Windows.Input.ICommand SaveCuesCommand { get; }
+        public System.Windows.Input.ICommand AddCueCommand { get; }
+        public System.Windows.Input.ICommand DeleteCueCommand { get; }
 
         public TrackInspectorViewModel(
             Services.IAudioAnalysisService audioAnalysisService, 
@@ -291,7 +297,6 @@ namespace SLSKDONET.ViewModels
                     IsGeneratingSpectrogram = false;
                 }
             });
-
             OpenInLabCommand = ReactiveCommand.Create(() =>
             {
                 if (Track != null && !string.IsNullOrEmpty(Track.TrackUniqueHash))
@@ -299,6 +304,48 @@ namespace SLSKDONET.ViewModels
                     _eventBus.Publish(new RequestForensicAnalysisEvent(Track.TrackUniqueHash));
                 }
             });
+
+            SaveCuesCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (Track == null) return;
+                try
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(Cues.OrderBy(c => c.Timestamp));
+                    Track.CuePointsJson = json;
+                    
+                    // Simple persist via LibraryService if available or direct DB
+                    using var db = new Data.AppDbContext();
+                    var trackEntity = await db.PlaylistTracks.Include(t => t.TechnicalDetails).FirstOrDefaultAsync(t => t.TrackUniqueHash == Track.TrackUniqueHash);
+                    var tech = trackEntity?.TechnicalDetails;
+                    if (tech != null)
+                    {
+                        tech.CuePointsJson = json;
+                        tech.IsPrepared = true;
+                        await db.SaveChangesAsync();
+                    }
+                    
+                    Track.IsPrepared = true;
+                    OnPropertyChanged(nameof(Track)); // Trigger UI refresh
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to save cues");
+                }
+            });
+
+            AddCueCommand = ReactiveCommand.Create<double>(timestamp =>
+            {
+                Cues.Add(new OrbitCue 
+                { 
+                    Timestamp = timestamp, 
+                    Name = $"Cue {Cues.Count + 1}", 
+                    Color = "#00BFFF", 
+                    Source = CueSource.User,
+                    Role = CueRole.Custom
+                });
+            });
+
+            DeleteCueCommand = ReactiveCommand.Create<OrbitCue>(cue => Cues.Remove(cue));
         }
 
         private async Task LoadProDjFeaturesAsync()
@@ -383,6 +430,7 @@ namespace SLSKDONET.ViewModels
                         LoadAnalysisAsync(value.TrackUniqueHash);
                         LoadAudioFeaturesAsync(value.TrackUniqueHash); // Phase 4
                         LoadForensicLogsAsync(value.TrackUniqueHash); // Phase 4.7
+                        LoadCues(value); // Phase 10
                         OnTrackChanged(); // Trigger Pro DJ features load
                     }
                 }
@@ -759,6 +807,29 @@ namespace SLSKDONET.ViewModels
             OnPropertyChanged(propertyName);
             return true;
         }
+
+        private void LoadCues(PlaylistTrack track)
+        {
+            Cues.Clear();
+            if (string.IsNullOrEmpty(track.CuePointsJson)) return;
+            
+            try
+            {
+                var cues = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<OrbitCue>>(track.CuePointsJson);
+                if (cues != null)
+                {
+                    foreach (var cue in cues) Cues.Add(cue);
+                }
+                OnPropertyChanged(nameof(Cues));
+                OnPropertyChanged(nameof(HasCues));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to deserialize cues");
+            }
+        }
+
+        public bool HasCues => Cues.Count > 0;
 
         public void Dispose()
         {

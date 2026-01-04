@@ -62,9 +62,18 @@ namespace SLSKDONET.Views.Avalonia.Controls
             set => SetValue(HighBandProperty, value);
         }
 
+        public static readonly StyledProperty<System.Collections.Generic.IEnumerable<OrbitCue>?> CuesProperty =
+            AvaloniaProperty.Register<WaveformControl, System.Collections.Generic.IEnumerable<OrbitCue>?>(nameof(Cues));
+
+        public System.Collections.Generic.IEnumerable<OrbitCue>? Cues
+        {
+            get => GetValue(CuesProperty);
+            set => SetValue(CuesProperty, value);
+        }
+
         static WaveformControl()
         {
-            AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty, LowBandProperty, MidBandProperty, HighBandProperty);
+            AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty, LowBandProperty, MidBandProperty, HighBandProperty, CuesProperty);
         }
         
         protected override void OnPointerPressed(global::Avalonia.Input.PointerPressedEventArgs e)
@@ -191,6 +200,42 @@ namespace SLSKDONET.Views.Avalonia.Controls
                         context.DrawLine(currentPeakPen, new Point(x, mid + rmsH), new Point(x, mid + peakH));
                     }
                 }
+            }
+            
+            RenderCues(context, width, height);
+        }
+
+        private void RenderCues(DrawingContext context, double width, double height)
+        {
+            var cues = Cues;
+            var data = WaveformData;
+            if (cues == null || data == null || data.DurationSeconds <= 0) return;
+
+            foreach (var cue in cues)
+            {
+                double x = (cue.Timestamp / data.DurationSeconds) * width;
+                if (x < 0 || x > width) continue;
+
+                var color = Color.Parse(cue.Color ?? "#FFFFFF");
+                var pen = new Pen(new SolidColorBrush(color, 0.8), 2);
+                
+                // Draw vertical marker line
+                context.DrawLine(pen, new Point(x, 0), new Point(x, height));
+
+                // Draw label at the top
+                var typeface = new Typeface(global::Avalonia.Media.FontFamily.Default, FontStyle.Normal, FontWeight.Bold);
+                var formattedText = new FormattedText(
+                    cue.Name ?? cue.Role.ToString(),
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    10,
+                    new SolidColorBrush(color));
+                
+                // Background for text to make it readable
+                var textRect = new Rect(x + 4, 2, formattedText.Width + 4, formattedText.Height);
+                context.DrawRectangle(new SolidColorBrush(Colors.Black, 0.6), null, textRect);
+                context.DrawText(formattedText, new Point(x + 6, 2));
             }
         }
     }

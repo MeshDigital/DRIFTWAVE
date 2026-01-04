@@ -1,114 +1,204 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Logging;
+using SLSKDONET.Models;
 
 namespace SLSKDONET.Services.Musical;
 
 /// <summary>
-/// Phase 4.2: Cue Generation Engine.
-/// Calculates DJ cue points based on detected drop time and track BPM.
-/// Implements 32-bar phrase structure typical of EDM/DnB production.
+/// Phase 10: Cue Generation Engine.
+/// Uses Tri-Band RMS data (from WaveformAnalysisService) to detect structural DJ cue points.
 /// </summary>
 public class CueGenerationEngine
 {
     private readonly ILogger<CueGenerationEngine> _logger;
+    private readonly DropDetectionEngine _dropDetectionEngine;
 
-    public CueGenerationEngine(ILogger<CueGenerationEngine> logger)
+    public CueGenerationEngine(ILogger<CueGenerationEngine> logger, DropDetectionEngine dropDetectionEngine)
     {
         _logger = logger;
+        _dropDetectionEngine = dropDetectionEngine;
     }
 
     /// <summary>
-    /// Generates DJ cue points from drop detection results.
+    /// Generates high-fidelity cue points based on Tri-Band frequency energy.
     /// </summary>
-    /// <param name="dropTime">Detected drop time in seconds</param>
-    /// <param name="bpm">Track BPM</param>
-    /// <returns>Set of 4 cue points (Intro, Build, Drop, PhraseStart)</returns>
-    public CuePointSet GenerateCues(float dropTime, float bpm)
+    public async Task<List<OrbitCue>> GenerateCuesAsync(WaveformAnalysisData data, double duration, string? genre = null)
     {
-        if (bpm <= 0)
+        var cues = new List<OrbitCue>();
+        if (data.RmsData == null || data.RmsData.Length == 0) return cues;
+
+        int pointsCount = data.RmsData.Length;
+        double secondsPerPoint = duration / pointsCount;
+
+        // 1. INTRO: Find first significant energy in Mid/High bands
+        int introIdx = FindFirstEnergy(data.MidData, 10); // Threshold 10/255
+        if (introIdx >= 0)
         {
-            _logger.LogWarning("Invalid BPM {Bpm} - cannot generate cues", bpm);
-            return new CuePointSet();
+            cues.Add(new OrbitCue 
+            { 
+                Timestamp = introIdx * secondsPerPoint, 
+                Name = "Intro", 
+                Role = CueRole.Intro, 
+                Color = "#0000FF", // Blue
+                Confidence = 0.9
+            });
         }
 
-        // Calculate bar duration
-        float barDuration = 60f / bpm;
-
-        // Phase 4.2: 32-bar phrase structure
-        // Standard EDM/DnB: Intro (8) → Build (8) → Drop (16)
-        
-        var cues = new CuePointSet
+        // 2. KICK-IN: Find where Low band (Bass) sustains
+        int kickInIdx = FindKickIn(data.LowData, introIdx >= 0 ? introIdx : 0);
+        if (kickInIdx >= 0)
         {
-            // Always start at 0
-            Intro = 0f,
-            
-            // Drop is exactly where detected
-            Drop = dropTime,
-            
-            // Build-up: 16 bars before drop
-            Build = dropTime - (barDuration * 16),
-            
-            // Phrase start: 32 bars before drop
-            PhraseStart = dropTime - (barDuration * 32)
-        };
+            cues.Add(new OrbitCue 
+            { 
+                Timestamp = kickInIdx * secondsPerPoint, 
+                Name = "Kick-In", 
+                Role = CueRole.KickIn, 
+                Color = "#00FFFF", // Cyan
+                Confidence = 0.8
+            });
+        }
 
-        // Phase 4.2: Clamp negative values to 0
-        if (cues.Build < 0) cues.Build = 0;
-        if (cues.PhraseStart < 0) cues.PhraseStart = 0;
+        // 3. THE DROP: Use sudden energy surge + existing engine logic
+        // This usually happens when all bands jump together or Low band explodes
+        int dropIdx = await FindDropIdxAsync(data, secondsPerPoint);
+        if (dropIdx >= 0)
+        {
+             cues.Add(new OrbitCue 
+            { 
+                Timestamp = dropIdx * secondsPerPoint, 
+                Name = "The Drop", 
+                Role = CueRole.Drop, 
+                Color = "#FF0000", // Red
+                Confidence = 0.7
+            });
+        }
 
-        // Phase 4.2: Beat-grid alignment (round to nearest beat)
-        cues.Build = AlignToBeat(cues.Build, barDuration);
-        cues.PhraseStart = AlignToBeat(cues.PhraseStart, barDuration);
-        cues.Drop = AlignToBeat(cues.Drop, barDuration);
+        // 4. OUTRO: Find start of final energy fade
+        int outroIdx = FindOutro(data.MidData, pointsCount);
+        if (outroIdx >= 0)
+        {
+            cues.Add(new OrbitCue 
+            { 
+                Timestamp = outroIdx * secondsPerPoint, 
+                Name = "Outro", 
+                Role = CueRole.Outro, 
+                Color = "#00FF00", // Green
+                Confidence = 0.8
+            });
+        }
 
-        _logger.LogInformation("Generated cues for {Bpm} BPM track: " +
-            "PhraseStart={PS:F1}s, Build={B:F1}s, Drop={D:F1}s",
-            bpm, cues.PhraseStart, cues.Build, cues.Drop);
+        return cues.OrderBy(c => c.Timestamp).ToList();
+    }
+
+    private int FindFirstEnergy(byte[] data, byte threshold)
+    {
+        for (int i = 0; i < data.Length; i++)
+        {
+            if (data[i] > threshold) return i;
+        }
+        return -1;
+    }
+
+    private int FindKickIn(byte[] lowData, int startIdx)
+    {
+        // Look for a "step up" in bass energy that sustains
+        int windowSize = 20; // ~0.2s if 100fps
+        for (int i = startIdx; i < lowData.Length - windowSize; i++)
+        {
+            double avg = lowData.Skip(i).Take(windowSize).Average(b => (int)b);
+            if (avg > 40) return i; // Baseline bass energy
+        }
+        return -1;
+    }
+
+    private async Task<int> FindDropIdxAsync(WaveformAnalysisData data, double secondsPerPoint)
+    {
+        // Simple surge detection for now: sharpest increase in total energy
+        // In full implementation, we'd integrate with DropDetectionEngine too
+        int bestIdx = -1;
+        double maxDelta = 0;
+        
+        int window = 50; // 0.5s
+        for (int i = 100; i < data.PeakData.Length - window; i++)
+        {
+            double delta = (int)data.PeakData[i] - (int)data.PeakData[i - 50];
+            if (delta > maxDelta)
+            {
+                maxDelta = delta;
+                bestIdx = i;
+            }
+        }
+        
+        return bestIdx;
+    }
+
+    private int FindOutro(byte[] midData, int totalPoints)
+    {
+        // Look at last 30% of track and find the last significant energy drop
+        int start = (int)(totalPoints * 0.7);
+        for (int i = totalPoints - 10; i > start; i--)
+        {
+            if (midData[i] > 30) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Phase 10: Industrial Prep Workflow (Synchronous Fallback)
+    /// </summary>
+    public List<OrbitCue> GenerateCues(Data.Entities.TrackTechnicalEntity technicalData, string? genre = null)
+    {
+        var cues = new List<OrbitCue>();
+        if (technicalData == null) return cues;
+
+        // 1. First Beat (Intro)
+        cues.Add(new OrbitCue 
+        { 
+            Timestamp = 0, 
+            Name = "Intro", 
+            Role = CueRole.Intro,
+            Color = "#0000FF" 
+        });
+
+        // 2. Drop Detection (Red Marker)
+        // Note: technicalData.HighLevel isn't standard in our current entity, might be from Essentia output
+        // We'll use a placeholder or basic check
+        if (technicalData.CuePointsJson != null && technicalData.CuePointsJson.Contains("Drop"))
+        {
+             // Already has cues?
+        }
+        
+        // 3. Outro detection (Green Marker)
+        // Assume default duration if not set
+        double duration = 180.0; // Placeholder
+        cues.Add(new OrbitCue 
+        { 
+            Timestamp = duration - 30, 
+            Name = "Outro", 
+            Role = CueRole.Outro,
+            Color = "#00FF00" 
+        });
 
         return cues;
     }
 
     /// <summary>
-    /// Aligns a timestamp to the nearest beat boundary.
-    /// Ensures cues land exactly on beats for DJ software compatibility.
+    /// Legacy/Direct Drop Support
     /// </summary>
-    private float AlignToBeat(float timestamp, float beatDuration)
+    public (double PhraseStart, double Build, double Drop, double Intro) GenerateCues(double dropTime, float bpm)
     {
-        if (timestamp <= 0) return 0;
+        // Simple 8-bar phrase math
+        double secondsPerBeat = 60.0 / (bpm > 0 ? bpm : 120);
+        double bars16 = secondsPerBeat * 4 * 16;
+        double bars8 = secondsPerBeat * 4 * 8;
         
-        // Round to nearest beat
-        float beats = timestamp / beatDuration;
-        float alignedBeats = (float)Math.Round(beats);
-        
-        return alignedBeats * beatDuration;
+        return (
+            PhraseStart: Math.Max(0, dropTime - bars16),
+            Build: Math.Max(0, dropTime - bars8),
+            Drop: dropTime,
+            Intro: 0
+        );
     }
-}
-
-/// <summary>
-/// Container for the 4 standard DJ cue points.
-/// </summary>
-public class CuePointSet
-{
-    /// <summary>
-    /// Intro cue (always 0 - start of track).
-    /// </summary>
-    public float Intro { get; set; } = 0f;
-
-    /// <summary>
-    /// Build-up cue (16 bars before drop).
-    /// Marks where tension starts building.
-    /// </summary>
-    public float Build { get; set; }
-
-    /// <summary>
-    /// Drop cue (main energy peak).
-    /// Marks where the bass/kick enters.
-    /// </summary>
-    public float Drop { get; set; }
-
-    /// <summary>
-    /// Phrase start cue (32 bars before drop).
-    /// Marks the beginning of the complete phrase.
-    /// </summary>
-    public float PhraseStart { get; set; }
 }

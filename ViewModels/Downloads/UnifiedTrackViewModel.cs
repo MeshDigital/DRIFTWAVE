@@ -274,6 +274,11 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public string DynamicRangeDisplay => Model.DynamicRange.HasValue ? $"{Model.DynamicRange:F1} LU" : "—";
 
     public bool IsEnriched => Model.IsEnriched;
+    public bool IsPrepared => Model.IsPrepared;
+    public string? PrimaryGenre => Model.PrimaryGenre;
+
+    public string PreparationStatus => IsPrepared ? "Prepared" : "Raw";
+    public Avalonia.Media.IBrush PreparationColor => IsPrepared ? Avalonia.Media.Brushes.DodgerBlue : Avalonia.Media.Brushes.Gray;
 
     public WaveformAnalysisData WaveformData => new WaveformAnalysisData
     {
@@ -371,6 +376,9 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 Model.Valence = updatedTrack.Valence;
                 Model.Genres = updatedTrack.Genres;
                 Model.Popularity = updatedTrack.Popularity;
+                Model.IsPrepared = updatedTrack.IsPrepared;
+                Model.PrimaryGenre = updatedTrack.PrimaryGenre;
+                Model.CuePointsJson = updatedTrack.CuePointsJson;
                 
                 // Sync Waveform bands
                 Model.LowData = updatedTrack.LowData;
@@ -404,6 +412,10 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 this.RaisePropertyChanged(nameof(IsSecure));
                 this.RaisePropertyChanged(nameof(QualityIcon));
                 this.RaisePropertyChanged(nameof(QualityColor));
+                this.RaisePropertyChanged(nameof(IsPrepared));
+                this.RaisePropertyChanged(nameof(PreparationStatus));
+                this.RaisePropertyChanged(nameof(PreparationColor));
+                this.RaisePropertyChanged(nameof(PrimaryGenre));
                 
                 // Audio features
                 this.RaisePropertyChanged(nameof(IsEnriched));

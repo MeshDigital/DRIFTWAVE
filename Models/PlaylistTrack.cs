@@ -161,10 +161,22 @@ public class PlaylistTrack
     public string? SourcePlaylistName { get; set; }
     
     public bool IsEnriched { get; set; } = false;
+    public bool IsPrepared { get; set; } = false; // Phase 10
+    public string? PrimaryGenre { get; set; } // Phase 10
 
     // Phase 13: Per-Track Filter Overrides
     public string? PreferredFormats { get; set; }
     public int? MinBitrateOverride { get; set; }
+
+    public WaveformAnalysisData WaveformDataObj => new WaveformAnalysisData
+    {
+        PeakData = WaveformData ?? Array.Empty<byte>(),
+        RmsData = RmsData ?? Array.Empty<byte>(),
+        LowData = LowData ?? Array.Empty<byte>(),
+        MidData = MidData ?? Array.Empty<byte>(),
+        HighData = HighData ?? Array.Empty<byte>(),
+        DurationSeconds = (CanonicalDuration ?? 0) / 1000.0
+    };
 }
 
 /// <summary>

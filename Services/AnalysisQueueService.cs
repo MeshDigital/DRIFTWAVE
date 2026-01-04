@@ -250,6 +250,7 @@ public class AnalysisWorker : BackgroundService
     private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisWorker> _logger;
     private readonly IForensicLogger _forensicLogger;
+    private readonly Services.Musical.CueGenerationEngine _cueEngine;
     private readonly int _maxConcurrentAnalyses;
     private readonly SemaphoreSlim _concurrencyLimiter;
     
@@ -260,13 +261,14 @@ public class AnalysisWorker : BackgroundService
     private const int BatchSize = 10;
     private readonly TimeSpan BatchTimeout = TimeSpan.FromSeconds(5);
 
-    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger, Configuration.AppConfig config, IForensicLogger forensicLogger)
+    public AnalysisWorker(AnalysisQueueService queue, IServiceProvider serviceProvider, IEventBus eventBus, ILogger<AnalysisWorker> logger, Configuration.AppConfig config, IForensicLogger forensicLogger, Services.Musical.CueGenerationEngine cueEngine)
     {
         _queue = queue;
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
         _logger = logger;
         _forensicLogger = forensicLogger;
+        _cueEngine = cueEngine;
         
         // Determine optimal parallelism
         // ... (keep default logic) ...
@@ -459,6 +461,15 @@ public class AnalysisWorker : BackgroundService
                 PublishThrottled(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
                 resultContext.TechResult = await Task.Run(() => audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
 
+                // 4. Cue Generation (Heuristic)
+                if (resultContext.WaveformData != null)
+                {
+                    PublishThrottled(new AnalysisProgressEvent(trackHash, "Generating cue points...", 85));
+                    var cues = await _cueEngine.GenerateCuesAsync(resultContext.WaveformData, resultContext.WaveformData.DurationSeconds);
+                    resultContext.Cues = cues;
+                    _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, $"Generated {cues.Count} structural cues", trackHash);
+                }
+
                 PublishThrottled(new AnalysisProgressEvent(trackHash, "Queued for save...", 90));
                 
                 // Add to batch buffer
@@ -587,6 +598,15 @@ public class AnalysisWorker : BackgroundService
             track.TechnicalDetails.LowData = result.WaveformData.LowData;
             track.TechnicalDetails.MidData = result.WaveformData.MidData;
             track.TechnicalDetails.HighData = result.WaveformData.HighData;
+            
+            // Phase 10: Persist Cues
+            if (result.Cues != null && result.Cues.Any())
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(result.Cues);
+                track.CuePointsJson = json;
+                track.TechnicalDetails.CuePointsJson = json;
+                track.IsPrepared = result.Cues.Any(c => c.Confidence > 0.8);
+            }
         }
 
 
@@ -656,6 +676,14 @@ public class AnalysisWorker : BackgroundService
             entry.LowData = result.WaveformData.LowData;
             entry.MidData = result.WaveformData.MidData;
             entry.HighData = result.WaveformData.HighData;
+            
+            // Phase 10: Persist Cues
+            if (result.Cues != null && result.Cues.Any())
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(result.Cues);
+                entry.CuePointsJson = json;
+                entry.IsPrepared = result.Cues.Any(c => c.Confidence > 0.8);
+            }
         }
 
         if (result.TechResult != null)
@@ -707,5 +735,6 @@ public class AnalysisWorker : BackgroundService
         public WaveformAnalysisData? WaveformData { get; set; } // Changed from WaveformData
         public AudioAnalysisEntity? TechResult { get; set; }
         public AudioFeaturesEntity? MusicalResult { get; set; }
+        public List<OrbitCue>? Cues { get; set; } // Phase 10
     }
 }

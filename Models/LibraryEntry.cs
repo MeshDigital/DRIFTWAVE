@@ -102,4 +102,7 @@ public class LibraryEntry
 
     // Phase 15
     public string? DetectedSubGenre { get; set; }
+    public bool IsPrepared { get; set; } = false; // Phase 10
+    public string? PrimaryGenre { get; set; } // Phase 10
+    public string? CuePointsJson { get; set; } // Phase 10
 }

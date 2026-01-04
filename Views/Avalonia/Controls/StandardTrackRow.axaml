@@ -39,6 +39,14 @@
             <Setter Property="BorderBrush" Value="#FFD700"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
+        
+        <Style Selector="Border.PrepBadge">
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
     </UserControl.Styles>
 
     <Border Background="#1E1E1E" 
@@ -154,6 +162,19 @@
                    <!-- Integrity Check Badge -->
                    <Border Classes="IntegrityBadge Secure" IsVisible="{Binding IsSecure}">
                        <TextBlock Text="✓ VERIFIED" FontSize="9" FontWeight="Bold" Foreground="#00FF00"/>
+                   </Border>
+
+                   <!-- Preparation Badge (Phase 10) -->
+                   <Border Classes="PrepBadge" 
+                           Background="{Binding PreparationColor}" 
+                           Opacity="0.8"
+                           IsVisible="{Binding IsCompleted}">
+                       <TextBlock Text="{Binding PreparationStatus}" FontSize="8" FontWeight="Bold" Foreground="White"/>
+                   </Border>
+                   
+                   <!-- Primary Genre Tag (Phase 10) -->
+                   <Border Background="#33FFFFFF" CornerRadius="2" Padding="4,0" IsVisible="{Binding PrimaryGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                       <TextBlock Text="{Binding PrimaryGenre}" FontSize="9" Foreground="#CCC" FontWeight="SemiBold"/>
                    </Border>
                 </StackPanel>
             </StackPanel>

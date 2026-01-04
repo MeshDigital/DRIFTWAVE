@@ -120,6 +120,17 @@
                             </Grid>
                         </Border>
                         
+                        <!-- NEW: Interactive Waveform (Core of Phase 10) -->
+                        <Border Background="#111" CornerRadius="8" Height="100" Padding="1" ClipToBounds="True">
+                            <controls:WaveformControl Name="InspectorWaveform"
+                                                    WaveformData="{Binding Track.WaveformDataObj}"
+                                                    LowBand="{Binding Track.LowData}"
+                                                    MidBand="{Binding Track.MidData}"
+                                                    HighBand="{Binding Track.HighData}"
+                                                    Cues="{Binding Cues}"
+                                                    Height="100"/>
+                        </Border>
+                        
                         <!-- METRICS GRID: Key Analysis Data -->
                         <UniformGrid Columns="2" Rows="2">
                             <!-- Card 1: Sonic Integrity -->
@@ -298,7 +309,6 @@
                     </Button>
                 </Grid>
             </TabItem>
-
             <!-- TAB 3: PRO DJ (Mixes Well With + Radar) -->
             <TabItem Header="Pro DJ" FontSize="14" FontWeight="SemiBold">
                 <ScrollViewer Margin="0,10,0,0">
@@ -393,6 +403,94 @@
                                 <TextBlock Text="No other versions found" Foreground="#666" FontStyle="Italic" 
                                            HorizontalAlignment="Center" Margin="0,8"
                                            IsVisible="{Binding !OtherVersions.Count}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 4: PREPARATION (Cues & Metadata Management) -->
+            <TabItem Header="Preparation" FontSize="14" FontWeight="SemiBold">
+                <ScrollViewer Margin="0,10,0,0">
+                    <StackPanel Spacing="24">
+                        <!-- Cue List -->
+                        <Border Background="#252526" CornerRadius="12" Padding="16">
+                            <StackPanel Spacing="16">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="📍" FontSize="16"/>
+                                        <TextBlock Text="Cue Points" FontSize="14" FontWeight="SemiBold" Foreground="#AAA"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button Command="{Binding AddCueCommand}" Classes="accent" Padding="8,4" CornerRadius="4">
+                                            <TextBlock Text="+ Add Cue" FontSize="11" FontWeight="Bold"/>
+                                        </Button>
+                                        <Button Command="{Binding SaveCuesCommand}" Classes="success" Padding="8,4" CornerRadius="4">
+                                            <TextBlock Text="💾 Save All" FontSize="11" FontWeight="Bold"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding Cues}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                                                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                                    <!-- Color Indicator -->
+                                                    <Border Width="4" Height="24" CornerRadius="2" Background="{Binding Color}" Margin="0,0,12,0"/>
+                                                    
+                                                    <!-- Name & Role -->
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBox Text="{Binding Name}" FontWeight="SemiBold" Background="Transparent" BorderThickness="0" Padding="0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Role}" FontSize="10" Foreground="#666"/>
+                                                    </StackPanel>
+                                                    
+                                                    <!-- Timestamp -->
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="20,0">
+                                                        <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:F2}s'}" Foreground="#00BFFF" FontFamily="Consolas" FontSize="12" FontWeight="Bold"/>
+                                                    </StackPanel>
+                                                    
+                                                    <!-- Delete -->
+                                                    <Button Grid.Column="3" 
+                                                            Command="{Binding $parent[UserControl].DataContext.DeleteCueCommand}" 
+                                                            CommandParameter="{Binding}"
+                                                            Background="Transparent" BorderThickness="0">
+                                                        <PathIcon Data="{StaticResource delete_regular}" Width="16" Height="16" Foreground="#FF4444"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                
+                                <TextBlock Text="No cues generated or added yet." Foreground="#666" FontStyle="Italic" 
+                                           HorizontalAlignment="Center" Margin="0,8"
+                                           IsVisible="{Binding !HasCues}"/>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- Metadata Actions -->
+                        <Border Background="#252526" CornerRadius="12" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="📝" FontSize="16"/>
+                                    <TextBlock Text="Preparation Actions" FontSize="14" FontWeight="SemiBold" Foreground="#AAA"/>
+                                </StackPanel>
+                                
+                                <WrapPanel ItemWidth="180">
+                                    <Button Command="{Binding ForceReAnalyzeCommand}" Margin="4" CornerRadius="6" HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <PathIcon Data="{StaticResource arrow_counterclockwise_regular}" Width="14" Height="14"/>
+                                            <TextBlock Text="Force Re-Analysis" FontSize="12"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{Binding GenerateSpectrogramCommand}" Margin="4" CornerRadius="6" HorizontalAlignment="Stretch">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <PathIcon Data="{StaticResource radar_regular}" Width="14" Height="14"/>
+                                            <TextBlock Text="View Spectrum" FontSize="12"/>
+                                        </StackPanel>
+                                    </Button>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>

@@ -349,11 +349,11 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                             // Generate cues from drop
                             var cues = _cueEngine.GenerateCues(dropTime.Value, entity.Bpm);
                             
-                            entity.DropTimeSeconds = dropTime;
-                            entity.CuePhraseStart = cues.PhraseStart;
-                            entity.CueBuild = cues.Build;
-                            entity.CueDrop = cues.Drop;
-                            entity.CueIntro = cues.Intro;
+                            entity.DropTimeSeconds = (float)dropTime.Value;
+                            entity.CuePhraseStart = (float)cues.PhraseStart;
+                            entity.CueBuild = (float)cues.Build;
+                            entity.CueDrop = (float)cues.Drop;
+                            entity.CueIntro = (float)cues.Intro;
                             
                             _logger.LogInformation("🎯 Drop + Cues generated: Drop={Drop:F1}s, Build={Build:F1}s, PhraseStart={PS:F1}s",
                                 dropTime.Value, cues.Build, cues.PhraseStart);

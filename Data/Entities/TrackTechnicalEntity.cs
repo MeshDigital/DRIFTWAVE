@@ -33,6 +33,8 @@ namespace SLSKDONET.Data.Entities
         
         public string? AudioFingerprint { get; set; }
         public string? SpectralHash { get; set; }
+        public bool IsPrepared { get; set; } = false; // Phase 10
+        public string? PrimaryGenre { get; set; } // Phase 10
         
         public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     }
