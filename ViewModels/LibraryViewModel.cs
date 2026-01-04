@@ -1009,51 +1009,154 @@ public class LibraryViewModel : INotifyPropertyChanged, IDisposable
             MixHelperSeedTrack = seedTrack;
             HarmonicMatches.Clear();
 
-            _logger.LogDebug("Loading harmonic matches for: {Title}", seedTrack.Title);
+            _logger.LogDebug("Loading matches for: {Title}", seedTrack.Title);
 
-            // Check for cancellation before expensive operation
-            if (cancellationToken.IsCancellationRequested)
-            {
-                _logger.LogDebug("Harmonic match loading cancelled for: {Title}", seedTrack.Title);
-                return;
-            }
+            if (cancellationToken.IsCancellationRequested) return;
 
-            // Find matches
-            var matches = await _harmonicMatchService.GetHarmonicMatchesAsync(
+            // 1. Prepare Tasks
+            var harmonicTask = _harmonicMatchService.GetHarmonicMatchesAsync(
                 seedTrack.Model.Id,
-                limit: 10, // Sidebar shows top 10
+                limit: 15, 
                 includeBpmRange: true,
                 includeEnergyMatch: true);
 
-            // Check cancellation again after async operation
-            if (cancellationToken.IsCancellationRequested)
-            {
-                _logger.LogDebug("Harmonic match loading cancelled after query for: {Title}", seedTrack.Title);
-                return;
-            }
+            var sonicTask = GetSonicMatchesInternalAsync(seedTrack, cancellationToken); // Helper method
 
-            // Convert to ViewModel
-            foreach (var match in matches)
+            await Task.WhenAll(harmonicTask, sonicTask);
+
+            if (cancellationToken.IsCancellationRequested) return;
+
+            var harmonicResults = await harmonicTask;
+            var sonicResults = await sonicTask;
+
+            // 2. Merge Results
+            // Strategy: Show Harmonic matches, but upgrade them to "Sonic Twin" if they also match sonically.
+            // Add purely sonic matches at the bottom or interleave?
+            // "Sonic Twins usually trump generic harmonic matches for vibe."
+            // Let's create a combined list.
+            
+            var combined = new List<HarmonicMatchViewModel>();
+            var existingIds = new HashSet<Guid>();
+
+            // A. Process Harmonic Matches
+            foreach (var match in harmonicResults)
             {
-                HarmonicMatches.Add(new HarmonicMatchViewModel
+                var vm = new HarmonicMatchViewModel
                 {
                     Track = MapEntityToLibraryEntry(match.Track),
                     CompatibilityScore = match.CompatibilityScore,
                     Relationship = match.KeyRelationship,
                     BpmDifference = match.BpmDifference
+                };
+
+                // Check if this is also a sonic match
+                var sonicMatch = sonicResults.FirstOrDefault(s => s.TrackHash == match.Track.UniqueHash);
+                if (sonicMatch != default)
+                {
+                    vm.CompatibilityScore = Math.Max(vm.CompatibilityScore, sonicMatch.Similarity * 100);
+                    vm.Relationship = KeyRelationship.SonicTwin; // Upgrade status
+                    vm.IsSonicMatch = true;
+                }
+
+                combined.Add(vm);
+                existingIds.Add(match.Track.Id);
+            }
+
+            // B. Add unique Sonic Matches (that weren't harmonic matches)
+            foreach (var sonic in sonicResults)
+            {
+                // We need to look up the LibraryEntry for the sonic match (it returns Hash)
+                // The sonic search in VM already fetches LibraryEntries usually? 
+                // Let's make GetSonicMatchesInternalAsync return populated objects to save lookups.
+                
+                if (existingIds.Contains(sonic.Id)) continue;
+
+                combined.Add(new HarmonicMatchViewModel
+                {
+                    Track = MapEntityToLibraryEntry(sonic.Entity),
+                    CompatibilityScore = sonic.Similarity * 100,
+                    Relationship = KeyRelationship.SonicTwin,
+                    BpmDifference = seedTrack.Model.BPM.HasValue && sonic.Entity.BPM.HasValue 
+                         ? Math.Abs(seedTrack.Model.BPM.Value - sonic.Entity.BPM.Value) : null,
+                    IsSonicMatch = true
                 });
             }
 
-            _logger.LogDebug("Loaded {Count} matches for Mix Helper", matches.Count);
+            // 3. Sort and Populate
+            // Sort by Score descending
+            var sorted = combined.OrderByDescending(x => x.CompatibilityScore).Take(20).ToList();
+
+            foreach (var vm in sorted)
+            {
+                HarmonicMatches.Add(vm);
+            }
+
+            _logger.LogDebug("Loaded {Count} combined matches", HarmonicMatches.Count);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load harmonic matches for sidebar");
+            _logger.LogError(ex, "Failed to load sidebar matches");
         }
         finally
         {
-            IsLoadingMatches = false;
+             IsLoadingMatches = false;
         }
+    }
+
+    // Helper struct for internal usage
+    private record SonicMatch(Guid Id, string TrackHash, float Similarity, Data.LibraryEntryEntity Entity);
+
+    private async Task<List<SonicMatch>> GetSonicMatchesInternalAsync(PlaylistTrackViewModel seedTrack, System.Threading.CancellationToken token)
+    {
+         try
+         {
+            var audioFeatures = await _libraryService.GetAllAudioFeaturesAsync();
+            var seedFeatures = audioFeatures.FirstOrDefault(af => af.TrackUniqueHash == seedTrack.GlobalId);
+            
+            if (seedFeatures == null || string.IsNullOrEmpty(seedFeatures.AiEmbeddingJson)) return new List<SonicMatch>();
+
+            float[]? seedVector = null;
+            try 
+            {
+                seedVector = System.Text.Json.JsonSerializer.Deserialize<float[]>(seedFeatures.AiEmbeddingJson);
+            }
+            catch { return new List<SonicMatch>(); }
+
+            if (seedVector == null) return new List<SonicMatch>();
+            
+            if (token.IsCancellationRequested) return new List<SonicMatch>();
+
+            // Run on thread pool
+            var matches = await Task.Run(() => _personalClassifier.FindSimilarTracks(
+                seedVector, 
+                (float)(seedTrack.Model.BPM ?? 120),
+                audioFeatures, 
+                limit: 10
+            ), token);
+
+            if (!matches.Any()) return new List<SonicMatch>();
+
+            // Map hashes to Entities
+            // We need to fetch entities to get details (Id, BPM, etc)
+            // Use LoadAll (cached) or Find? LoadAll is likely cached by Service/Context
+            var allEntries = await _libraryService.LoadAllLibraryEntriesAsync();
+            var entryDict = allEntries.ToDictionary(e => e.UniqueHash);
+            
+            var results = new List<SonicMatch>();
+            foreach (var m in matches)
+            {
+                if (entryDict.TryGetValue(m.TrackHash, out var entity))
+                {
+                    results.Add(new SonicMatch(entity.Id, m.TrackHash, m.Similarity, entity));
+                }
+            }
+            return results;
+         }
+         catch (Exception ex)
+         {
+             _logger.LogWarning("Sonic match background lookup failed: {Message}", ex.Message);
+             return new List<SonicMatch>();
+         }
     }
 
     private SLSKDONET.Models.LibraryEntry MapEntityToLibraryEntry(SLSKDONET.Data.LibraryEntryEntity entity)

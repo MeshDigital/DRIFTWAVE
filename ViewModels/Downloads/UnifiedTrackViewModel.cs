@@ -113,9 +113,19 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
          // Initialize sliding window for speed
          _lastProgressTime = DateTime.MinValue;
 
-         // Phase 0: Load artwork
-         _ = LoadAlbumArtworkAsync();
+         // Phase 0: Load artwork via Proxy
+         _artwork = new ArtworkProxy(_artworkCache, Model.AlbumArtUrl);
+         
+         FindSimilarCommand = new RelayCommand(FindSimilar);
     }
+    
+    private void FindSimilar()
+    {
+        if (Model == null) return;
+        _eventBus.Publish(new FindSimilarRequestEvent(Model));
+    }
+
+    public ICommand FindSimilarCommand { get; }
 
     // IDisplayableTrack Implementation
     public string GlobalId => Model.TrackUniqueHash;
@@ -124,19 +134,11 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public string AlbumName => Model.Album ?? "Unknown Album";
     public string? AlbumArtUrl => Model.AlbumArtUrl;
 
-    private Avalonia.Media.Imaging.Bitmap? _artworkBitmap;
-    public Avalonia.Media.Imaging.Bitmap? ArtworkBitmap
-    {
-        get => _artworkBitmap;
-        private set
-        {
-            if (_artworkBitmap != value)
-            {
-                _artworkBitmap?.Dispose(); // Free memory
-                this.RaiseAndSetIfChanged(ref _artworkBitmap, value);
-            }
-        }
-    }
+    private ArtworkProxy _artwork;
+    public ArtworkProxy Artwork => _artwork;
+    
+    // Legacy support: redirects to Proxy.Image (which triggers load)
+    public Avalonia.Media.Imaging.Bitmap? ArtworkBitmap => _artwork?.Image;
 
     private PlaylistTrackState _state;
     public PlaylistTrackState State
@@ -407,27 +409,14 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 this.RaisePropertyChanged(nameof(IsEnriched));
                 this.RaisePropertyChanged(nameof(WaveformData));
                 
-                // Trigger artwork reload now that we have the AlbumArtUrl and SpotifyAlbumId
-                await LoadAlbumArtworkAsync();
+                // Update Artwork Proxy
+                _artwork = new ArtworkProxy(_artworkCache, Model.AlbumArtUrl);
+                this.RaisePropertyChanged(nameof(Artwork));
+                this.RaisePropertyChanged(nameof(ArtworkBitmap));
             }
         });
     }
 
-    private async System.Threading.Tasks.Task LoadAlbumArtworkAsync()
-    {
-        if (string.IsNullOrWhiteSpace(Model.AlbumArtUrl) || string.IsNullOrWhiteSpace(Model.SpotifyAlbumId))
-            return;
-
-        try
-        {
-            ArtworkBitmap = await _artworkCache.GetBitmapAsync(Model.AlbumArtUrl);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to load artwork for {GlobalId}: {ex.Message}");
-        }
-    }
-    
     private void PlayTrack()
     {
         // Construct a lightweight VM payload for the player
@@ -441,7 +430,6 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public void Dispose()
     {
         _disposables.Dispose();
-        _artworkBitmap?.Dispose();
-        _artworkBitmap = null;
+        // Artwork is a proxy, cache manages bitmap disposal
     }
 }

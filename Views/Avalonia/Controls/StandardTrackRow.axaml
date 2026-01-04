@@ -58,9 +58,15 @@
                         <PathIcon Data="{StaticResource folder_open_regular}" Width="16" Height="16"/>
                     </MenuItem.Icon>
                 </MenuItem>
-                 <MenuItem Header="Add to Project" Command="{Binding AddToProjectCommand}" IsVisible="{Binding IsCompleted}">
+                <MenuItem Header="Add to Project" Command="{Binding AddToProjectCommand}" IsVisible="{Binding IsCompleted}">
                     <MenuItem.Icon>
                         <PathIcon Data="{StaticResource add_circle_regular}" Width="16" Height="16"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                
+                <MenuItem Header="Find Similar (Sonic Twin)" Command="{Binding FindSimilarCommand}" IsVisible="{Binding IsCompleted}">
+                    <MenuItem.Icon>
+                        <PathIcon Data="{StaticResource radar_regular}" Width="16" Height="16"/>
                     </MenuItem.Icon>
                 </MenuItem>
                 
@@ -97,6 +103,13 @@
                         <PathIcon Data="{StaticResource delete_regular}" Width="16" Height="16"/>
                     </MenuItem.Icon>
                 </MenuItem>
+                
+                <!-- Phase 7: Forensic Duplication -->
+                <MenuItem Header="Delete &amp; Blacklist (Use with Caution!)" Command="{Binding DeleteAndBlacklistCommand}" IsVisible="{Binding IsCompleted}">
+                    <MenuItem.Icon>
+                        <PathIcon Data="{StaticResource shield_dismiss_regular}" Width="16" Height="16" Foreground="#FF4444"/>
+                    </MenuItem.Icon>
+                </MenuItem>
             </ContextMenu>
         </Border.ContextMenu>
             
@@ -108,9 +121,9 @@
                     CornerRadius="4" ClipToBounds="True" Background="#111">
                 <Panel>
                     <!-- Actual Image -->
-                    <Image Source="{Binding ArtworkBitmap}" 
+                    <Image Source="{Binding Artwork.Image}" 
                            Stretch="UniformToFill"
-                           IsVisible="{Binding ArtworkBitmap, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                           IsVisible="{Binding Artwork.Image, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                            
                     <!-- Placeholder/Status Overlay if no art or if downloading -->
                     <PathIcon Data="{StaticResource music_regular}" 

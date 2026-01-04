@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -181,23 +181,23 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         {
             if (e.Album is PlaylistJob job)
             {
-                _logger.LogInformation("📢 Processing DownloadAlbumRequest for Project: {Title}", job.SourceTitle);
+                _logger.LogInformation("ðŸ“¢ Processing DownloadAlbumRequest for Project: {Title}", job.SourceTitle);
                 
                 // Ensure tracks are loaded
                  _ = Task.Run(async () => 
                  {
-                     _logger.LogInformation("🔍 Loading tracks for project {Id}...", job.Id);
+                     _logger.LogInformation("ðŸ” Loading tracks for project {Id}...", job.Id);
                      var tracks = await _libraryService.LoadPlaylistTracksAsync(job.Id);
                      
                      if (tracks.Any())
                      {
-                         _logger.LogInformation("✅ Found {Count} tracks, queuing...", tracks.Count);
+                         _logger.LogInformation("âœ… Found {Count} tracks, queuing...", tracks.Count);
                          QueueTracks(tracks);
-                         _logger.LogInformation("🚀 Queued {Count} tracks for project {Title}", tracks.Count, job.SourceTitle);
+                         _logger.LogInformation("ðŸš€ Queued {Count} tracks for project {Title}", tracks.Count, job.SourceTitle);
                      }
                      else
                      {
-                         _logger.LogWarning("⚠️ No tracks found for project {Title} (ID: {Id}) - Database might be empty or tracks missing", job.SourceTitle, job.Id);
+                         _logger.LogWarning("âš ï¸ No tracks found for project {Title} (ID: {Id}) - Database might be empty or tracks missing", job.SourceTitle, job.Id);
                      }
                  });
             }
@@ -292,7 +292,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 try 
                 {
                     _downloadSemaphore.Release(diff);
-                    _logger.LogInformation("🚀 Increased concurrent download limit to {Count}", value);
+                    _logger.LogInformation("ðŸš€ Increased concurrent download limit to {Count}", value);
                 }
                 catch (SemaphoreFullException) 
                 {
@@ -305,7 +305,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 // Decrease limit: Acquire slots asynchronously to throttle future downloads
                 // We don't cancel running downloads, just prevent new ones until count drops
                 int reduceBy = Math.Abs(diff);
-                _logger.LogInformation("🛑 Decreasing concurrent download limit to {Count} (throttling {Reduce} slots)", value, reduceBy);
+                _logger.LogInformation("ðŸ›‘ Decreasing concurrent download limit to {Count} (throttling {Reduce} slots)", value, reduceBy);
                 
                 Task.Run(async () => 
                 {
@@ -892,7 +892,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             _logger.LogWarning(ex, "Failed to mark job as user-paused in DB (non-fatal)");
         }
         
-        _logger.LogInformation("⏸️ Paused track: {Artist} - {Title} (user-initiated)", ctx.Model.Artist, ctx.Model.Title);
+        _logger.LogInformation("â¸ï¸ Paused track: {Artist} - {Title} (user-initiated)", ctx.Model.Artist, ctx.Model.Title);
     }
 
     /// <summary>
@@ -908,7 +908,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
 
         if (active.Any())
         {
-            _logger.LogInformation("⏸️ Pausing all {Count} active downloads...", active.Count);
+            _logger.LogInformation("â¸ï¸ Pausing all {Count} active downloads...", active.Count);
             foreach(var d in active) 
             {
                  await PauseTrackAsync(d.GlobalId);
@@ -982,7 +982,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         if (!string.IsNullOrEmpty(stalledUser))
         {
             ctx.BlacklistedUsers.Add(stalledUser);
-            _logger.LogWarning("⚠️ Health Monitor: Blacklisting peer {User} for {Track}", stalledUser, ctx.Model.Title);
+            _logger.LogWarning("âš ï¸ Health Monitor: Blacklisting peer {User} for {Track}", stalledUser, ctx.Model.Title);
         }
 
         // 1. Cancel active transfer (stops Soulseek)
@@ -1048,76 +1048,6 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         };
         
         QueueTracks(new List<PlaylistTrack> { playlistTrack });
-    }
-
-    /// <summary>
-    /// Phase 2.5: Hydration - Detects and resumes orphaned downloads from crashed/closed sessions.
-    /// Scans for tracks stuck in Downloading/Searching state and checks for existing .part files.
-    /// </summary>
-    private async Task HydrateFromCrashAsync()
-    {
-        var orphanedTracks = new List<DownloadContext>();
-        
-        lock (_collectionLock)
-        {
-            orphanedTracks = _downloads.Where(t => 
-                t.State == PlaylistTrackState.Downloading || 
-                t.State == PlaylistTrackState.Searching).ToList();
-        }
-        
-        if (!orphanedTracks.Any())
-        {
-            _logger.LogInformation("✅ No orphaned downloads detected. Clean startup.");
-            return;
-        }
-
-        _logger.LogWarning("🔍 Detected {Count} orphaned downloads. Hydrating...", orphanedTracks.Count);
-        
-        int resumedCount = 0;
-        foreach (var ctx in orphanedTracks)
-        {
-            // Check for existing .part file to resume
-            var partPath = _pathProvider.GetTrackPath(
-                ctx.Model.Artist, 
-                ctx.Model.Album ?? "Unknown Album", 
-                ctx.Model.Title, 
-                "mp3") + ".part";
-            
-            if (File.Exists(partPath))
-            {
-                var partSize = new FileInfo(partPath).Length;
-                ctx.BytesReceived = partSize;
-                ctx.IsResuming = true;
-                resumedCount++;
-                
-                _logger.LogInformation("📁 Found .part file ({Size:N0} bytes) for {Track}. Will resume.", 
-                    partSize, ctx.Model.Title);
-            }
-            
-            // Reset to Pending so ProcessQueueLoop picks it up
-            // Pro-tip from user: Avoid firing too many UI events during startup
-            ctx.State = PlaylistTrackState.Pending;
-        }
-        
-        // PERFORMANCE FIX: Batch update instead of sequential await loop
-        // Sequential UpdateStateAsync for 100+ tracks = minutes of blocking startup
-        // Just update in-memory state - DB sync will happen naturally when downloads start
-        // No need to publish events during silent startup hydration
-        _logger.LogInformation("✅ Hydration complete: {Total} orphaned, {Resumed} with .part files (state updated in-memory)", 
-            orphanedTracks.Count, resumedCount);
-        
-        // UX: Notify via logs (UI notification event can be added in Step 4: Download Center UI)
-        if (orphanedTracks.Count > 0)
-        {
-            var message = orphanedTracks.Count == 1 
-                ? "Resuming 1 interrupted download."
-                : $"Resuming {orphanedTracks.Count} interrupted downloads.";
-                
-            _logger.LogInformation("📢 {Message}", message);
-        }
-        
-        _logger.LogInformation("✅ Hydration complete: {Total} orphaned, {Resumed} with .part files", 
-            orphanedTracks.Count, resumedCount);
     }
 
     public async Task StartAsync(CancellationToken ct = default)
@@ -1231,7 +1161,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                         var dbTrack = await _databaseService.FindTrackAsync(state.TrackGlobalId);
                         if (dbTrack == null)
                         {
-                            _logger.LogWarning("👻 Zombie Checkpoint: {Track} (File & Record missing). Cleaning up.", state.Title);
+                            _logger.LogWarning("ðŸ‘» Zombie Checkpoint: {Track} (File & Record missing). Cleaning up.", state.Title);
                             await _crashJournal.CompleteCheckpointAsync(checkpoint.Id); 
                             zombies++;
                             continue;
@@ -1254,7 +1184,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     {
                         try 
                         {
-                            _logger.LogWarning("⚠️ Truncation Guard: Truncating {Track} from {Disk} to {Journal} bytes.", 
+                            _logger.LogWarning("âš ï¸ Truncation Guard: Truncating {Track} from {Disk} to {Journal} bytes.", 
                                 state.Title, info.Length, state.BytesDownloaded);
                                 
                             using (var fs = new FileStream(state.PartFilePath, FileMode.Open, FileAccess.Write, FileShare.None))
@@ -1290,7 +1220,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 }
                 
                 recovered++;
-                _logger.LogInformation("✅ Recovered Session: {Artist} - {Title} ({Percent}%)", 
+                _logger.LogInformation("âœ… Recovered Session: {Artist} - {Title} ({Percent}%)", 
                     state.Artist, state.Title, (state.BytesDownloaded * 100.0 / Math.Max(1, state.ExpectedSize)).ToString("F0"));
             }
 
@@ -1433,7 +1363,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 var existingEntry = await _libraryService.FindLibraryEntryAsync(ctx.Model.TrackUniqueHash);
                 if (existingEntry != null && File.Exists(existingEntry.FilePath))
                 {
-                    _logger.LogInformation("♻️ Track already in library: {Artist} - {Title}, reusing file: {Path}", 
+                    _logger.LogInformation("â™»ï¸ Track already in library: {Artist} - {Title}, reusing file: {Path}", 
                         ctx.Model.Artist, ctx.Model.Title, existingEntry.FilePath);
                     
                     // Reuse existing file instead of downloading
@@ -1503,7 +1433,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 if (ctx.Model.Priority >= 10 && ctx.State == PlaylistTrackState.Downloading)
                 {
                     cancellationReason = "Preempted for high-priority download";
-                    _logger.LogInformation("⏸ Download preempted for high-priority work: {Title} - deferring to queue", ctx.Model.Title);
+                    _logger.LogInformation("â¸ Download preempted for high-priority work: {Title} - deferring to queue", ctx.Model.Title);
                     await UpdateStateAsync(ctx, PlaylistTrackState.Deferred, "Deferred for high-priority downloads");
                     return;
                 }
@@ -1512,7 +1442,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 if (ctx.State == PlaylistTrackState.Paused)
                 {
                     cancellationReason = "User paused download";
-                    _logger.LogInformation("⏸ Download paused by user: {Title}", ctx.Model.Title);
+                    _logger.LogInformation("â¸ Download paused by user: {Title}", ctx.Model.Title);
                     return;
                 }
                 
@@ -1520,7 +1450,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                 if (ctx.State == PlaylistTrackState.Cancelled)
                 {
                     cancellationReason = "User cancelled download";
-                    _logger.LogInformation("❌ Download cancelled by user: {Title}", ctx.Model.Title);
+                    _logger.LogInformation("âŒ Download cancelled by user: {Title}", ctx.Model.Title);
                     return;
                 }
                 
@@ -1534,7 +1464,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
 
                 // Otherwise it's an unexpected cancellation (health monitor, timeout, etc.)
                 cancellationReason = "System/timeout cancellation";
-                _logger.LogWarning("⚠️ Unexpected cancellation for {Title} in state {State}. Marking as cancelled. Reason: {Reason}", 
+                _logger.LogWarning("âš ï¸ Unexpected cancellation for {Title} in state {State}. Marking as cancelled. Reason: {Reason}", 
                     ctx.Model.Title, ctx.State, cancellationReason);
                 await UpdateStateAsync(ctx, PlaylistTrackState.Cancelled);
             }
@@ -1556,7 +1486,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     {
                         if (ctx.BlacklistedUsers.Add(ctx.CurrentUsername))
                         {
-                            _logger.LogWarning("🚫 Blacklisted peer {User} for {Track} due to error", ctx.CurrentUsername, ctx.Model.Title);
+                            _logger.LogWarning("ðŸš« Blacklisted peer {User} for {Track} due to error", ctx.CurrentUsername, ctx.Model.Title);
                         }
                     }
                 }
@@ -1642,14 +1572,14 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             if (expectedSize > 0 && diskBytes >= expectedSize)
             {
                 startPosition = diskBytes;
-                _logger.LogInformation("👻 Ghost File Detected: Disk ({Disk}) >= Expected ({Expected}). Skipping truncation despite Journal ({Journal}).", 
+                _logger.LogInformation("ðŸ‘» Ghost File Detected: Disk ({Disk}) >= Expected ({Expected}). Skipping truncation despite Journal ({Journal}).", 
                     diskBytes, expectedSize, confirmedBytes);
             }
             else if (confirmedBytes > 0 && diskBytes > confirmedBytes)
             {
                 // Case 1: Disk has more data than journal (unconfirmed tail)
                 // Truncate to confirmed bytes to ensure no corrupt/torn data is kept
-                _logger.LogWarning("⚠️ Atomic Resume: Truncating {Diff} bytes of unconfirmed data for {Track}", 
+                _logger.LogWarning("âš ï¸ Atomic Resume: Truncating {Diff} bytes of unconfirmed data for {Track}", 
                     diskBytes - confirmedBytes, ctx.Model.Title);
                     
                 using (var fs = File.OpenWrite(partPath))
@@ -1704,7 +1634,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         };
 
         string? checkpointId = await _crashJournal.LogCheckpointAsync(checkpoint);
-        _logger.LogDebug("✅ Download checkpoint logged: {Id} - {Artist} - {Title}", 
+        _logger.LogDebug("âœ… Download checkpoint logged: {Id} - {Artist} - {Title}", 
             checkpointId, ctx.Model.Artist, ctx.Model.Title);
 
         // Phase 2A: PERIODIC HEARTBEAT with stall detection
@@ -1731,7 +1661,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                         stallCount++;
                         if (stallCount >= 4)
                         {
-                            _logger.LogWarning("⚠️ Download stalled for 1 minute: {Artist} - {Title} ({Current}/{Total} bytes)",
+                            _logger.LogWarning("âš ï¸ Download stalled for 1 minute: {Artist} - {Title} ({Current}/{Total} bytes)",
                                 ctx.Model.Artist, ctx.Model.Title, currentBytes, checkpointState.ExpectedSize);
                             // Skip heartbeat update to save SSD writes
                             continue;
@@ -1847,7 +1777,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                      throw new IOException($"Failed to atomically move file from {partPath} to {finalPath}");
                 }
                 
-                _logger.LogInformation("Atomic move complete: {Part} → {Final}", 
+                _logger.LogInformation("Atomic move complete: {Part} â†’ {Final}", 
                     Path.GetFileName(partPath), Path.GetFileName(finalPath));
 
                 // Phase 1A: POST-DOWNLOAD VERIFICATION
@@ -1886,7 +1816,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                         return;
                     }
                     
-                    _logger.LogInformation("✅ File verification passed: {Path}", finalPath);
+                    _logger.LogInformation("âœ… File verification passed: {Path}", finalPath);
                 }
                 catch (Exception verifyEx)
                 {
@@ -1912,7 +1842,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     ctx.IsFinalizing = true;
                     
                     await _crashJournal.CompleteCheckpointAsync(checkpointId);
-                    _logger.LogDebug("✅ Download checkpoint completed: {Id}", checkpointId);
+                    _logger.LogDebug("âœ… Download checkpoint completed: {Id}", checkpointId);
                 }
 
                 // CRITICAL: Create LibraryEntry for global index (enables All Tracks view + cross-project deduplication)
@@ -1927,9 +1857,9 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     Bitrate = bestMatch.Bitrate
                 };
                 await _libraryService.SaveOrUpdateLibraryEntryAsync(libraryEntry);
-                _logger.LogInformation("📚 Added to library: {Artist} - {Title}", ctx.Model.Artist, ctx.Model.Title);
+                _logger.LogInformation("ðŸ“š Added to library: {Artist} - {Title}", ctx.Model.Artist, ctx.Model.Title);
 
-                _logger.LogInformation("📚 Added to library: {Artist} - {Title}", ctx.Model.Artist, ctx.Model.Title);
+                _logger.LogInformation("ðŸ“š Added to library: {Artist} - {Title}", ctx.Model.Artist, ctx.Model.Title);
 
                 // Phase 3: Integrated Audio Analysis Pipeline (Waveform + Technical + UI Feedback)
                 try
@@ -1939,18 +1869,18 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     {
                         try
                         {
-                            _logger.LogInformation("🔬 Starting post-download analysis for {Title}", ctx.Model.Title);
+                            _logger.LogInformation("ðŸ”¬ Starting post-download analysis for {Title}", ctx.Model.Title);
 
                             // A. Generate Waveform (Visual)
                             WaveformAnalysisData? waveform = null;
                             try
                             {
                                 waveform = await _waveformService.GenerateWaveformAsync(analysisParams.Path);
-                                _logger.LogInformation("✅ Waveform generated: {Points} points", waveform.PeakData.Length);
+                                _logger.LogInformation("âœ… Waveform generated: {Points} points", waveform.PeakData.Length);
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogWarning(ex, "⚠️ Waveform generation failed (non-critical)");
+                                _logger.LogWarning(ex, "âš ï¸ Waveform generation failed (non-critical)");
                             }
 
                             // B. Analyze Audio Quality (Technical)
@@ -1958,11 +1888,11 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                             try
                             {
                                 analysis = await _audioAnalysisService.AnalyzeFileAsync(analysisParams.Path, analysisParams.Hash);
-                                _logger.LogInformation("✅ Audio analysis complete: {Loudness} LUFS", analysis?.LoudnessLufs);
+                                _logger.LogInformation("âœ… Audio analysis complete: {Loudness} LUFS", analysis?.LoudnessLufs);
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogWarning(ex, "⚠️ Audio analysis failed (non-critical)");
+                                _logger.LogWarning(ex, "âš ï¸ Audio analysis failed (non-critical)");
                             }
 
                             // C. Atomic Database Update (All or Nothing)
@@ -1979,7 +1909,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                                         db.AudioAnalysis.Remove(existing);
                                     
                                     db.AudioAnalysis.Add(analysis);
-                                    _logger.LogInformation("🔊 Audio analysis saved for {Track}", ctx.Model.Title);
+                                    _logger.LogInformation("ðŸ”Š Audio analysis saved for {Track}", ctx.Model.Title);
                                 }
 
                                 // C2. Update ALL PlaylistTrack instances with waveform & metrics
@@ -2005,7 +1935,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                                 }
 
                                 await db.SaveChangesAsync();
-                                _logger.LogInformation("✅ Analysis persisted for {Count} playlist instances", trackInstances.Count);
+                                _logger.LogInformation("âœ… Analysis persisted for {Count} playlist instances", trackInstances.Count);
 
                                 // D. Notify UI (Success)
                                 _eventBus.Publish(new TrackAnalysisCompletedEvent(analysisParams.Hash, true));
@@ -2014,19 +1944,19 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                                 if (analysis != null)
                                 {
                                     _analysisQueue.QueueAnalysis(analysisParams.Path, analysisParams.Hash);
-                                    _logger.LogInformation("🧠 Queued for musical analysis: {Title}", ctx.Model.Title);
+                                    _logger.LogInformation("ðŸ§  Queued for musical analysis: {Title}", ctx.Model.Title);
                                 }
                             }
                             catch (Exception dbEx)
                             {
-                                _logger.LogError(dbEx, "❌ Failed to persist analysis results");
+                                _logger.LogError(dbEx, "âŒ Failed to persist analysis results");
                                 _eventBus.Publish(new TrackAnalysisCompletedEvent(
                                     analysisParams.Hash, false, dbEx.Message));
                             }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "❌ Analysis pipeline catastrophic failure");
+                            _logger.LogError(ex, "âŒ Analysis pipeline catastrophic failure");
                             _eventBus.Publish(new TrackAnalysisCompletedEvent(
                                 analysisParams.Hash, false, "Analysis pipeline failed"));
                         }
@@ -2216,7 +2146,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
     /// </summary>
     public async Task PrioritizeProjectAsync(Guid playlistId)
     {
-        _logger.LogInformation("🚀 Prioritizing project: {PlaylistId}", playlistId);
+        _logger.LogInformation("ðŸš€ Prioritizing project: {PlaylistId}", playlistId);
 
         // Fix #1: Persist to database FIRST for crash resilience
         await _databaseService.UpdatePlaylistTracksPriorityAsync(playlistId, 0);
@@ -2232,7 +2162,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             }
         }
 
-        _logger.LogInformation("✅ Prioritized {Count} tracks from project {PlaylistId} (database + in-memory)",
+        _logger.LogInformation("âœ… Prioritized {Count} tracks from project {PlaylistId} (database + in-memory)",
             updatedCount, playlistId);
     }
 
@@ -2255,7 +2185,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
 
         if (lowestPriority != null && lowestPriority.Model.Priority > 0) // Preempt anything lower than High Priority (0)
         {
-            _logger.LogInformation("⏸ Preempting lower priority download (Priority {Prio}): {Title}", 
+            _logger.LogInformation("â¸ Preempting lower priority download (Priority {Prio}): {Title}", 
                 lowestPriority.Model.Priority, lowestPriority.Model.Title);
             await PauseTrackAsync(lowestPriority.Model.TrackUniqueHash);
         }

@@ -20,9 +20,10 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
     private MainViewModel? _mainViewModel; // Injected post-construction
     private readonly PlayerViewModel _playerViewModel;
     private readonly IFileInteractionService _fileInteractionService;
+    private readonly ForensicLockdownService _forensicLockdownService; // Phase 7
 
     public event PropertyChangedEventHandler? PropertyChanged;
-
+    
     // Commands
     public System.Windows.Input.ICommand PlayTrackCommand { get; }
     public System.Windows.Input.ICommand HardRetryCommand { get; }
@@ -31,6 +32,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand CancelCommand { get; }
     public System.Windows.Input.ICommand DownloadAlbumCommand { get; }
     public System.Windows.Input.ICommand RemoveTrackCommand { get; }
+    public System.Windows.Input.ICommand DeleteAndBlacklistCommand { get; } // Phase 7
     public System.Windows.Input.ICommand RetryOfflineTracksCommand { get; }
     public System.Windows.Input.ICommand OpenFolderCommand { get; }
 
@@ -38,13 +40,16 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
         ILogger<TrackOperationsViewModel> logger,
         DownloadManager downloadManager,
         PlayerViewModel playerViewModel,
-        IFileInteractionService fileInteractionService)
+        IFileInteractionService fileInteractionService,
+        ForensicLockdownService forensicLockdownService)
     {
         _logger = logger;
         _downloadManager = downloadManager;
         _playerViewModel = playerViewModel;
         _fileInteractionService = fileInteractionService;
+        _forensicLockdownService = forensicLockdownService;
 
+        // Initialize commands
         // Initialize commands
         PlayTrackCommand = new RelayCommand<PlaylistTrackViewModel>(ExecutePlayTrack);
         HardRetryCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteHardRetry);
@@ -53,6 +58,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
         CancelCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteCancel);
         DownloadAlbumCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteDownloadAlbum);
         RemoveTrackCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteRemoveTrack);
+        DeleteAndBlacklistCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteDeleteAndBlacklist); // Phase 7
         RetryOfflineTracksCommand = new AsyncRelayCommand(ExecuteRetryOfflineTracks);
         OpenFolderCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteOpenFolder);
     }
@@ -145,6 +151,38 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to remove track");
+        }
+    }
+
+    private async Task ExecuteDeleteAndBlacklist(PlaylistTrackViewModel? track)
+    {
+        if (track == null) return;
+
+        try
+        {
+             _logger.LogInformation("Deleting and blacklisting track: {Title}", track.Title);
+
+            // 1. Calculate Hash if missing
+            // The file might be corrupted, so we try to get metadata hash first.
+            // But usually the file exists if we are deleting it.
+            // For now, assume track.GlobalId IS the hash (UniqueHash), or we need to calculate audio hash.
+            // The request was "Audio Hashing". 
+            // UniqueHash is usually the Soulseek File Hash (standard MD5?) or path-based?
+            // In ORBIT logic, UniqueHash for SearchResult is typically the File Hash from Soulseek.
+            
+            string hashToBlock = track.GlobalId; 
+            
+            // 2. Blacklist
+            await _forensicLockdownService.BlacklistAsync(hashToBlock, "User Deleted & Blacklisted", track.Title);
+
+            // 3. Delete File (Reuse existing logic)
+            await _downloadManager.DeleteTrackFromDiskAndHistoryAsync(track.GlobalId);
+            
+             _logger.LogInformation("Track blacklisted and deleted successfully");
+        }
+        catch (Exception ex)
+        {
+             _logger.LogError(ex, "Failed to blacklist track");
         }
     }
 

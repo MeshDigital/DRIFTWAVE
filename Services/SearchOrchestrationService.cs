@@ -28,6 +28,9 @@ public class SearchOrchestrationService
     private readonly ISafetyFilterService _safetyFilter; // Week 2: Gatekeeper
     private readonly AppConfig _config;
     
+    private readonly ILibraryService _libraryService;
+    private readonly Services.AI.PersonalClassifierService _personalClassifier;
+    
     // Throttling: Prevent getting banned by issuing too many searches at once
     private readonly SemaphoreSlim _searchSemaphore;
     
@@ -37,7 +40,9 @@ public class SearchOrchestrationService
         SearchQueryNormalizer searchQueryNormalizer,
         SearchNormalizationService searchNormalization,
         ISafetyFilterService safetyFilter,
-        AppConfig config)
+        AppConfig config,
+        ILibraryService libraryService,
+        Services.AI.PersonalClassifierService personalClassifier)
     {
         _logger = logger;
         _soulseek = soulseek;
@@ -45,6 +50,8 @@ public class SearchOrchestrationService
         _searchNormalization = searchNormalization;
         _safetyFilter = safetyFilter;
         _config = config;
+        _libraryService = libraryService;
+        _personalClassifier = personalClassifier;
         
         // Initialize simple signaling semaphore
         _searchSemaphore = new SemaphoreSlim(Math.Max(1, _config.MaxConcurrentSearches));
@@ -177,6 +184,89 @@ public class SearchOrchestrationService
         return rankedResults.ToList();
     }
     
+    public async Task<List<Track>> SearchSimilarAsync(string seedTrackHash, int limit = 50)
+    {
+        _logger.LogInformation("Finding sonic twins for track: {Hash}", seedTrackHash);
+        
+        // 1. Get all candidates (Audio Features)
+        var allFeatures = await _libraryService.GetAllAudioFeaturesAsync();
+        
+        // 2. Find the seed track's embedding
+        var seedFeatures = allFeatures.FirstOrDefault(f => f.TrackUniqueHash == seedTrackHash);
+        if (seedFeatures == null || string.IsNullOrEmpty(seedFeatures.AiEmbeddingJson))
+        {
+            _logger.LogWarning("Seed track {Hash} has no embedding. Cannot find similar tracks.", seedTrackHash);
+            return new List<Track>();
+        }
+        
+        float[]? seedVector;
+        try 
+        {
+            seedVector = System.Text.Json.JsonSerializer.Deserialize<float[]>(seedFeatures.AiEmbeddingJson);
+        }
+        catch 
+        {
+            return new List<Track>();
+        }
+        
+        if (seedVector == null || seedVector.Length != 128)
+            return new List<Track>();
+
+        // 3. Perform Vector Search
+        var matches = _personalClassifier.FindSimilarTracks(seedVector, (float)seedFeatures.Bpm, allFeatures, limit);
+        
+        if (matches.Count == 0)
+        {
+             return new List<Track>();
+        }
+        
+        // 4. Map back to Track objects
+        // We need metadata for these hashes.
+        var matchedHashes = matches.ToDictionary(m => m.TrackHash, m => m.Similarity);
+        var results = new List<Track>();
+        
+        foreach (var match in matches)
+        {
+             var entry = await _libraryService.FindLibraryEntryAsync(match.TrackHash);
+             if (entry != null)
+             {
+                 // Create a "Track" that represents this library file
+                 // This allows it to be displayed in the SearchResults UI
+                 var t = new Track
+                 {
+                     Filename = System.IO.Path.GetFileName(entry.FilePath),
+                     Directory = System.IO.Path.GetDirectoryName(entry.FilePath),
+                     Artist = entry.Artist,
+                     Title = entry.Title,
+                     Album = entry.Album,
+                     Size = entry.FileSizeBytes,
+                     Bitrate = entry.Bitrate,
+                     Length = (int)(entry.DurationMs / 1000),
+                     Format = System.IO.Path.GetExtension(entry.FilePath)?.TrimStart('.'),
+                     FilePath = entry.FilePath,
+                     LocalPath = entry.FilePath,
+                     IsInLibrary = true,
+                     
+                     // Compatibility / UI fields
+                     CurrentRank = match.Similarity * 100, // Convert 0-1 to 0-100 scale for UI consistency
+                     ScoreBreakdown = $"Sonic Twin ({match.Similarity:P0} Match)",
+                     
+                     // Spotify / Metadata
+                     AlbumArtUrl = entry.AlbumArtUrl,
+                     SpotifyTrackId = entry.SpotifyTrackId,
+                     BPM = entry.BPM,
+                     MusicalKey = entry.MusicalKey,
+                     Energy = entry.Energy,
+                     Danceability = entry.Danceability,
+                     Valence = entry.Valence
+                 };
+                 results.Add(t);
+             }
+        }
+        
+        return results;
+    }
+
     private List<AlbumSearchResult> GroupResultsByAlbum(List<Track> tracks)
     {
         _logger.LogInformation("Grouping {Count} tracks into albums", tracks.Count);

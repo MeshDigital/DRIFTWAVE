@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<Entities.ForensicLogEntry> ForensicLogs { get; set; } // Phase 4.7: Forensic Logging
     public DbSet<Entities.StyleDefinitionEntity> StyleDefinitions { get; set; } // Phase 15: Style Lab
     public DbSet<Entities.LibraryActionLogEntity> LibraryActionLogs { get; set; } // Phase 16.1: Ledger
+    public DbSet<Entities.BlacklistedItemEntity> Blacklist { get; set; } // Phase 7: Forensic Duplication
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -138,5 +139,11 @@ public class AppDbContext : DbContext
             .WithOne(p => p.TechnicalDetails)
             .HasForeignKey<Entities.TrackTechnicalEntity>(t => t.PlaylistTrackId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Phase 7: Forensic Duplication
+        modelBuilder.Entity<Entities.BlacklistedItemEntity>()
+            .HasIndex(b => b.Hash)
+            .IsUnique()
+            .HasDatabaseName("IX_Blacklist_Hash");
     }
 }

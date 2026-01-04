@@ -13,6 +13,8 @@ public class HarmonicMatchViewModel
     public KeyRelationship Relationship { get; set; }
     public double? BpmDifference { get; set; }
 
+    public bool IsSonicMatch { get; set; }
+
     // Display properties
     public string RelationshipIcon => Relationship switch
     {
@@ -28,6 +30,7 @@ public class HarmonicMatchViewModel
         KeyRelationship.Perfect => "Perfect",
         KeyRelationship.Compatible => "Compatible",
         KeyRelationship.Relative => "Relative",
+        KeyRelationship.SonicTwin => "Sonic Twin",
         _ => "None"
     };
 

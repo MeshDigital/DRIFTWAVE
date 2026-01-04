@@ -581,6 +581,9 @@ public partial class App : Application
         services.AddSingleton<TrackForensicLogger>();
         services.AddSingleton<IForensicLogger>(sp => sp.GetRequiredService<TrackForensicLogger>());
         
+        // Phase 7: Forensic Duplication (The Immune System)
+        services.AddSingleton<ForensicLockdownService>();
+        
         // Phase 3: Audio Analysis Services
         services.AddSingleton<WaveformAnalysisService>();
         

@@ -233,6 +233,11 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         eventBus.GetEvent<TrackAddedEvent>()
             .Subscribe(OnTrackAdded)
             .DisposeWith(_disposables);
+            
+        // Phase 6: Hybrid Search
+        eventBus.GetEvent<FindSimilarRequestEvent>()
+            .Subscribe(OnFindSimilarRequest)
+            .DisposeWith(_disposables);
 
         // --- Reactive Pipeline Setup ---
         var filterPredicate = FilterViewModel.FilterChanged;
@@ -611,6 +616,61 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
          Dispatcher.UIThread.InvokeAsync(() =>
         {
             // Placeholder for future use
+        });
+    }
+
+    private void OnFindSimilarRequest(FindSimilarRequestEvent evt)
+    {
+        Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            // 1. Navigate to Search Page (if not already there)
+            _navigationService.NavigateTo("Search");
+            
+            // 2. Prepare UI
+            SearchQuery = $"sonic: {evt.SeedTrack.Title}"; // Display indicator
+            StatusText = $"Finding sonic twins for '{evt.SeedTrack.Title}'...";
+            IsSearching = true;
+            _searchResults.Clear();
+            AlbumResults.Clear();
+            HiddenResultsCount = 0;
+            
+            try 
+            {
+                // 3. Execute Vector Search
+                var results = await _searchOrchestration.SearchSimilarAsync(evt.SeedTrack.TrackUniqueHash);
+                
+                // 4. Update Results
+                if (results.Any())
+                {
+                    var viewModels = results.Select(t => 
+                    {
+                        // Use a specific SearchResult wrapper
+                        var sr = new SearchResult(t); 
+                        sr.Status = TrackStatus.Downloaded; // They are library tracks
+                        
+                        // Map ranking score
+                        sr.CurrentRank = t.CurrentRank;
+                        
+                        return new AnalyzedSearchResultViewModel(sr);
+                    }).ToList();
+                    
+                    _searchResults.AddRange(viewModels);
+                    StatusText = $"Found {results.Count} sonic twins";
+                }
+                else
+                {
+                    StatusText = "No similar tracks found (check if analysis is complete)";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Sonic search failed");
+                StatusText = "Sonic search failed";
+            }
+            finally
+            {
+                IsSearching = false;
+            }
         });
     }
 
