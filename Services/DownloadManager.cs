@@ -489,9 +489,12 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
             // FIX: Use Dictionary for robust O(1) lookup and to avoid variable re-declaration issues in loop
             var existingMap = _downloads
                 .Where(d => !string.IsNullOrEmpty(d.Model.TrackUniqueHash))
-                .ToDictionary(d => d.Model.TrackUniqueHash, d => d);
+                .GroupBy(d => d.Model.TrackUniqueHash)
+                .ToDictionary(g => g.Key!, g => g.First());
             
-            var existingIds = _downloads.ToDictionary(d => d.Model.Id, d => d);
+            var existingIds = _downloads
+                .GroupBy(d => d.Model.Id)
+                .ToDictionary(g => g.Key, g => g.First());
 
             foreach (var track in tracks)
             {
@@ -505,7 +508,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     // Fix: Smart Retry if in a terminal/failure state
                     if (existingCtx.State == PlaylistTrackState.Failed || 
                         existingCtx.State == PlaylistTrackState.Cancelled || 
-                        existingCtx.State == PlaylistTrackState.Deferred)
+                        existingCtx.State == PlaylistTrackState.Deferred ||
+                        existingCtx.State == PlaylistTrackState.Pending)
                     {
                         _logger.LogInformation("Retrying existing track {Title} (State: {State}) - Bumping to Priority 0", track.Title, existingCtx.State);
                         
@@ -1305,7 +1309,7 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                     var eligibleTracks = _downloads.Where(t => 
                         t.State == PlaylistTrackState.Pending && 
                         (!t.NextRetryTime.HasValue || t.NextRetryTime.Value <= DateTime.Now) &&
-                        (t.Model.IsEnriched || (DateTime.Now - t.Model.AddedAt).TotalMinutes > 5))
+                        (t.Model.IsEnriched || t.Model.Priority == 0 || (DateTime.Now - t.Model.AddedAt).TotalMinutes > 5))
                         .ToList();
 
                     if (eligibleTracks.Any())

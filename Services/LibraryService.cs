@@ -80,6 +80,13 @@ public class LibraryService : ILibraryService
         return entities.Select(EntityToLibraryEntry).ToList();
     }
 
+    public async Task<List<LibraryEntry>> SearchLibraryEntriesWithStatusAsync(string query, int limit = 50)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return new List<LibraryEntry>();
+        var entities = await _databaseService.SearchLibraryEntriesWithStatusAsync(query, limit).ConfigureAwait(false);
+        return entities.Select(EntityToLibraryEntry).ToList();
+    }
+
     public async Task SaveOrUpdateLibraryEntryAsync(LibraryEntry entry)
     {
         try
@@ -550,6 +557,20 @@ public class LibraryService : ILibraryService
         {
             _logger.LogError(ex, "Failed to load playlist tracks for {PlaylistId}", playlistId);
             return new List<PlaylistTrack>();
+        }
+    }
+
+    public async Task<PlaylistTrack?> GetPlaylistTrackByHashAsync(Guid playlistId, string trackHash)
+    {
+        try
+        {
+            var entity = await _databaseService.GetPlaylistTrackByHashAsync(playlistId, trackHash).ConfigureAwait(false);
+            return entity != null ? EntityToPlaylistTrack(entity) : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load playlist track by hash for {PlaylistId}/{Hash}", playlistId, trackHash);
+            return null;
         }
     }
 

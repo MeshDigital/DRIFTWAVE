@@ -26,6 +26,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     private string? _errorMessage;
     private string? _coverArtUrl;
     private Avalonia.Media.Imaging.Bitmap? _artworkBitmap;
+    private bool _isAnalyzing; // New field for analysis feedback
 
     private int _sortOrder;
     public DateTime AddedAt => Model?.AddedAt ?? DateTime.MinValue;
@@ -290,6 +291,8 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                 _disposables.Add(_eventBus.GetEvent<TrackStateChangedEvent>().Subscribe(OnStateChanged));
                 _disposables.Add(_eventBus.GetEvent<TrackProgressChangedEvent>().Subscribe(OnProgressChanged));
                 _disposables.Add(_eventBus.GetEvent<Models.TrackMetadataUpdatedEvent>().Subscribe(OnMetadataUpdated));
+                _disposables.Add(_eventBus.GetEvent<Models.TrackAnalysisStartedEvent>().Subscribe(OnAnalysisStarted));
+                _disposables.Add(_eventBus.GetEvent<Models.TrackAnalysisFailedEvent>().Subscribe(OnAnalysisFailed));
             }
 
             // Fire-and-forget artwork load
@@ -311,22 +314,27 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
             _disposables.Dispose();
             CancellationTokenSource?.Cancel();
             CancellationTokenSource?.Dispose();
+            
+            // Dispose of bitmap to free unmanaged memory
+            _artworkBitmap?.Dispose();
+            _artworkBitmap = null;
         }
 
         _isDisposed = true;
     }
-    
+
     private void OnMetadataUpdated(Models.TrackMetadataUpdatedEvent evt)
     {
         if (evt.TrackGlobalId != GlobalId) return;
         
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
+             _isAnalyzing = false; // Clear analyzing flag
+
              // Reload track data from database to get updated metadata
              if (_libraryService != null)
              {
-                 var tracks = await _libraryService.LoadPlaylistTracksAsync(Model.PlaylistId);
-                 var updatedTrack = tracks.FirstOrDefault(t => t.TrackUniqueHash == GlobalId);
+                 var updatedTrack = await _libraryService.GetPlaylistTrackByHashAsync(Model.PlaylistId, GlobalId);
                  
                  if (updatedTrack != null)
                  {
@@ -344,6 +352,11 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      Model.Energy = updatedTrack.Energy;
                      Model.Danceability = updatedTrack.Danceability;
                      Model.Valence = updatedTrack.Valence;
+                     Model.Loudness = updatedTrack.Loudness;
+                     Model.TruePeak = updatedTrack.TruePeak;
+                     Model.DynamicRange = updatedTrack.DynamicRange;
+                     
+                     // Update Analysis info if available
                      Model.Popularity = updatedTrack.Popularity;
                      Model.Genres = updatedTrack.Genres;
                      
@@ -385,8 +398,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              // Notify Extended Props
              OnPropertyChanged(nameof(BPM));
              OnPropertyChanged(nameof(MusicalKey));
-             OnPropertyChanged(nameof(KeyDisplay));
-             OnPropertyChanged(nameof(BpmDisplay));
+             OnPropertyChanged(nameof(KeyDisplay)); // Assuming KeyDisplay is a computed property that uses MusicalKey
+             OnPropertyChanged(nameof(BpmDisplay)); // Assuming BpmDisplay is a computed property that uses BPM
+             OnPropertyChanged(nameof(LoudnessDisplay));
              OnPropertyChanged(nameof(Energy));
              OnPropertyChanged(nameof(Danceability));
              OnPropertyChanged(nameof(Valence));
@@ -421,6 +435,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         {
              State = evt.State;
              if (evt.Error != null) ErrorMessage = evt.Error;
+             OnPropertyChanged(nameof(DetailedStatusText)); // Update tooltip
              
              // NEW: Load file size from disk when track completes
              if (evt.State == PlaylistTrackState.Completed && FileSizeBytes == 0)
@@ -463,6 +478,33 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              {
                  FileSizeBytes = evt.TotalBytes;
              }
+        });
+    }
+
+    private void OnAnalysisStarted(Models.TrackAnalysisStartedEvent evt)
+    {
+        if (evt.TrackGlobalId != GlobalId) return;
+        
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+             _isAnalyzing = true;
+             OnPropertyChanged(nameof(MetadataStatus));
+             OnPropertyChanged(nameof(MetadataStatusColor));
+             OnPropertyChanged(nameof(MetadataStatusSymbol));
+        });
+    }
+
+    private void OnAnalysisFailed(Models.TrackAnalysisFailedEvent evt)
+    {
+        if (evt.TrackGlobalId != GlobalId) return;
+        
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+             _isAnalyzing = false;
+             // Could update ErrorMessage here if desired
+             OnPropertyChanged(nameof(MetadataStatus));
+             OnPropertyChanged(nameof(MetadataStatusColor));
+             OnPropertyChanged(nameof(MetadataStatusSymbol));
         });
     }
 
@@ -530,6 +572,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
             {
                 _errorMessage = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(DetailedStatusText));
             }
         }
     }
@@ -593,15 +636,22 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
             }
         }
     }
+    
+    // Fix: Add display property for consistent "—" fallback
+    public string BpmDisplay => Model.BPM.HasValue && Model.BPM > 0 ? $"{Model.BPM:0}" : "—";
+    public string KeyDisplay => !string.IsNullOrEmpty(Model.MusicalKey) ? Model.MusicalKey : "—";
+
 
     public string MetadataStatus
     {
         get
         {
+            if (_isAnalyzing) return "Analyzing";
             if (Model.IsEnriched) return "Enriched";
             if (!string.IsNullOrEmpty(Model.SpotifyTrackId)) return "Identified"; // Partial state
             return "Pending"; // Waiting for enrichment worker
         }
+
     }
 
     // Phase 1: UI Metadata
@@ -674,10 +724,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         }
     }
 
-    // Phase 9: Metadata display defaults (no empty cells)
-    public string BpmDisplay => Model.BPM.HasValue && Model.BPM.Value > 0 ? $"{Model.BPM:F1}" : "—";
-    
-    public string KeyDisplay => !string.IsNullOrWhiteSpace(Model.Tonality) ? Model.Tonality : "Unknown";
+
+
+
 
 
     public bool IsActive => State == PlaylistTrackState.Searching || 
@@ -725,8 +774,13 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         _ => "?"
     };
 
+    public string DetailedStatusText => !string.IsNullOrEmpty(ErrorMessage) 
+        ? $"Status: {State}\nDetails: {ErrorMessage}" 
+        : StatusText;
+
     public string MetadataStatusColor => MetadataStatus switch
     {
+        "Analyzing" => "#00BFFF", // Deep Sky Blue
         "Enriched" => "#FFD700", // Gold
         "Identified" => "#1E90FF", // DodgerBlue
         _ => "#505050"
@@ -734,6 +788,8 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
 
     public string MetadataStatusSymbol => MetadataStatus switch
     {
+
+        "Analyzing" => "⚙️",
         "Enriched" => "✨",
         "Identified" => "🆔",
         _ => "⏳"
@@ -799,6 +855,8 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         {
             if (_artworkBitmap != value)
             {
+                // CRITICAL: Dispose of the previous bitmap to free unmanaged memory
+                _artworkBitmap?.Dispose();
                 _artworkBitmap = value;
                 OnPropertyChanged();
             }

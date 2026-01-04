@@ -526,12 +526,12 @@
                                                     Effect="{Binding IsDownloaded, Converter={StaticResource BoolBlurConverter}}">
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Text="⏱" FontSize="11" Foreground="#666"/>
-                                                <TextBlock Text="{Binding BPM, StringFormat='{}{0:F0}'}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
+                                                <TextBlock Text="{Binding BpmDisplay}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
                                             </StackPanel>
                                             
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Text="🎵" FontSize="11" Foreground="#666"/>
-                                                <TextBlock Text="{Binding MusicalKey}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
+                                                <TextBlock Text="{Binding KeyDisplay}" FontFamily="Consolas, Monospace" FontSize="11" Foreground="#888"/>
                                             </StackPanel>
 
                                             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -595,7 +595,7 @@
                                         <Grid ColumnDefinitions="Auto,*,400">
                                             <!-- High Res Art -->
                                             <Border Grid.Column="0" Width="140" Height="140" CornerRadius="8" Background="#111" Margin="0,0,24,0" BoxShadow="0 4 12 0 #80000000">
-                                                <Image Source="{Binding AlbumArtUrl, Converter={StaticResource BitmapValueConverter}}" Stretch="UniformToFill"/>
+                                                <Image Source="{Binding ArtworkBitmap}" Stretch="UniformToFill"/>
                                             </Border>
                                             
                                             <!-- Detailed Stats -->
@@ -616,6 +616,14 @@
                                                 <Separator Height="1" Background="#222" Margin="0,8"/>
                                                 
                                                 <StackPanel Orientation="Horizontal" Spacing="24">
+                                                    <StackPanel>
+                                                        <TextBlock Text="MUSICAL" FontSize="10" Foreground="#555"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                                                            <TextBlock Text="{Binding KeyDisplay}" Foreground="#4EC9B0" FontWeight="Bold"/>
+                                                            <TextBlock Text="{Binding BpmDisplay}" Foreground="#CCC"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    
                                                     <StackPanel>
                                                         <TextBlock Text="QUALITY" FontSize="10" Foreground="#555"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2">

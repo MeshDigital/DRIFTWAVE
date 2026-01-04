@@ -15,7 +15,7 @@
 
     <Grid>
         <!-- MASTER VIEW: Analysis Queue -->
-        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*,Auto,200" IsVisible="{Binding !IsLabModeActive}">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,*,Auto,200" IsVisible="{Binding !IsLabModeActive}">
             
             <!-- Header -->
             <Border Grid.Row="0" Margin="32,32,32,16">
@@ -36,12 +36,27 @@
 
             <!-- Mission Control: Thread Activity Grid -->
             <Grid Grid.Row="1" Margin="32,0,32,16" RowDefinitions="Auto,Auto">
-                <Grid ColumnDefinitions="*,250" Margin="0,0,0,8">
-                    <TextBlock Grid.Column="0" Text="🧵 THREAD ACTIVITY" FontSize="12" FontWeight="Bold" Foreground="#00D9FF" />
-                    <TextBlock Grid.Column="1" Text="🕵️ LIVE FORENSIC STREAM" FontSize="12" FontWeight="Bold" Foreground="#FFA500" HorizontalAlignment="Right"/>
+                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+                    <TextBlock Grid.Column="0" Text="🧵 THREAD ACTIVITY" FontSize="12" FontWeight="Bold" Foreground="#00D9FF" VerticalAlignment="Center"/>
+                    
+                    <Button Grid.Column="1" Command="{Binding ToggleForensicStreamCommand}" 
+                            Background="Transparent" BorderThickness="0" Padding="8,4" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding IsForensicStreamExpanded, Converter={StaticResource BoolParameterConverter}, ConverterParameter='Collapse|Expand'}" 
+                                      FontSize="10" Foreground="#888"/>
+                            <PathIcon Data="{StaticResource FullScreenData}" Width="12" Height="12" Foreground="#888"/>
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Grid.Column="2" Text="🕵️ LIVE FORENSIC STREAM" FontSize="12" FontWeight="Bold" Foreground="#FFA500" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                 </Grid>
                 
-                <Grid Grid.Row="1" ColumnDefinitions="2*, 8, 1*">
+                <Grid Grid.Row="1" MaxHeight="400">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{Binding !IsForensicStreamExpanded, Converter={StaticResource BoolParameterConverter}, ConverterParameter='2*|0'}"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
                     <!-- Threads -->
                     <DataGrid Grid.Column="0" ItemsSource="{Binding ActiveThreads}" AutoGenerateColumns="False" 
                               CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8" MaxHeight="250">
@@ -68,6 +83,10 @@
                             <DataGridTextColumn Header="Time" Binding="{Binding ElapsedTime}" Width="70"/>
                         </DataGrid.Columns>
                     </DataGrid>
+                    
+                    <!-- Resizer -->
+                    <GridSplitter Grid.Column="1" Background="#333" Width="2" HorizontalAlignment="Stretch" 
+                                  IsVisible="{Binding !IsForensicStreamExpanded}"/>
                     
                     <!-- Live Logs -->
                     <Border Grid.Column="2" Background="#111" CornerRadius="8" BorderBrush="#333" BorderThickness="1">
@@ -106,8 +125,44 @@
                 </Grid>
             </Border>
 
+            <!-- Library Discovery / Status Search -->
+            <Grid Grid.Row="3" Margin="32,24,32,0" RowDefinitions="Auto,Auto,*">
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,12">
+                    <TextBlock Text="🔍 LIBRARY ANALYSIS STATUS" FontSize="12" FontWeight="Bold" Foreground="#FFA500" VerticalAlignment="Center"/>
+                    <TextBox Width="300" Watermark="Search library status (Artist or Title)..." 
+                             Text="{Binding SearchQuery}"
+                             Background="#111" BorderBrush="#333" Foreground="White"
+                             Padding="12,6" CornerRadius="4"/>
+                </StackPanel>
+                
+                <Border Grid.Row="2" IsVisible="{Binding LibrarySearchResults.Count}" 
+                        Background="#252526" CornerRadius="8" Padding="1" MaxHeight="300" Margin="0,0,0,16">
+                    <DataGrid ItemsSource="{Binding LibrarySearchResults}" AutoGenerateColumns="False" 
+                              CanUserResizeColumns="True" Background="Transparent" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="*"/>
+                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*"/>
+                            <DataGridTemplateColumn Header="Status" Width="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0">
+                                            <Ellipse Width="8" Height="8" 
+                                                     Fill="{Binding IsEnriched, Converter={StaticResource BoolParameterConverter}, ConverterParameter='LimeGreen|Gray'}"/>
+                                            <TextBlock Text="{Binding IsEnriched, Converter={StaticResource BoolParameterConverter}, ConverterParameter='Enriched|Pending'}"
+                                                       FontSize="11" Foreground="#DDD"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="BPM" Binding="{Binding BPM, StringFormat='{}{0:F1}'}" Width="60"/>
+                            <DataGridTextColumn Header="Key" Binding="{Binding MusicalKey}" Width="60"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+
             <!-- Active Jobs -->
-            <Grid Grid.Row="3" Margin="32,16,32,16" RowDefinitions="Auto,*">
+            <Grid Grid.Row="4" Margin="32,16,32,16" RowDefinitions="Auto,*">
                 <TextBlock Grid.Row="0" Text="ACTIVE PROCESSING" FontSize="12" FontWeight="Bold" Foreground="#4EC9B0" Margin="0,0,0,8"/>
                 <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveJobs}" AutoGenerateColumns="False" CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8">
                     <DataGrid.Columns>
@@ -126,10 +181,10 @@
             </Grid>
 
             <!-- Splitter -->
-            <GridSplitter Grid.Row="4" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
+            <GridSplitter Grid.Row="5" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
 
             <!-- Completed Jobs -->
-            <Grid Grid.Row="5" Margin="32,16,32,16" RowDefinitions="Auto,*">
+            <Grid Grid.Row="6" Margin="32,16,32,16" RowDefinitions="Auto,*">
                 <TextBlock Grid.Row="0" Text="RECENTLY COMPLETED" FontSize="12" FontWeight="Bold" Foreground="#1DB954" Margin="0,0,0,8"/>
                 <DataGrid Grid.Row="1" ItemsSource="{Binding CompletedJobs}" AutoGenerateColumns="False" CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8">
                     <DataGrid.Columns>
@@ -152,10 +207,10 @@
             </Grid>
             
             <!-- Splitter -->
-            <GridSplitter Grid.Row="6" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
+            <GridSplitter Grid.Row="7" Background="#333" Height="1" HorizontalAlignment="Stretch" Margin="32,0"/>
 
             <!-- Failed Jobs -->
-            <Grid Grid.Row="7" Margin="32,16,32,32" RowDefinitions="Auto,*">
+            <Grid Grid.Row="8" Margin="32,16,32,32" RowDefinitions="Auto,*">
                  <TextBlock Grid.Row="0" Text="FAILED / ERRORS" FontSize="12" FontWeight="Bold" Foreground="#F44336" Margin="0,0,0,8"/>
                  <DataGrid Grid.Row="1" ItemsSource="{Binding FailedJobs}" AutoGenerateColumns="False" CanUserResizeColumns="True" Background="#252526" BorderThickness="0" CornerRadius="8">
                     <DataGrid.Columns>

@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:converters="clr-namespace:SLSKDONET.Views.Avalonia.Converters"
+             xmlns:conv_root="clr-namespace:SLSKDONET.Converters"
              x:Class="SLSKDONET.App"
              RequestedThemeVariant="Dark">
     
@@ -38,10 +39,12 @@
         <converters:BoolInverseConverter x:Key="BoolInverseConverter"/>
         <converters:VuHeightConverter x:Key="VuHeightConverter"/>
         <converters:PercentageToAngleConverter x:Key="PercentageToAngleConverter"/>
+        <conv_root:ParameterizedBooleanConverter x:Key="BoolParameterConverter"/>
 
         <!-- Icons -->
         <StreamGeometry x:Key="icons_spotify">M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.32-1.32 9.84-.6 13.561 1.621.42.181.6.779.18 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 14.82 1.14.54.3.72.96.42 1.5-.3.54-.96.72-1.5.42z</StreamGeometry>
         <StreamGeometry x:Key="icons_library">M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 2v16h16V4H4zm2 2h4v12H6V6zm6 0h4v12h-4V6zm6 0h2v12h-2V6z</StreamGeometry>
+        <StreamGeometry x:Key="FullScreenData">M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z</StreamGeometry>
     </Application.Resources>
     
     <Application.Styles>

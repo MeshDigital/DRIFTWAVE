@@ -562,7 +562,16 @@ public class AnalysisWorker : BackgroundService
 
     private void ApplyResultsToTrack(PlaylistTrackEntity track, AnalysisResultContext result)
     {
-        track.IsEnriched = true;
+        // Fix: Only mark as enriched if we actually got musical results
+        if (result.MusicalResult != null)
+        {
+            track.IsEnriched = true;
+            track.BPM = result.MusicalResult.Bpm;
+            track.MusicalKey = result.MusicalResult.Key + (result.MusicalResult.Scale == "minor" ? "m" : "");
+            track.Energy = result.MusicalResult.Energy;
+            track.Danceability = result.MusicalResult.Danceability;
+        }
+
         if (result.WaveformData != null)
         {
             track.WaveformData = result.WaveformData.PeakData;
@@ -571,14 +580,7 @@ public class AnalysisWorker : BackgroundService
             track.MidData = result.WaveformData.MidData;
             track.HighData = result.WaveformData.HighData;
         }
-        
-        if (result.MusicalResult != null)
-        {
-            track.BPM = result.MusicalResult.Bpm;
-            track.MusicalKey = result.MusicalResult.Key + (result.MusicalResult.Scale == "minor" ? "m" : "");
-            track.Energy = result.MusicalResult.Energy;
-            track.Danceability = result.MusicalResult.Danceability;
-        }
+
 
         if (result.TechResult != null)
         {
@@ -611,7 +613,16 @@ public class AnalysisWorker : BackgroundService
 
     private void ApplyResultsToLibraryEntry(LibraryEntryEntity entry, AnalysisResultContext result)
     {
-        entry.IsEnriched = true;
+        if (result.MusicalResult != null)
+        {
+            entry.IsEnriched = true;
+            entry.BPM = result.MusicalResult.Bpm;
+            // Fix: Map properties directly from result
+            entry.MusicalKey = result.MusicalResult.Key + (result.MusicalResult.Scale == "minor" ? "m" : "");
+            entry.Energy = result.MusicalResult.Energy;
+            entry.Danceability = result.MusicalResult.Danceability;
+        }
+
         if (result.WaveformData != null)
         {
             entry.WaveformData = result.WaveformData.PeakData;
@@ -620,13 +631,7 @@ public class AnalysisWorker : BackgroundService
             entry.MidData = result.WaveformData.MidData;
             entry.HighData = result.WaveformData.HighData;
         }
-        if (result.MusicalResult != null)
-        {
-            entry.BPM = result.MusicalResult.Bpm;
-            entry.MusicalKey = result.MusicalResult.Key + (result.MusicalResult.Scale == "minor" ? "m" : "");
-            entry.Energy = result.MusicalResult.Energy;
-            entry.Danceability = result.MusicalResult.Danceability;
-        }
+
         if (result.TechResult != null)
         {
             entry.Bitrate = result.TechResult.Bitrate;

@@ -32,6 +32,11 @@ public interface ILibraryService
     /// Loads all library entries (main global index).
     /// </summary>
     Task<List<LibraryEntry>> LoadAllLibraryEntriesAsync();
+    
+    /// <summary>
+    /// Searches library entries and returns enrichment status.
+    /// </summary>
+    Task<List<LibraryEntry>> SearchLibraryEntriesWithStatusAsync(string query, int limit = 50);
 
     /// <summary>
     /// Atomically saves (inserts or updates) a library entry based on its UniqueHash.
@@ -138,6 +143,12 @@ public interface ILibraryService
     /// Used for "All Tracks" view.
     /// </summary>
     Task<List<PlaylistTrack>> GetAllPlaylistTracksAsync();
+
+    /// <summary>
+    /// Loads a specific track from a playlist by its unique hash.
+    /// Used for efficient metadata updates without reloading the entire playlist.
+    /// </summary>
+    Task<PlaylistTrack?> GetPlaylistTrackByHashAsync(Guid playlistId, string trackHash);
 
     /// <summary>
     /// Saves a single playlist track entry.

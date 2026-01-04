@@ -128,7 +128,14 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public Avalonia.Media.Imaging.Bitmap? ArtworkBitmap
     {
         get => _artworkBitmap;
-        private set => this.RaiseAndSetIfChanged(ref _artworkBitmap, value);
+        private set
+        {
+            if (_artworkBitmap != value)
+            {
+                _artworkBitmap?.Dispose(); // Free memory
+                this.RaiseAndSetIfChanged(ref _artworkBitmap, value);
+            }
+        }
     }
 
     private PlaylistTrackState _state;
@@ -323,8 +330,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
         // Reload from DB to ensure Model has new IDs (SpotifyAlbumId etc.)
         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            var tracks = await _libraryService.LoadPlaylistTracksAsync(Model.PlaylistId);
-            var updatedTrack = tracks.FirstOrDefault(t => t.TrackUniqueHash == GlobalId);
+            var updatedTrack = await _libraryService.GetPlaylistTrackByHashAsync(Model.PlaylistId, GlobalId);
             
             if (updatedTrack != null)
             {
@@ -415,5 +421,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public void Dispose()
     {
         _disposables.Dispose();
+        _artworkBitmap?.Dispose();
+        _artworkBitmap = null;
     }
 }

@@ -166,6 +166,33 @@ public class AnalysisQueueViewModel : ReactiveObject
     // Mission Control: Live Forensic Stream
     public ObservableCollection<LiveLogViewModel> LiveForensicLogs { get; } = new();
     private const int MaxLogHistory = 100;
+    
+    // Mission Control: Library Analysis Search
+    private string? _searchQuery;
+    public string? SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _searchQuery, value);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                LibrarySearchResults.Clear();
+            }
+        }
+    }
+
+    public ObservableCollection<LibraryEntry> LibrarySearchResults { get; } = new();
+    
+    private bool _isForensicStreamExpanded;
+    public bool IsForensicStreamExpanded
+    {
+        get => _isForensicStreamExpanded;
+        set => this.RaiseAndSetIfChanged(ref _isForensicStreamExpanded, value);
+    }
+
+    public ReactiveCommand<Unit, Unit> ToggleForensicStreamCommand { get; }
+
     private readonly IForensicLogger _forensicLogger;
     private readonly ILibraryService _libraryService; // For Forensic Lab
 
@@ -190,12 +217,26 @@ public class AnalysisQueueViewModel : ReactiveObject
 
         InspectTrackCommand = ReactiveCommand.Create<AnalysisJobViewModel>(InspectTrack);
         RunBrainTestCommand = ReactiveCommand.CreateFromTask(RunBrainTestAsync);
+        ToggleForensicStreamCommand = ReactiveCommand.Create(() => { IsForensicStreamExpanded = !IsForensicStreamExpanded; });
         CloseLabCommand = ReactiveCommand.Create(() => 
         {
             LabViewModel?.Dispose();
             LabViewModel = null;
             IsLabModeActive = false;
         });
+
+        // Search debouncing
+        this.WhenAnyValue(x => x.SearchQuery)
+            .Throttle(TimeSpan.FromMilliseconds(400))
+            .DistinctUntilChanged()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(async q => 
+            {
+                if (!string.IsNullOrWhiteSpace(q) && q.Length >= 2)
+                {
+                    await PerformSearchAsync(q);
+                }
+            });
 
         // Subscriptions
         _eventBus.GetEvent<TrackAnalysisStartedEvent>()
@@ -234,6 +275,24 @@ public class AnalysisQueueViewModel : ReactiveObject
         while (LiveForensicLogs.Count > MaxLogHistory)
         {
             LiveForensicLogs.RemoveAt(LiveForensicLogs.Count - 1);
+        }
+    }
+
+    private async Task PerformSearchAsync(string query)
+    {
+        try
+        {
+            var results = await _libraryService.SearchLibraryEntriesWithStatusAsync(query);
+            
+            LibrarySearchResults.Clear();
+            foreach (var res in results)
+            {
+                LibrarySearchResults.Add(res);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Search failed in AnalysisQueue");
         }
     }
 

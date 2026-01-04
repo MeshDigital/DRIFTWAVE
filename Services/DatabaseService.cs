@@ -1372,6 +1372,21 @@ public class DatabaseService
         return await context.Tracks.FirstOrDefaultAsync(t => t.GlobalId == globalId && t.IsEnriched);
     }
 
+    /// <summary>
+    /// Searches library entries and returns enrichment status.
+    /// Used by Mission Control for status lookups.
+    /// </summary>
+    public async Task<List<LibraryEntryEntity>> SearchLibraryEntriesWithStatusAsync(string query, int limit = 50)
+    {
+        using var context = new AppDbContext();
+        var lowerQuery = query.ToLower();
+        return await context.LibraryEntries
+            .Where(e => e.Artist.ToLower().Contains(lowerQuery) || e.Title.ToLower().Contains(lowerQuery))
+            .OrderByDescending(e => e.AddedAt)
+            .Take(limit)
+            .ToListAsync();
+    }
+
 
     public async Task<List<LibraryEntryEntity>> GetLibraryEntriesNeedingEnrichmentAsync(int limit)
     {
@@ -1406,12 +1421,13 @@ public class DatabaseService
                 if (!string.IsNullOrEmpty(result.OfficialTitle)) entry.Title = result.OfficialTitle;
 
                 // Did we get features? (Legacy/Single call pathway)
-                if (result.Bpm > 0 || result.Energy > 0)
+                if (result.Bpm > 0 || result.Energy > 0 || !string.IsNullOrEmpty(result.MusicalKey))
                 {
                     entry.BPM = result.Bpm;
                     entry.Energy = result.Energy;
                     entry.Valence = result.Valence;
                     entry.Danceability = result.Danceability;
+                    if (!string.IsNullOrEmpty(result.MusicalKey)) entry.MusicalKey = result.MusicalKey;
                     entry.IsEnriched = true; // Complete!
                 }
                 else
@@ -1438,12 +1454,13 @@ public class DatabaseService
                 pt.SpotifyArtistId = result.SpotifyArtistId;
                 if (!string.IsNullOrEmpty(result.ISRC)) pt.ISRC = result.ISRC;
                 if (!string.IsNullOrEmpty(result.AlbumArtUrl)) pt.AlbumArtUrl = result.AlbumArtUrl;
-                if (result.Bpm > 0)
+                if (result.Bpm > 0 || !string.IsNullOrEmpty(result.MusicalKey))
                 {
                     pt.BPM = result.Bpm;
                     pt.Energy = result.Energy;
                     pt.Valence = result.Valence;
                     pt.Danceability = result.Danceability;
+                    if (!string.IsNullOrEmpty(result.MusicalKey)) pt.MusicalKey = result.MusicalKey;
                     pt.IsEnriched = true;
                 }
             }
@@ -1476,12 +1493,13 @@ public class DatabaseService
                 if (!string.IsNullOrEmpty(result.ISRC)) track.ISRC = result.ISRC;
                 if (!string.IsNullOrEmpty(result.AlbumArtUrl)) track.AlbumArtUrl = result.AlbumArtUrl;
                 
-                if (result.Bpm > 0)
+                if (result.Bpm > 0 || !string.IsNullOrEmpty(result.MusicalKey))
                 {
                     track.BPM = result.Bpm;
                     track.Energy = result.Energy;
                     track.Valence = result.Valence;
                     track.Danceability = result.Danceability;
+                    if (!string.IsNullOrEmpty(result.MusicalKey)) track.MusicalKey = result.MusicalKey;
                 }
             }
             
@@ -1532,6 +1550,13 @@ public class DatabaseService
                 entry.Energy = f.Energy;
                 entry.Valence = f.Valence;
                 entry.Danceability = f.Danceability;
+                
+                // Map Spotify Key/Mode to Camelot Notation
+                // key: 0=C, 1=C#, etc. mode: 0=minor, 1=major
+                // Camelot Formula: (key + 7) % 12 + 1
+                var camelotNum = (f.Key + 7) % 12 + 1;
+                entry.MusicalKey = $"{camelotNum}{(f.Mode == 1 ? "B" : "A")}";
+                
                 entry.IsEnriched = true;
             }
         }
@@ -1549,6 +1574,10 @@ public class DatabaseService
                 pt.Energy = f.Energy;
                 pt.Valence = f.Valence;
                 pt.Danceability = f.Danceability;
+                
+                var camelotNum = (f.Key + 7) % 12 + 1;
+                pt.MusicalKey = $"{camelotNum}{(f.Mode == 1 ? "B" : "A")}";
+                
                 pt.IsEnriched = true;
             }
         }
@@ -1655,6 +1684,13 @@ public class DatabaseService
             .Where(t => t.PlaylistId == jobId)
             .OrderBy(t => t.TrackNumber)
             .ToListAsync();
+    }
+
+    public async Task<PlaylistTrackEntity?> GetPlaylistTrackByHashAsync(Guid jobId, string trackHash)
+    {
+        using var context = new AppDbContext();
+        return await context.PlaylistTracks
+            .FirstOrDefaultAsync(t => t.PlaylistId == jobId && t.TrackUniqueHash == trackHash);
     }
 
     public async Task SavePlaylistTrackAsync(PlaylistTrackEntity track)
@@ -1845,54 +1881,79 @@ public class DatabaseService
                  }
             }
             
+            // Pre-fetch existing library entries for metadata inheritance
+            // This ensures new playlist tracks inherit data from already enriched library items.
+            var allHashes = job.PlaylistTracks
+                .Select(t => t.TrackUniqueHash)
+                .Where(h => !string.IsNullOrEmpty(h))
+                .Distinct()
+                .ToList();
+                
+            var libraryEntries = await context.LibraryEntries
+                .Where(e => allHashes.Contains(e.UniqueHash))
+                .ToDictionaryAsync(e => e.UniqueHash);
+
             // For tracks, we also need to handle Add vs Update. 
             if (!jobExists) // This branch is only taken if we successfully added a NEW job and it stayed new
             {
-                var trackEntities = job.PlaylistTracks.Select(track => new PlaylistTrackEntity
+                var trackEntities = job.PlaylistTracks.Select(track => 
                 {
-                    Id = track.Id,
-                    PlaylistId = job.Id,
-                    Artist = track.Artist,
-                    Title = track.Title,
-                    Album = track.Album,
-                    TrackUniqueHash = track.TrackUniqueHash,
-                    Status = track.Status,
-                    ResolvedFilePath = track.ResolvedFilePath,
-                    TrackNumber = track.TrackNumber,
-                    AddedAt = track.AddedAt,
-                    SortOrder = track.SortOrder,
-                    Priority = track.Priority,
-                    SourcePlaylistId = track.SourcePlaylistId,
-                    SourcePlaylistName = track.SourcePlaylistName,
-                    // Phase 0: Spotify Metadata
-                    SpotifyTrackId = track.SpotifyTrackId,
-                    SpotifyAlbumId = track.SpotifyAlbumId,
-                    SpotifyArtistId = track.SpotifyArtistId,
-                    AlbumArtUrl = track.AlbumArtUrl,
-                    ArtistImageUrl = track.ArtistImageUrl,
-                    Genres = track.Genres,
-                    Popularity = track.Popularity,
-                    CanonicalDuration = track.CanonicalDuration,
-                    ReleaseDate = track.ReleaseDate,
+                    // Inherit from Library if missing
+                    libraryEntries.TryGetValue(track.TrackUniqueHash ?? "", out var entry);
 
-                    // Phase 0.1: Musical Intelligence
-                    MusicalKey = track.MusicalKey,
-                    BPM = track.BPM,
-                    CuePointsJson = track.CuePointsJson,
-                    AudioFingerprint = track.AudioFingerprint,
-                    BitrateScore = track.BitrateScore,
-                    AnalysisOffset = track.AnalysisOffset,
+                    return new PlaylistTrackEntity
+                    {
+                        Id = track.Id,
+                        PlaylistId = job.Id,
+                        Artist = track.Artist,
+                        Title = track.Title,
+                        Album = track.Album,
+                        TrackUniqueHash = track.TrackUniqueHash,
+                        Status = track.Status,
+                        ResolvedFilePath = track.ResolvedFilePath,
+                        TrackNumber = track.TrackNumber,
+                        AddedAt = track.AddedAt,
+                        SortOrder = track.SortOrder,
+                        Priority = track.Priority,
+                        SourcePlaylistId = track.SourcePlaylistId,
+                        SourcePlaylistName = track.SourcePlaylistName,
+                        
+                        // Phase 0: Spotify Metadata (Inherit if possible)
+                        SpotifyTrackId = track.SpotifyTrackId ?? entry?.SpotifyTrackId,
+                        SpotifyAlbumId = track.SpotifyAlbumId ?? entry?.SpotifyAlbumId,
+                        SpotifyArtistId = track.SpotifyArtistId ?? entry?.SpotifyArtistId,
+                        AlbumArtUrl = track.AlbumArtUrl ?? entry?.AlbumArtUrl,
+                        ArtistImageUrl = track.ArtistImageUrl, // Usually library entry doesn't have this yet
+                        Genres = track.Genres ?? entry?.Genres,
+                        Popularity = track.Popularity > 0 ? track.Popularity : (entry?.Popularity ?? 0),
+                        CanonicalDuration = track.CanonicalDuration > 0 ? track.CanonicalDuration : (entry?.DurationSeconds ?? 0),
+                        ReleaseDate = track.ReleaseDate,
 
-                    // Phase 8: Sonic Integrity
-                    SpectralHash = track.SpectralHash,
-                    QualityConfidence = track.QualityConfidence,
-                    FrequencyCutoff = track.FrequencyCutoff,
-                    IsTrustworthy = track.IsTrustworthy,
-                    QualityDetails = track.QualityDetails,
+                        // Phase 0.1: Musical Intelligence (Inherit if possible)
+                        MusicalKey = !string.IsNullOrEmpty(track.MusicalKey) ? track.MusicalKey : entry?.MusicalKey,
+                        BPM = track.BPM > 0 ? track.BPM : (entry?.BPM ?? 0),
+                        Energy = track.Energy > 0 ? track.Energy : (entry?.Energy ?? 0),
+                        Danceability = track.Danceability > 0 ? track.Danceability : (entry?.Danceability ?? 0),
+                        Valence = track.Valence > 0 ? track.Valence : (entry?.Valence ?? 0),
+                        
+                        CuePointsJson = track.CuePointsJson,
+                        AudioFingerprint = track.AudioFingerprint,
+                        BitrateScore = track.BitrateScore,
+                        AnalysisOffset = track.AnalysisOffset,
 
-                    // Phase 13: Search Filter Overrides
-                    PreferredFormats = track.PreferredFormats,
-                    MinBitrateOverride = track.MinBitrateOverride
+                        // Phase 8: Sonic Integrity
+                        SpectralHash = track.SpectralHash,
+                        QualityConfidence = track.QualityConfidence,
+                        FrequencyCutoff = track.FrequencyCutoff,
+                        IsTrustworthy = track.IsTrustworthy,
+                        QualityDetails = track.QualityDetails,
+
+                        // Phase 13: Search Filter Overrides
+                        PreferredFormats = track.PreferredFormats,
+                        MinBitrateOverride = track.MinBitrateOverride,
+                        
+                        IsEnriched = (track.IsEnriched || (entry?.IsEnriched ?? false))
+                    };
                 });
                 context.PlaylistTracks.AddRange(trackEntities);
             }
@@ -1907,6 +1968,9 @@ public class DatabaseService
 
                 foreach (var track in job.PlaylistTracks)
                 {
+                    // Inherit from Library if missing
+                    libraryEntries.TryGetValue(track.TrackUniqueHash ?? "", out var entry);
+
                     var trackEntity = new PlaylistTrackEntity
                     {
                         Id = track.Id,
@@ -1923,20 +1987,25 @@ public class DatabaseService
                         Priority = track.Priority,
                         SourcePlaylistId = track.SourcePlaylistId,
                         SourcePlaylistName = track.SourcePlaylistName,
-                        // Phase 0: Spotify Metadata
-                        SpotifyTrackId = track.SpotifyTrackId,
-                        SpotifyAlbumId = track.SpotifyAlbumId,
-                        SpotifyArtistId = track.SpotifyArtistId,
-                        AlbumArtUrl = track.AlbumArtUrl,
+                        
+                        // Phase 0: Spotify Metadata (Inherit)
+                        SpotifyTrackId = track.SpotifyTrackId ?? entry?.SpotifyTrackId,
+                        SpotifyAlbumId = track.SpotifyAlbumId ?? entry?.SpotifyAlbumId,
+                        SpotifyArtistId = track.SpotifyArtistId ?? entry?.SpotifyArtistId,
+                        AlbumArtUrl = track.AlbumArtUrl ?? entry?.AlbumArtUrl,
                         ArtistImageUrl = track.ArtistImageUrl,
-                        Genres = track.Genres,
-                        Popularity = track.Popularity,
-                        CanonicalDuration = track.CanonicalDuration,
+                        Genres = track.Genres ?? entry?.Genres,
+                        Popularity = track.Popularity > 0 ? track.Popularity : (entry?.Popularity ?? 0),
+                        CanonicalDuration = track.CanonicalDuration > 0 ? track.CanonicalDuration : (entry?.DurationSeconds ?? 0),
                         ReleaseDate = track.ReleaseDate,
                         
-                        // Phase 0.1: Musical Intelligence
-                        MusicalKey = track.MusicalKey,
-                        BPM = track.BPM,
+                        // Phase 0.1: Musical Intelligence (Inherit)
+                        MusicalKey = !string.IsNullOrEmpty(track.MusicalKey) ? track.MusicalKey : entry?.MusicalKey,
+                        BPM = track.BPM > 0 ? track.BPM : (entry?.BPM ?? 0),
+                        Energy = track.Energy > 0 ? track.Energy : (entry?.Energy ?? 0),
+                        Danceability = track.Danceability > 0 ? track.Danceability : (entry?.Danceability ?? 0),
+                        Valence = track.Valence > 0 ? track.Valence : (entry?.Valence ?? 0),
+
                         CuePointsJson = track.CuePointsJson,
                         AudioFingerprint = track.AudioFingerprint,
                         BitrateScore = track.BitrateScore,
@@ -1951,7 +2020,9 @@ public class DatabaseService
 
                         // Phase 13: Search Filter Overrides
                         PreferredFormats = track.PreferredFormats,
-                        MinBitrateOverride = track.MinBitrateOverride
+                        MinBitrateOverride = track.MinBitrateOverride,
+                        
+                        IsEnriched = (track.IsEnriched || (entry?.IsEnriched ?? false))
                     };
 
                     if (existingTrackIdSet.Contains(track.Id))

@@ -71,6 +71,11 @@ public class AudioFeaturesEntity
     public float Danceability { get; set; }
     
     /// <summary>
+    /// Valence score (0.0 - 1.0). Higher = more positive/happy.
+    /// </summary>
+    public float Valence { get; set; }
+
+    /// <summary>
     /// Spectral centroid (Hz). Indicates "brightness" of the sound.
     /// Higher values = brighter, more treble-heavy.
     /// </summary>

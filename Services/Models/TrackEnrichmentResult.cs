@@ -15,6 +15,7 @@ public class TrackEnrichmentResult
     public double? Energy { get; set; }
     public double? Valence { get; set; }
     public double? Danceability { get; set; }
+    public string? MusicalKey { get; set; }
     
     // Genre Support (Stage 3)
     public System.Collections.Generic.List<string>? Genres { get; set; }

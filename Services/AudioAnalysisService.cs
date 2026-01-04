@@ -234,7 +234,7 @@ public class AudioAnalysisService : IAudioAnalysisService
     private double ParseValue(string log, string regexPattern)
     {
         var match = Regex.Match(log, regexPattern);
-        if (match.Success && double.TryParse(match.Groups[1].Value, out double result))
+        if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double result))
         {
             return result;
         }

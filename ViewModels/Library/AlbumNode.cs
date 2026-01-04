@@ -138,7 +138,10 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
     {
         if (_downloadManager == null || !Tracks.Any()) return;
         
-        var tracksToDownload = Tracks.Select(t => t.Model).ToList();
+        var tracksToDownload = Tracks.Select(t => { 
+            t.Model.Priority = 0; 
+            return t.Model; 
+        }).ToList();
         _downloadManager.QueueTracks(tracksToDownload);
     }
 

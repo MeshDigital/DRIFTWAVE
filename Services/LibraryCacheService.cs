@@ -12,84 +12,77 @@ namespace SLSKDONET.Services;
 /// </summary>
 public class LibraryCacheService
 {
-    private readonly ConcurrentDictionary<Guid, PlaylistJob> _projectCache = new();
-    private readonly ConcurrentDictionary<string, List<PlaylistTrack>> _trackCache = new();
-    private DateTime _lastCacheRefresh = DateTime.MinValue;
-    private readonly TimeSpan _cacheLifetime = TimeSpan.FromMinutes(5);
+    private class CachedItem<T>
+    {
+        public T Item { get; set; } = default!;
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    }
+
+    private readonly ConcurrentDictionary<Guid, CachedItem<PlaylistJob>> _projectCache = new();
+    private readonly ConcurrentDictionary<string, CachedItem<List<PlaylistTrack>>> _trackCache = new();
+    private readonly TimeSpan _cacheLifetime = TimeSpan.FromMinutes(2);
+    private const int MaxCacheSize = 50; // Prevent memory fatigue
     
-    /// <summary>
-    /// Attempts to get a project from cache.
-    /// Returns null if not cached or cache is stale.
-    /// </summary>
     public PlaylistJob? GetProject(Guid projectId)
     {
-        if (IsStale()) ClearCache();
-        return _projectCache.TryGetValue(projectId, out var project) ? project : null;
+        if (_projectCache.TryGetValue(projectId, out var cached) && !IsItemStale(cached.Timestamp))
+            return cached.Item;
+        
+        if (_projectCache.Count > MaxCacheSize) EnforceLimits();
+        return null;
     }
     
-    /// <summary>
-    /// Attempts to get tracks for a project from cache.
-    /// Returns null if not cached or cache is stale.
-    /// </summary>
     public List<PlaylistTrack>? GetTracks(Guid projectId)
     {
-        if (IsStale()) ClearCache();
-        return _trackCache.TryGetValue(projectId.ToString(), out var tracks) ? tracks : null;
+        if (_trackCache.TryGetValue(projectId.ToString(), out var cached) && !IsItemStale(cached.Timestamp))
+            return cached.Item;
+            
+        if (_trackCache.Count > MaxCacheSize) EnforceLimits();
+        return null;
     }
     
-    /// <summary>
-    /// Caches a project. Updates cache refresh timestamp.
-    /// </summary>
     public void CacheProject(PlaylistJob project)
     {
-        _projectCache[project.Id] = project;
-        _lastCacheRefresh = DateTime.UtcNow;
+        if (_projectCache.Count > MaxCacheSize) EnforceLimits();
+        _projectCache[project.Id] = new CachedItem<PlaylistJob> { Item = project };
     }
     
-    /// <summary>
-    /// Caches tracks for a project. Updates cache refresh timestamp.
-    /// </summary>
     public void CacheTracks(Guid projectId, List<PlaylistTrack> tracks)
     {
-        _trackCache[projectId.ToString()] = tracks;
-        _lastCacheRefresh = DateTime.UtcNow;
+        if (_trackCache.Count > MaxCacheSize) EnforceLimits();
+        _trackCache[projectId.ToString()] = new CachedItem<List<PlaylistTrack>> { Item = tracks };
     }
     
-    /// <summary>
-    /// Invalidates cache for a specific project.
-    /// Call this when a project is modified/saved.
-    /// </summary>
     public void InvalidateProject(Guid projectId)
     {
         _projectCache.TryRemove(projectId, out _);
         _trackCache.TryRemove(projectId.ToString(), out _);
     }
     
-    /// <summary>
-    /// Invalidates entire cache.
-    /// Call this on bulk operations or when cache is stale.
-    /// </summary>
     public void ClearCache()
     {
         _projectCache.Clear();
         _trackCache.Clear();
-        _lastCacheRefresh = DateTime.MinValue;
     }
     
-    /// <summary>
-    /// Checks if cache has exceeded its lifetime (5 minutes).
-    /// </summary>
-    private bool IsStale() => DateTime.UtcNow - _lastCacheRefresh > _cacheLifetime;
+    private bool IsItemStale(DateTime timestamp) => DateTime.UtcNow - timestamp > _cacheLifetime;
+
+    private void EnforceLimits()
+    {
+        // Simple strategy: Clear everything if we hit limits, rather than complex LRU
+        // This is safe because it's just a performance cache.
+        if (_projectCache.Count > MaxCacheSize || _trackCache.Count > MaxCacheSize)
+        {
+            ClearCache();
+        }
+    }
     
-    /// <summary>
-    /// Gets cache statistics for monitoring.
-    /// </summary>
     public (int ProjectCount, int TrackCacheCount, TimeSpan Age) GetCacheStats()
     {
         return (
             _projectCache.Count,
             _trackCache.Count,
-            DateTime.UtcNow - _lastCacheRefresh
+            TimeSpan.Zero // Item-level now, so global age is less meaningful
         );
     }
 }

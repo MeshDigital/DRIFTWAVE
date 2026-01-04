@@ -34,8 +34,8 @@ highlevel:
     compute: true
     svm_models: []
     tensorflow_models:
-        - "Tools/Models/discogs-effnet-bs64-1.pb" # REQUIRED for Style Lab
-        - "Tools/Models/voice_instrumental-msd-musicnn-1.pb"
-        - "Tools/Models/danceability-msd-musicnn-1.pb"
-        - "Tools/Models/mood_happy-msd-musicnn-1.pb"
-        - "Tools/Models/mood_aggressive-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/discogs-effnet-bs64-1.pb" # REQUIRED for Style Lab
+        - "Tools/Essentia/models/voice_instrumental-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/danceability-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/mood_happy-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/mood_aggressive-msd-musicnn-1.pb"

@@ -79,9 +79,17 @@ namespace SLSKDONET.ViewModels
         public ObservableCollection<PlaylistTrack> OtherVersions { get; } = new();
         
         // Vibe Radar Data (0-100 scale for UI)
-        public double VibeEnergy => (Track?.Energy ?? 0) * 100;
-        public double VibeDance => (AudioFeatures?.Danceability ?? 0) * 100;
-        public double VibeMood => (AudioFeatures?.KeyConfidence ?? 0) * 100; // Proxy for now
+        public double VibeEnergy => (AudioFeatures != null && AudioFeatures.Energy > 0 
+            ? AudioFeatures.Energy 
+            : (float)(Track?.Energy ?? 0)) * 100;
+
+        public double VibeDance => (AudioFeatures != null && AudioFeatures.Danceability > 0 
+            ? AudioFeatures.Danceability 
+            : (float)(Track?.Danceability ?? 0)) * 100;
+
+        public double VibeMood => (AudioFeatures != null && AudioFeatures.MoodConfidence > 0 
+            ? AudioFeatures.MoodConfidence 
+            : (float)(Track?.Valence ?? 0)) * 100;
         
         public bool HasProDjFeatures => HasAnalysis && !string.IsNullOrEmpty(CamelotKey);
         public System.Windows.Input.ICommand ForceReAnalyzeCommand { get; }
@@ -140,6 +148,25 @@ namespace SLSKDONET.ViewModels
                         ProgressModal = null;
                         IsAnalyzing = false;
                         OnPropertyChanged(nameof(IsProgressModalVisible));
+                    }
+                })
+                .DisposeWith(_disposables);
+            
+            // Phase 4: Listen for metadata updates (Enrichment)
+            _eventBus.GetEvent<TrackMetadataUpdatedEvent>()
+                .Where(evt => Track?.TrackUniqueHash == evt.TrackGlobalId)
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(async evt =>
+                {
+                    if (Track != null)
+                    {
+                        // Reload track data to ensure we have the latest enrichment
+                        var freshTrack = await _libraryService.GetPlaylistTrackByHashAsync(Track.PlaylistId, evt.TrackGlobalId);
+                        if (freshTrack != null)
+                        {
+                            _logger.LogDebug("[Inspector] Metadata updated for current track {Hash}, refreshing UI", evt.TrackGlobalId);
+                            Track = freshTrack; // Re-assignment triggers property notifications and analysis re-load
+                        }
                     }
                 })
                 .DisposeWith(_disposables);
@@ -505,6 +532,11 @@ namespace SLSKDONET.ViewModels
             // Re-notify main properties to pick up intelligence data if available
             OnPropertyChanged(nameof(CamelotKey));
             OnPropertyChanged(nameof(BpmLabel));
+            
+            // Phase 4: Notify Vibe Radar to refresh with forensic truths
+            OnPropertyChanged(nameof(VibeEnergy));
+            OnPropertyChanged(nameof(VibeDance));
+            OnPropertyChanged(nameof(VibeMood));
         }
 
         public double Energy => Track?.Energy ?? 0;

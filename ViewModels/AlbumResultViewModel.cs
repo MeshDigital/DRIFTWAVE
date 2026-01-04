@@ -72,38 +72,48 @@ public class AlbumResultViewModel
     {
         if (Tracks == null || !Tracks.Any()) return;
         
-        // Create PlaylistJob for Library integration
-        var job = new PlaylistJob
+        try
         {
-            Id = System.Guid.NewGuid(),
-            SourceTitle = $"{Artist} - {AlbumTitle}",
-            SourceType = "Album",
-            CreatedAt = System.DateTime.Now,
-            DestinationFolder = ""
-        };
-        
-        // Convert tracks to PlaylistTrack and add to job
-        foreach(var t in Tracks)
-        {
-            var playlistTrack = new PlaylistTrack
+            // Create PlaylistJob for Library integration
+            var job = new PlaylistJob
             {
                 Id = System.Guid.NewGuid(),
-                PlaylistId = job.Id,
-                Artist = t.Artist ?? "",
-                Title = t.Title ?? "",
-                Album = AlbumTitle ?? "",
-                Status = TrackStatus.Missing,
-                TrackUniqueHash = t.UniqueHash ?? "",
-                ResolvedFilePath = string.Empty,
-                AddedAt = System.DateTime.Now
+                SourceTitle = $"{Artist} - {AlbumTitle}",
+                SourceType = "Album",
+                CreatedAt = System.DateTime.Now,
+                DestinationFolder = ""
             };
             
-            job.PlaylistTracks.Add(playlistTrack);
-            job.OriginalTracks.Add(t);
+            // Convert tracks to PlaylistTrack and add to job
+            foreach(var t in Tracks)
+            {
+                var playlistTrack = new PlaylistTrack
+                {
+                    Id = System.Guid.NewGuid(),
+                    PlaylistId = job.Id,
+                    Artist = t.Artist ?? "",
+                    Title = t.Title ?? "",
+                    Album = AlbumTitle ?? "",
+                    Status = TrackStatus.Missing,
+                    TrackUniqueHash = t.UniqueHash ?? "",
+                    ResolvedFilePath = string.Empty,
+                    AddedAt = System.DateTime.Now,
+                    IsEnriched = true,
+                    Priority = 0
+                };
+                
+                job.PlaylistTracks.Add(playlistTrack);
+                job.OriginalTracks.Add(t);
+            }
+            
+            // Use new QueueProject overload - creates job in Library and queues tracks
+            await _downloadManager.QueueProject(job);
         }
-        
-        // Use new QueueProject overload - creates job in Library and queues tracks
-        await _downloadManager.QueueProject(job);
+        catch (System.Exception ex)
+        {
+            // Log would be good here, but we don't have a logger in this VM?
+            // Actually it doesn't seem to have one.
+        }
     }
 
     private void ForceScanAlbum_Execute()

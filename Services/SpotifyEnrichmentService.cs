@@ -55,6 +55,7 @@ public class SpotifyEnrichmentService
                  Energy = cached.Energy,
                  Valence = cached.Valence,
                  Danceability = cached.Danceability,
+                 MusicalKey = cached.MusicalKey,
                  AlbumArtUrl = cached.AlbumArtUrl ?? string.Empty,
                  ISRC = cached.ISRC
              };
@@ -225,7 +226,12 @@ public class SpotifyEnrichmentService
             identification.Energy = features.Energy;
             identification.Valence = features.Valence;
             identification.Danceability = features.Danceability;
-            _logger.LogInformation("Spotify: Enriched '{Title}' (BPM: {BPM})", identification.OfficialTitle, features.Tempo);
+            
+            // Map Spotify Key/Mode to Camelot
+            var camelotNum = (features.Key + 7) % 12 + 1;
+            identification.MusicalKey = $"{camelotNum}{(features.Mode == 1 ? "B" : "A")}";
+            
+            _logger.LogInformation("Spotify: Enriched '{Title}' (BPM: {BPM}, Key: {Key})", identification.OfficialTitle, features.Tempo, identification.MusicalKey);
         }
 
         return identification;
