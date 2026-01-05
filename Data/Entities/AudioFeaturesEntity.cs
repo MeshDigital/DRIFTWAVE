@@ -112,6 +112,11 @@ public class AudioFeaturesEntity
     /// Null if no clear drop detected.
     /// </summary>
     public float? DropTimeSeconds { get; set; }
+
+    /// <summary>
+    /// Confidence of the drop detection (0.0 - 1.0).
+    /// </summary>
+    public float DropConfidence { get; set; }
     
     /// <summary>
     /// Intro cue point (usually 0.0 - start of track).

@@ -384,7 +384,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
                      
                      // Update Analysis info if available
                      Model.Popularity = updatedTrack.Popularity;
+                     Model.Popularity = updatedTrack.Popularity;
                      Model.Genres = updatedTrack.Genres;
+                     Model.IsReviewNeeded = updatedTrack.IsReviewNeeded; // Phase 10.4
                      
                      // NEW: Sync Waveform and Technical Analysis results
                      Model.WaveformData = updatedTrack.WaveformData;
@@ -452,6 +454,7 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              // Dates
              OnPropertyChanged(nameof(ReleaseDate));
              OnPropertyChanged(nameof(ReleaseYear));
+             OnPropertyChanged(nameof(IsReviewNeeded)); // Phase 10.4
         });
     }
 
@@ -669,6 +672,20 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
     // Fix: Add display property for consistent "—" fallback
     public string BpmDisplay => Model.BPM.HasValue && Model.BPM > 0 ? $"{Model.BPM:0}" : "—";
     public string KeyDisplay => !string.IsNullOrEmpty(Model.MusicalKey) ? Model.MusicalKey : "—";
+    
+    // Phase 10.4: Industrial Prep
+    public bool IsReviewNeeded
+    {
+        get => Model.IsReviewNeeded;
+        set
+        {
+            if (Model.IsReviewNeeded != value)
+            {
+                Model.IsReviewNeeded = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
 
     public string MetadataStatus

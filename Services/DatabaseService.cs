@@ -152,6 +152,7 @@ public class DatabaseService
                     ""DynamicComplexity"" REAL NOT NULL,
                     ""LoudnessLUFS"" REAL NOT NULL,
                     ""DropTimeSeconds"" REAL NULL,
+                    ""DropConfidence"" REAL NOT NULL DEFAULT 0,
                     ""CueIntro"" REAL NOT NULL,
                     ""CueBuild"" REAL NULL,
                     ""CueDrop"" REAL NULL,
@@ -352,6 +353,12 @@ public class DatabaseService
                 columnsToAdd.Add(("TruePeak", "TruePeak REAL NULL"));
             if (!existingColumns.Contains("DynamicRange"))
                 columnsToAdd.Add(("DynamicRange", "DynamicRange REAL NULL"));
+
+            // Phase 10.4: Industrial Scale prep
+            if (!existingColumns.Contains("IsReviewNeeded"))
+                columnsToAdd.Add(("IsReviewNeeded", "IsReviewNeeded INTEGER DEFAULT 0"));
+            if (!existingColumns.Contains("IsPrepared"))
+                 columnsToAdd.Add(("IsPrepared", "IsPrepared INTEGER DEFAULT 0"));
 
             foreach (var (name, definition) in columnsToAdd)
             {
@@ -595,8 +602,6 @@ public class DatabaseService
                     existingColumns.Add(reader.GetString(1));
                 }
             }
-            if (!existingColumns.Contains("GoldCount"))
-            {
                 _logger.LogWarning("Schema Patch: Adding missing column 'GoldCount' to LibraryHealth");
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryHealth ADD COLUMN GoldCount INTEGER DEFAULT 0");
             }
@@ -609,6 +614,22 @@ public class DatabaseService
             {
                 _logger.LogWarning("Schema Patch: Adding missing column 'BronzeCount' to LibraryHealth");
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE LibraryHealth ADD COLUMN BronzeCount INTEGER DEFAULT 0");
+            }
+            
+            // Check audio_features table
+            cmdSchema.CommandText = "PRAGMA table_info(audio_features)";
+            existingColumns.Clear();
+            using (var reader = await cmdSchema.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    existingColumns.Add(reader.GetString(1));
+                }
+            }
+            if (!existingColumns.Contains("DropConfidence"))
+            {
+                 _logger.LogWarning("Schema Patch: Adding missing column 'DropConfidence' to audio_features");
+                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE audio_features ADD COLUMN DropConfidence REAL DEFAULT 0");
             }
             
             _logger.LogInformation("[{Ms}ms] Database Init: Schema patches completed", sw.ElapsedMilliseconds);

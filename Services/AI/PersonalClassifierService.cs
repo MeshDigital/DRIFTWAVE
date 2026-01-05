@@ -6,8 +6,6 @@ using Microsoft.ML;
 using Microsoft.ML.Data;
 using Microsoft.ML.Trainers.LightGbm;
 
-using Microsoft.ML.Trainers.LightGbm;
-
 namespace SLSKDONET.Services.AI;public class PersonalClassifierService
 {
     private readonly MLContext _mlContext;

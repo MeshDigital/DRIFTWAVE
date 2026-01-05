@@ -350,6 +350,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                             var cues = _cueEngine.GenerateCues(dropTime.Value, entity.Bpm);
                             
                             entity.DropTimeSeconds = (float)dropTime.Value;
+                            entity.DropConfidence = (float)confidence;
                             entity.CuePhraseStart = (float)cues.PhraseStart;
                             entity.CueBuild = (float)cues.Build;
                             entity.CueDrop = (float)cues.Drop;

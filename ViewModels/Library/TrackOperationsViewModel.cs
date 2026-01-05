@@ -21,6 +21,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
     private readonly PlayerViewModel _playerViewModel;
     private readonly IFileInteractionService _fileInteractionService;
     private readonly ForensicLockdownService _forensicLockdownService; // Phase 7
+    private readonly Services.Musical.ManualCueGenerationService _prepService; // Phase 10.4
 
     public event PropertyChangedEventHandler? PropertyChanged;
     
@@ -35,21 +36,23 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
     public System.Windows.Input.ICommand DeleteAndBlacklistCommand { get; } // Phase 7
     public System.Windows.Input.ICommand RetryOfflineTracksCommand { get; }
     public System.Windows.Input.ICommand OpenFolderCommand { get; }
+    public System.Windows.Input.ICommand IndustrialPrepCommand { get; } // Phase 10.4
 
     public TrackOperationsViewModel(
         ILogger<TrackOperationsViewModel> logger,
         DownloadManager downloadManager,
         PlayerViewModel playerViewModel,
         IFileInteractionService fileInteractionService,
-        ForensicLockdownService forensicLockdownService)
+        ForensicLockdownService forensicLockdownService,
+        Services.Musical.ManualCueGenerationService prepService)
     {
         _logger = logger;
         _downloadManager = downloadManager;
         _playerViewModel = playerViewModel;
         _fileInteractionService = fileInteractionService;
         _forensicLockdownService = forensicLockdownService;
+        _prepService = prepService;
 
-        // Initialize commands
         // Initialize commands
         PlayTrackCommand = new RelayCommand<PlaylistTrackViewModel>(ExecutePlayTrack);
         HardRetryCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteHardRetry);
@@ -61,6 +64,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
         DeleteAndBlacklistCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteDeleteAndBlacklist); // Phase 7
         RetryOfflineTracksCommand = new AsyncRelayCommand(ExecuteRetryOfflineTracks);
         OpenFolderCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteOpenFolder);
+        IndustrialPrepCommand = new AsyncRelayCommand<System.Collections.IList>(ExecuteIndustrialPrep);
     }
 
     public void SetMainViewModel(MainViewModel mainViewModel)
@@ -247,6 +251,47 @@ public class TrackOperationsViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to open folder");
+        }
+    }
+
+    private async Task ExecuteIndustrialPrep(System.Collections.IList? selectedItems)
+    {
+        if (selectedItems == null || selectedItems.Count == 0) return;
+
+        try
+        {
+            _logger.LogInformation("Creating industrial prep batch for {Count} items", selectedItems.Count);
+
+            var tracks = new System.Collections.Generic.List<PlaylistTrack>();
+            foreach (var item in selectedItems)
+            {
+                if (item is PlaylistTrackViewModel vm && vm.Model != null)
+                {
+                    tracks.Add(vm.Model);
+                }
+            }
+
+            if (tracks.Count == 0) return;
+
+            // Run in background / show progress
+            // Ideally we should show a progress modal or status bar update. 
+            // For Phase 10.4 MVP, logging and maybe a toast is fine, but since it's blocking?
+            // ProcessTracksAsync is async.
+            
+            // TODO: Wire up progress to UI if possible.
+            var progress = new Progress<int>(p => 
+            {
+                // Optionally update status bar
+            });
+
+            var result = await _prepService.ProcessTracksAsync(tracks, progress);
+            
+            _logger.LogInformation("Industrial Prep Complete: {Success} prepared, {Skipped} skipped", 
+                result.Success, result.Skipped);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Industrial Prep Batch Failed");
         }
     }
 

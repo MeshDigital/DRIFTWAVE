@@ -430,6 +430,14 @@
                                                 <TextBlock Text="🔬"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
+
+                                        <MenuItem Header="Industrial Prep (Bulk)" 
+                                                  Command="{Binding $parent[UserControl].DataContext.Operations.IndustrialPrepCommand}" 
+                                                  CommandParameter="{Binding $parent[UserControl].DataContext.Tracks.SelectedTracks}">
+                                            <MenuItem.Icon>
+                                                <TextBlock Text="🏭"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                         
                                         <MenuItem Header="Open File Location" 
                                                   Command="{Binding $parent[UserControl].DataContext.Operations.OpenFolderCommand}" 
@@ -550,21 +558,37 @@
                                         </StackPanel>
                                         
                                         <!-- Line 1 Right: Status Badge -->
-                                        <Border Grid.Row="0" Grid.Column="2" 
-                                                Background="#1AFFFFFF" 
-                                                CornerRadius="4" 
-                                                Padding="8,2" 
-                                                VerticalAlignment="Center"
-                                                Margin="0,0,12,0">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <TextBlock Text="{Binding MetadataStatusSymbol}" VerticalAlignment="Center" FontSize="10"/>
-                                                <TextBlock Text="{Binding StatusText}" 
-                                                           Foreground="{Binding StatusColor}" 
-                                                           FontWeight="Bold" 
-                                                           FontSize="11"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
+                                        <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="0,0,12,0" VerticalAlignment="Center">
+                                            <!-- Review Needed Badge -->
+                                            <Border Background="#33FFCC00" 
+                                                    CornerRadius="4" 
+                                                    Padding="8,2"
+                                                    IsVisible="{Binding IsReviewNeeded}"
+                                                    ToolTip.Tip="Low confidence drop detection (< 70%)">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="⚠️" VerticalAlignment="Center" FontSize="10"/>
+                                                    <TextBlock Text="REVIEW" 
+                                                               Foreground="#FFCC00" 
+                                                               FontWeight="Bold" 
+                                                               FontSize="10"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Status Badge -->
+                                            <Border Background="#1AFFFFFF" 
+                                                    CornerRadius="4" 
+                                                    Padding="8,2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding MetadataStatusSymbol}" VerticalAlignment="Center" FontSize="10"/>
+                                                    <TextBlock Text="{Binding StatusText}" 
+                                                               Foreground="{Binding StatusColor}" 
+                                                               FontWeight="Bold" 
+                                                               FontSize="11"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
                                         
                                         <!-- Actions -->
                                         <StackPanel Grid.RowSpan="2" Grid.Column="3" Orientation="Horizontal">

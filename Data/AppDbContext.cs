@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.IO;
 using SLSKDONET.Models;
 using Microsoft.Data.Sqlite; // Phase 1B
-using SLSKDONET.Models.Entities; // Added for TrackTechnicalEntity
+using SLSKDONET.Data.Entities; // Added for TrackTechnicalEntity
 
 namespace SLSKDONET.Data;
 
