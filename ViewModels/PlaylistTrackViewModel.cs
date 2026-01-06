@@ -443,6 +443,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              OnPropertyChanged(nameof(Bitrate));
              OnPropertyChanged(nameof(IntegritySymbol));
              OnPropertyChanged(nameof(IntegrityText));
+             
+             // CRITICAL: Reload technical data (waveforms) from TechnicalDetails table
+             _ = LoadTechnicalDataAsync();
              OnPropertyChanged(nameof(Duration));
 
              OnPropertyChanged(nameof(LoudnessDisplay));
