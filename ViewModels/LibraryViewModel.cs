@@ -280,7 +280,7 @@ public class LibraryViewModel : INotifyPropertyChanged, IDisposable
         });
         CloseInspectorCommand = new RelayCommand<object>(_ => IsInspectorOpen = false); // NEW
         IsInspectorOpen = false; // NEW
-        AnalyzeAlbumCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteAnalyzeAlbumAsync);
+        AnalyzeAlbumCommand = new AsyncRelayCommand<PlaylistJob>(job => ExecuteAnalyzeAlbumAsync(job?.Name));
         AnalyzeTrackCommand = new SLSKDONET.Views.RelayCommand<PlaylistTrackViewModel>(ExecuteAnalyzeTrack);
         ExportPlaylistCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportPlaylistAsync);
         AutoSortCommand = new AsyncRelayCommand(ExecuteAutoSortAsync);
@@ -288,9 +288,7 @@ public class LibraryViewModel : INotifyPropertyChanged, IDisposable
         HardwareExportCommand = new AsyncRelayCommand(ExecuteHardwareExportAsync, () => SelectedProject != null);
 
         // Wire up events between child ViewModels
-        Tracks.SetMainViewModel(this);
-        Projects.SetMainViewModel(this);
-        SmartPlaylists.SetMainViewModel(this);
+        Tracks.SetMainViewModel(null!); // Will be set correctly via SetMainViewModel(MainViewModel) call from parent
         
         // Refresh drives for Hardware Export
         RefreshAvailableDrives();

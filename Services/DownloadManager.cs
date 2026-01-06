@@ -494,17 +494,20 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
         int skipped = 0;
         int queued = 0;
         
+        // O(N) Optimization: Create lookup maps OUTSIDE the lock to prevent UI freeze on large imports
+        var currentDownloads = ActiveDownloads; 
+        
+        var existingMap = currentDownloads
+            .Where(d => !string.IsNullOrEmpty(d.Model.TrackUniqueHash))
+            .GroupBy(d => d.Model.TrackUniqueHash)
+            .ToDictionary(g => g.Key!, g => g.First());
+        
+        var existingIds = currentDownloads
+            .GroupBy(d => d.Model.Id)
+            .ToDictionary(g => g.Key, g => g.First());
+
         lock (_collectionLock)
         {
-            // FIX: Use Dictionary for robust O(1) lookup and to avoid variable re-declaration issues in loop
-            var existingMap = _downloads
-                .Where(d => !string.IsNullOrEmpty(d.Model.TrackUniqueHash))
-                .GroupBy(d => d.Model.TrackUniqueHash)
-                .ToDictionary(g => g.Key!, g => g.First());
-            
-            var existingIds = _downloads
-                .GroupBy(d => d.Model.Id)
-                .ToDictionary(g => g.Key, g => g.First());
 
             foreach (var track in tracks)
             {

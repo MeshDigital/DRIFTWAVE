@@ -79,7 +79,7 @@ public class HardwareExportService : IHardwareExportService
 
             try
             {
-                if (string.IsNullOrEmpty(track.FilePath) || !File.Exists(track.FilePath))
+                if (string.IsNullOrEmpty(track.ResolvedFilePath) || !File.Exists(track.ResolvedFilePath))
                 {
                     _logger.LogWarning("Track file missing: {Title}", track.Title);
                     continue;
@@ -88,7 +88,7 @@ public class HardwareExportService : IHardwareExportService
                 // 1. Sanitize folder names
                 string artist = SanitizeForFat32(track.Artist ?? "Unknown Artist");
                 string album = SanitizeForFat32(track.Album ?? "Unknown Album");
-                string fileName = SanitizeForFat32(Path.GetFileName(track.FilePath));
+                string fileName = SanitizeForFat32(Path.GetFileName(track.ResolvedFilePath));
 
                 string targetDir = Path.Combine(musicFolder, artist, album);
                 if (!Directory.Exists(targetDir))
@@ -108,7 +108,7 @@ public class HardwareExportService : IHardwareExportService
                 bool skip = false;
                 if (File.Exists(targetPath))
                 {
-                    var sourceInfo = new FileInfo(track.FilePath);
+                    var sourceInfo = new FileInfo(track.ResolvedFilePath);
                     var targetInfo = new FileInfo(targetPath);
                     if (sourceInfo.Length == targetInfo.Length)
                         skip = true;
@@ -117,7 +117,7 @@ public class HardwareExportService : IHardwareExportService
                 if (!skip)
                 {
                     // Copy file
-                    using (var sourceStream = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
+                    using (var sourceStream = new FileStream(track.ResolvedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
                     using (var destinationStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
                     {
                         await sourceStream.CopyToAsync(destinationStream, cancellationToken);
@@ -151,11 +151,13 @@ public class HardwareExportService : IHardwareExportService
                  // Clone or find new path
                  string artist = SanitizeForFat32(t.Artist ?? "Unknown Artist");
                  string album = SanitizeForFat32(t.Album ?? "Unknown Album");
-                 string fileName = SanitizeForFat32(Path.GetFileName(t.FilePath!));
-                 string relativePath = Path.Combine("Contents", artist, album, fileName);
-                 // RekordboxService usually expects full paths for XML generation? 
-                 // Actually Rekordbox XML tracks use "Location" attribute which is a URL starting with file://localhost/
-                 return (t, relativePath);
+                 string fileName = SanitizeForFat32(Path.GetFileName(t.ResolvedFilePath));
+                 
+                 // We need to return the track with its new path for XML generation
+                 // For now, RekordboxService expects ResolvedFilePath to exist.
+                 // We temp-override it or better, pass the mapping.
+                 // TODO: Support path mapping in RekordboxService
+                 return t; 
             }).ToList();
 
             // TODO: Update RekordboxService to support exporting with relative/virtual paths

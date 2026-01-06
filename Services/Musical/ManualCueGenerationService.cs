@@ -68,25 +68,37 @@ public class ManualCueGenerationService
     {
         var result = new CueGenerationResult { TotalTracks = tracks.Count };
         int processed = 0;
+        const int batchSize = 10;
 
-        foreach (var track in tracks)
+        // Process in batches to balance performance and database locking
+        for (int i = 0; i < tracks.Count; i += batchSize)
         {
             if (cancellationToken.IsCancellationRequested) break;
 
-            try
+            var batch = tracks.Skip(i).Take(batchSize).ToList();
+            
+            await _databaseService.RunInTransactionAsync(async () =>
             {
-                bool success = await ProcessSingleTrackAsync(track, cancellationToken);
-                if (success) result.Success++;
-                else result.Failed++;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to process track {Id}: {FilePath}", track.Id, track.ResolvedFilePath);
-                result.Failed++;
-            }
+                foreach (var track in batch)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
 
-            processed++;
-            progress?.Report((processed * 100) / tracks.Count);
+                    try
+                    {
+                        bool success = await ProcessSingleTrackAsync(track, cancellationToken);
+                        if (success) result.Success++;
+                        else result.Failed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to process track {Id}: {FilePath}", track.Id, track.ResolvedFilePath);
+                        result.Failed++;
+                    }
+
+                    processed++;
+                    progress?.Report((processed * 100) / tracks.Count);
+                }
+            });
         }
 
         return result;
@@ -147,8 +159,7 @@ public class ManualCueGenerationService
             }
 
             // 6. Save to Database 
-            // Stub: In real imp, we would update AudioFeaturesEntity with drop data.
-            // await SaveTrackDataAsync(track, features, dropResult, cues);
+            await SaveTrackDataAsync(track, features, cues);
 
             return true;
         }
@@ -159,10 +170,54 @@ public class ManualCueGenerationService
         }
     }
 
-    private async Task SaveTrackDataAsync(PlaylistTrack track, AudioFeaturesEntity features, DropDetectionResult drop, List<OrbitCue> cues)
+    private async Task SaveTrackDataAsync(PlaylistTrack track, AudioFeaturesEntity features, List<OrbitCue> cues)
     {
-        // Stub: Implementation for DB persistence
-        await Task.CompletedTask;
+        // 1. Update global library track features
+        var globalTrack = await _databaseService.FindTrackAsync(track.TrackUniqueHash);
+        if (globalTrack != null)
+        {
+             globalTrack.CuePointsJson = System.Text.Json.JsonSerializer.Serialize(cues);
+             globalTrack.BPM = features.Bpm;
+             globalTrack.MusicalKey = features.Key;
+             globalTrack.Energy = (double)features.Energy;
+             globalTrack.Danceability = (double)features.Danceability;
+             globalTrack.IsEnriched = true;
+             await _databaseService.SaveTrackAsync(globalTrack);
+        }
+
+        // 2. Update the specific playlist track entry
+        track.CuePointsJson = globalTrack!.CuePointsJson;
+        track.BPM = globalTrack.BPM;
+        track.MusicalKey = globalTrack.MusicalKey;
+        track.Energy = globalTrack.Energy;
+        track.Danceability = globalTrack.Danceability;
+        track.IsPrepared = true;
+        
+        // Convert PlaylistTrack model back to entity for saving
+        // This assumes DatabaseService has a way to save PlaylistTrack models or we map it here.
+        // Actually, DatabaseService.SavePlaylistTrackAsync takes a PlaylistTrackEntity.
+        
+        var entity = new PlaylistTrackEntity
+        {
+            Id = track.Id,
+            PlaylistId = track.PlaylistId,
+            TrackUniqueHash = track.TrackUniqueHash,
+            Artist = track.Artist,
+            Title = track.Title,
+            Album = track.Album,
+            Status = track.Status,
+            ResolvedFilePath = track.ResolvedFilePath,
+            CuePointsJson = track.CuePointsJson,
+            BPM = track.BPM,
+            MusicalKey = track.MusicalKey,
+            Energy = track.Energy,
+            Danceability = track.Danceability,
+            IsPrepared = track.IsPrepared,
+            AddedAt = track.AddedAt
+            // Note: IsReviewNeeded is not persisted on PlaylistTrackEntity
+        };
+        
+        await _databaseService.SavePlaylistTrackAsync(entity);
     }
 }
 

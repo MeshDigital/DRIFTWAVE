@@ -18,6 +18,10 @@ public class DownloadContext
     public double Progress { get; set; }
     public string GlobalId => Model.TrackUniqueHash;
     public string? ErrorMessage { get; set; }
+    
+    // Industrial Prep Helper Properties
+    public string ArtistName => Model.Artist;
+    public string TrackTitle => Model.Title;
 
     // Phase 3B: Peer Blacklisting for Health Monitor
     public HashSet<string> BlacklistedUsers { get; set; } = new(StringComparer.OrdinalIgnoreCase);

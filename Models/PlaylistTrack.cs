@@ -202,6 +202,7 @@ public enum PlaylistTrackState
     Searching,
     Queued,
     Downloading,
+    Converting,
     Paused,
     Deferred,
     Completed,

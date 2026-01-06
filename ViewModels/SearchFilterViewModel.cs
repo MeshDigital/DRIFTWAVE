@@ -164,7 +164,7 @@ public class SearchFilterViewModel : ReactiveObject
             // Phase 12.6: Hide potential fakes/upscales (Operational Hardening)
             if (hideSuspects)
             {
-                if (result.IntegrityStatus == "Suspect" || MetadataForensicService.IsFake(result.Model)) 
+                if (result.IntegrityStatus == "Suspect" || SLSKDONET.Services.MetadataForensicService.IsFake(result.Model)) 
                     return false;
 
                 // 4. Manual Forensic Size Gate (Phase 11.5)

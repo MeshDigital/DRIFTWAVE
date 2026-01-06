@@ -32,6 +32,7 @@ public class TrackListViewModel : ReactiveObject, IDisposable
     private readonly IEventBus _eventBus;
     private readonly AppConfig _config;
     private readonly MetadataEnrichmentOrchestrator _enrichmentOrchestrator;
+    private readonly IBulkOperationCoordinator _bulkCoordinator;
 
     public HierarchicalLibraryViewModel Hierarchical { get; }
 
@@ -270,7 +271,8 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         IEventBus eventBus,
         AppConfig config,
         MetadataEnrichmentOrchestrator enrichmentOrchestrator,
-        AnalysisQueueService analysisQueueService)
+        AnalysisQueueService analysisQueueService,
+        IBulkOperationCoordinator bulkCoordinator)
     {
         _logger = logger;
         _libraryService = libraryService;
@@ -279,6 +281,7 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         _eventBus = eventBus;
         _enrichmentOrchestrator = enrichmentOrchestrator;
         _config = config;
+        _bulkCoordinator = bulkCoordinator;
 
         Hierarchical = new HierarchicalLibraryViewModel(config, downloadManager, analysisQueueService);
         
@@ -635,12 +638,21 @@ public class TrackListViewModel : ReactiveObject, IDisposable
     private async Task ExecuteBulkDownloadAsync()
     {
         var selectedTracks = SelectedTracks.ToList();
-        
         if (!selectedTracks.Any()) return;
 
-        _logger.LogInformation("Bulk download for {Count} tracks", selectedTracks.Count);
-        _downloadManager.QueueTracks(selectedTracks.Select(t => t.Model).ToList());
-        SelectedTracks.Clear(); // Clear selection after action
+        if (_bulkCoordinator.IsRunning) return;
+
+        await _bulkCoordinator.RunOperationAsync(
+            selectedTracks,
+            async (track, ct) =>
+            {
+                _downloadManager.QueueTracks(new System.Collections.Generic.List<PlaylistTrack> { track.Model });
+                return true;
+            },
+            "Bulk Download"
+        );
+
+        SelectedTracks.Clear();
     }
 
     private async Task ExecuteCopyToFolderAsync()
@@ -685,47 +697,43 @@ public class TrackListViewModel : ReactiveObject, IDisposable
 
             _logger.LogInformation("Copying {Count} files to: {Folder}", selectedTracks.Count, targetFolder);
 
-            // Copy files
-            int successCount = 0;
-            int failCount = 0;
-
-            foreach (var track in selectedTracks)
-            {
-                try
+            await _bulkCoordinator.RunOperationAsync(
+                selectedTracks,
+                async (track, ct) =>
                 {
-                    var sourceFile = track.Model?.ResolvedFilePath;
-                    if (string.IsNullOrEmpty(sourceFile) || !System.IO.File.Exists(sourceFile))
+                    try
                     {
-                        _logger.LogWarning("Source file not found: {File}", sourceFile);
-                        failCount++;
-                        continue;
+                        var sourceFile = track.Model?.ResolvedFilePath;
+                        if (string.IsNullOrEmpty(sourceFile) || !System.IO.File.Exists(sourceFile))
+                        {
+                            return false;
+                        }
+
+                        var fileName = System.IO.Path.GetFileName(sourceFile);
+                        var targetFile = System.IO.Path.Combine(targetFolder, fileName);
+
+                        // Handle duplicate filenames
+                        int suffix = 1;
+                        while (System.IO.File.Exists(targetFile))
+                        {
+                            var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                            var ext = System.IO.Path.GetExtension(fileName);
+                            targetFile = System.IO.Path.Combine(targetFolder, $"{nameWithoutExt} ({suffix}){ext}");
+                            suffix++;
+                        }
+
+                        System.IO.File.Copy(sourceFile, targetFile, false);
+                        return true;
                     }
-
-                    var fileName = System.IO.Path.GetFileName(sourceFile);
-                    var targetFile = System.IO.Path.Combine(targetFolder, fileName);
-
-                    // Handle duplicate filenames
-                    int suffix = 1;
-                    while (System.IO.File.Exists(targetFile))
+                    catch (Exception ex)
                     {
-                        var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(fileName);
-                        var ext = System.IO.Path.GetExtension(fileName);
-                        targetFile = System.IO.Path.Combine(targetFolder, $"{nameWithoutExt} ({suffix}){ext}");
-                        suffix++;
+                        _logger.LogError(ex, "Failed to copy track: {Title}", track.Title);
+                        return false;
                     }
+                },
+                "Copy to Folder"
+            );
 
-                    System.IO.File.Copy(sourceFile, targetFile, false);
-                    _logger.LogInformation("📂 Copied {Current}/{Total}: {File}", successCount + failCount, selectedTracks.Count, fileName);
-                    successCount++;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to copy track: {Title}", track.Title);
-                    failCount++;
-                }
-            }
-
-            _logger.LogInformation("Copy complete: {Success} succeeded, {Fail} failed", successCount, failCount);
             SelectedTracks.Clear();
         }
         catch (Exception ex)
@@ -742,11 +750,17 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         
         if (!selectedTracks.Any()) return;
 
-        _logger.LogInformation("Bulk retry for {Count} tracks", selectedTracks.Count);
-        foreach (var track in selectedTracks)
-        {
-            track.Resume();
-        }
+        if (_bulkCoordinator.IsRunning) return;
+
+        await _bulkCoordinator.RunOperationAsync(
+            selectedTracks,
+            async (track, ct) =>
+            {
+                track.Resume();
+                return true;
+            },
+            "Bulk Retry"
+        );
         
         // Ensure DownloadManager resumes if paused
         _ = _downloadManager.StartAsync();
@@ -761,34 +775,42 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         
         if (!selectedTracks.Any()) return;
 
-        _logger.LogInformation("Bulk cancel for {Count} tracks", selectedTracks.Count);
-        foreach (var track in selectedTracks)
-        {
-            track.Cancel();
-        }
+        if (_bulkCoordinator.IsRunning) return;
+
+        await _bulkCoordinator.RunOperationAsync(
+            selectedTracks,
+            async (track, ct) =>
+            {
+                track.Cancel();
+                return true;
+            },
+            "Bulk Cancel"
+        );
         SelectedTracks.Clear();
     }
 
     private async Task ExecuteBulkReEnrichAsync()
     {
         var selectedTracks = SelectedTracks.ToList();
-        
         if (!selectedTracks.Any()) return;
 
-        _logger.LogInformation("Bulk re-enrich for {Count} tracks", selectedTracks.Count);
-        
-        foreach (var track in selectedTracks)
-        {
-            if (track.Model != null)
+        if (_bulkCoordinator.IsRunning) return;
+
+        await _bulkCoordinator.RunOperationAsync(
+            selectedTracks,
+            async (track, ct) =>
             {
-                // Queue for Spotify metadata lookup and tag writing
-                await _enrichmentOrchestrator.QueueForEnrichmentAsync(track.Model.TrackUniqueHash, track.Model.PlaylistId);
-                _logger.LogDebug("Queued {Artist} - {Title} for re-enrichment", track.Artist, track.Title);
-            }
-        }
+                if (track.Model != null)
+                {
+                    await _enrichmentOrchestrator.QueueForEnrichmentAsync(track.Model.TrackUniqueHash, track.Model.PlaylistId);
+                    return true;
+                }
+                return false;
+            },
+            "Bulk Re-Enrich"
+        );
         
         SelectedTracks.Clear();
-        _logger.LogInformation("Re-enrichment queued for {Count} tracks - metadata will be refreshed in background", selectedTracks.Count);
     }
 
     private void OnGlobalTrackUpdated(object? sender, PlaylistTrackViewModel e)

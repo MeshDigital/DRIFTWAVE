@@ -35,6 +35,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
     private readonly IFileInteractionService _fileInteractionService;
     private readonly IClipboardService _clipboardService;
     private readonly SearchOrchestrationService _searchOrchestration;
+    private readonly IBulkOperationCoordinator _bulkCoordinator;
 
     private readonly FileNameFormatter _fileNameFormatter;
     
@@ -209,7 +210,8 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         IClipboardService clipboardService,
         SearchOrchestrationService searchOrchestration,
         FileNameFormatter fileNameFormatter,
-        IEventBus eventBus)
+        IEventBus eventBus,
+        IBulkOperationCoordinator bulkCoordinator)
     {
         _logger = logger;
         _soulseek = soulseek;
@@ -224,6 +226,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         _clipboardService = clipboardService;
         _searchOrchestration = searchOrchestration;
         _fileNameFormatter = fileNameFormatter;
+        _bulkCoordinator = bulkCoordinator;
 
         // Reactive Status Updates
         eventBus.GetEvent<TrackStateChangedEvent>()
@@ -243,7 +246,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         var filterPredicate = FilterViewModel.FilterChanged;
 
         _searchResults.Connect()
-            .Filter(FilterViewModel.FilterChanged.Select(f => new Func<AnalyzedSearchResultViewModel, bool>(vm => f(vm.RawResult)))) 
+            .Filter(FilterViewModel.FilterChanged.Select(f => new Func<AnalyzedSearchResultViewModel, bool>(vm => f(vm.RawResult))))
             .Sort(SortExpressionComparer<AnalyzedSearchResultViewModel>.Descending(t => t.TrustScore))
             .ObserveOn(RxApp.MainThreadScheduler)
             .Bind(out _publicSearchResults)
@@ -529,16 +532,19 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
 
         if (!toDownload.Any()) return;
 
-        if (toDownload.Count > 20)
-        {
-            _logger.LogWarning("Batch download > 20 items requested.");
-        }
+        if (_bulkCoordinator.IsRunning) return;
 
-        foreach (var vm in toDownload)
-        {
-             vm.RawResult.Status = TrackStatus.Pending;
-             _downloadManager.EnqueueTrack(vm.RawResult.Model);
-        }
+        await _bulkCoordinator.RunOperationAsync(
+            toDownload,
+            async (vm, ct) =>
+            {
+                vm.RawResult.Status = TrackStatus.Pending;
+                _downloadManager.EnqueueTrack(vm.RawResult.Model);
+                return true;
+            },
+            "Batch Download"
+        );
+
         StatusText = $"Queued {toDownload.Count} downloads";
     }
 

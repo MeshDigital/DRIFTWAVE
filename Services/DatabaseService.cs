@@ -26,6 +26,95 @@ public class DatabaseService
         _logger = logger;
     }
 
+    private Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? _currentTransaction;
+    private AppDbContext? _transactionContext;
+
+    public async Task BeginTransactionAsync()
+    {
+        await _writeSemaphore.WaitAsync();
+        try
+        {
+            _transactionContext = new AppDbContext();
+            _currentTransaction = await _transactionContext.Database.BeginTransactionAsync();
+        }
+        catch (Exception ex)
+        {
+            _writeSemaphore.Release();
+            _logger.LogError(ex, "Failed to begin database transaction");
+            throw;
+        }
+    }
+
+    public async Task CommitTransactionAsync()
+    {
+        if (_currentTransaction == null || _transactionContext == null)
+            throw new InvalidOperationException("No active transaction to commit");
+
+        try
+        {
+            await _transactionContext.SaveChangesAsync();
+            await _currentTransaction.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to commit database transaction");
+            throw;
+        }
+        finally
+        {
+            await CleanupTransactionAsync();
+            _writeSemaphore.Release();
+        }
+    }
+
+    public async Task RollbackTransactionAsync()
+    {
+        if (_currentTransaction == null) return;
+
+        try
+        {
+            await _currentTransaction.RollbackAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to rollback database transaction");
+        }
+        finally
+        {
+            await CleanupTransactionAsync();
+            _writeSemaphore.Release();
+        }
+    }
+
+    private async Task CleanupTransactionAsync()
+    {
+        if (_currentTransaction != null)
+        {
+            await _currentTransaction.DisposeAsync();
+            _currentTransaction = null;
+        }
+        if (_transactionContext != null)
+        {
+            await _transactionContext.DisposeAsync();
+            _transactionContext = null;
+        }
+    }
+
+    public async Task RunInTransactionAsync(Func<Task> action)
+    {
+        await BeginTransactionAsync();
+        try
+        {
+            await action();
+            await CommitTransactionAsync();
+        }
+        catch
+        {
+            await RollbackTransactionAsync();
+            throw;
+        }
+    }
+
     public async Task InitAsync()
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -1184,17 +1273,17 @@ public class DatabaseService
     public async Task SaveTrackAsync(TrackEntity track)
     {
         const int maxRetries = 5;
-        
-        // Serialize all database writes to prevent SQLite locking
-        await _writeSemaphore.WaitAsync();
+        var context = _transactionContext ?? new AppDbContext();
+        bool isInsideTransaction = _transactionContext != null;
+
+        if (!isInsideTransaction) await _writeSemaphore.WaitAsync();
+
         try
         {
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
                 try
                 {
-                    using var context = new AppDbContext();
-
                     // Find existing entity by GlobalId (primary key)
                     var existingTrack = await context.Tracks
                         .FirstOrDefaultAsync(t => t.GlobalId == track.GlobalId);
@@ -1246,13 +1335,15 @@ public class DatabaseService
                         existingTrack.CompletedAt = track.CompletedAt;
 
                         // Don't update AddedAt - preserve original
-                        // context.Tracks.Update() is not needed - EF Core tracks changes automatically
                     }
 
-                    await context.SaveChangesAsync();
+                    if (!isInsideTransaction)
+                    {
+                        await context.SaveChangesAsync();
+                    }
                     return; // Success - exit method
                 }
-                catch (DbUpdateException ex) when (ex.InnerException is SqliteException sqliteEx && sqliteEx.SqliteErrorCode == 5)
+                catch (DbUpdateException ex) when (ex.InnerException is SqliteException sqliteEx && sqliteEx.SqliteErrorCode == 5 && !isInsideTransaction)
                 {
                     // SQLite Error 5: Database is locked
                     if (attempt < maxRetries - 1)
@@ -1260,7 +1351,7 @@ public class DatabaseService
                         _logger.LogWarning(
                             "SQLite database locked saving track {GlobalId}, attempt {Attempt}/{Max}. Retrying...", 
                             track.GlobalId, attempt + 1, maxRetries);
-                        await Task.Delay(100 * (attempt + 1)); // Exponential backoff: 100ms, 200ms, 300ms, 400ms
+                        await Task.Delay(100 * (attempt + 1)); // Exponential backoff
                         continue; // Retry
                     }
                     else
@@ -1271,14 +1362,14 @@ public class DatabaseService
                         throw;
                     }
                 }
-                catch (DbUpdateConcurrencyException ex)
+                catch (DbUpdateConcurrencyException ex) when (!isInsideTransaction)
                 {
                     if (attempt < maxRetries - 1)
                     {
                         // Retry after a brief delay
                         _logger.LogWarning("Concurrency conflict saving track {GlobalId}, attempt {Attempt}/{Max}. Retrying...", 
                             track.GlobalId, attempt + 1, maxRetries);
-                        await Task.Delay(50 * (attempt + 1)); // Exponential backoff: 50ms, 100ms, 150ms, 200ms
+                        await Task.Delay(50 * (attempt + 1));
                         continue;
                     }
                     else
@@ -1292,13 +1383,18 @@ public class DatabaseService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Unexpected error saving track {GlobalId}", track.GlobalId);
-                    throw;
+                    if (isInsideTransaction) throw;
+                    break;
                 }
             }
         }
         finally
         {
-            _writeSemaphore.Release();
+            if (!isInsideTransaction)
+            {
+                _writeSemaphore.Release();
+                await context.DisposeAsync();
+            }
         }
     }
     
@@ -1344,64 +1440,84 @@ public class DatabaseService
     /// </summary>
     public async Task<List<Guid>> UpdatePlaylistTrackStatusAndRecalculateJobsAsync(string trackUniqueHash, TrackStatus newStatus, string? resolvedPath)
     {
-        using var context = new AppDbContext();
+        var context = _transactionContext ?? new AppDbContext();
+        bool isInsideTransaction = _transactionContext != null;
 
-        // 1. Find all PlaylistTrack entries for this global track hash
-        var playlistTracks = await context.PlaylistTracks
-            .Where(pt => pt.TrackUniqueHash == trackUniqueHash)
-            .ToListAsync();
-
-        if (!playlistTracks.Any()) return new List<Guid>();
-
-        var distinctJobIds = playlistTracks.Select(pt => pt.PlaylistId).Distinct().ToList();
-
-        // 2. Update their status in memory
-        foreach (var pt in playlistTracks)
+        try
         {
-            pt.Status = newStatus;
-            
-            if (newStatus == TrackStatus.Downloaded || newStatus == TrackStatus.Failed || newStatus == TrackStatus.Skipped)
-            {
-                pt.CompletedAt = DateTime.UtcNow;
-            }
+            if (!isInsideTransaction) await _writeSemaphore.WaitAsync();
 
-            if (!string.IsNullOrEmpty(resolvedPath))
+            try
             {
-                pt.ResolvedFilePath = resolvedPath;
+                // 1. Find all PlaylistTrack entries for this global track hash
+                var playlistTracks = await context.PlaylistTracks
+                    .Where(pt => pt.TrackUniqueHash == trackUniqueHash)
+                    .ToListAsync();
+
+                if (!playlistTracks.Any()) return new List<Guid>();
+
+                var distinctJobIds = playlistTracks.Select(pt => pt.PlaylistId).Distinct().ToList();
+
+                // 2. Update their status in memory
+                foreach (var pt in playlistTracks)
+                {
+                    pt.Status = newStatus;
+                    
+                    if (newStatus == TrackStatus.Downloaded || newStatus == TrackStatus.Failed || newStatus == TrackStatus.Skipped)
+                    {
+                        pt.CompletedAt = DateTime.UtcNow;
+                    }
+
+                    if (!string.IsNullOrEmpty(resolvedPath))
+                    {
+                        pt.ResolvedFilePath = resolvedPath;
+                    }
+                }
+                
+                // 3. Fetch all affected jobs and all their related tracks
+                var jobsToUpdate = await context.Projects
+                    .Where(j => distinctJobIds.Contains(j.Id))
+                    .ToListAsync();
+
+                var allRelatedTracks = await context.PlaylistTracks
+                    .Where(t => distinctJobIds.Contains(t.PlaylistId))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // 4. Recalculate counts for each job
+                foreach (var job in jobsToUpdate)
+                {
+                    var currentJobTracks = allRelatedTracks
+                        .Where(t => t.PlaylistId == job.Id && t.TrackUniqueHash != trackUniqueHash)
+                        .ToList();
+                    currentJobTracks.AddRange(playlistTracks.Where(pt => pt.PlaylistId == job.Id));
+
+                    job.SuccessfulCount = currentJobTracks.Count(t => t.Status == TrackStatus.Downloaded);
+                    job.FailedCount = currentJobTracks.Count(t => t.Status == TrackStatus.Failed || t.Status == TrackStatus.Skipped);
+                }
+
+                // 5. Update Library Health stats
+                await UpdateLibraryHealthAsync(context);
+
+                // 6. Save changes
+                if (!isInsideTransaction)
+                {
+                    await context.SaveChangesAsync();
+                }
+                
+                _logger.LogInformation("Updated status for track {Hash}, affecting {TrackCount} playlist entries.", trackUniqueHash, playlistTracks.Count);
+
+                return distinctJobIds;
+            }
+            finally
+            {
+                if (!isInsideTransaction) _writeSemaphore.Release();
             }
         }
-        
-        // 3. Fetch all affected jobs and all their related tracks in two efficient queries
-        var jobsToUpdate = await context.Projects
-            .Where(j => distinctJobIds.Contains(j.Id))
-            .ToListAsync();
-
-        var allRelatedTracks = await context.PlaylistTracks
-            .Where(t => distinctJobIds.Contains(t.PlaylistId))
-            .AsNoTracking() // Use NoTracking for the read-only calculation part
-            .ToListAsync();
-
-        // 4. Recalculate counts for each job in memory
-        foreach (var job in jobsToUpdate)
+        finally
         {
-            // Combine the already-updated tracks with the other tracks for this job
-            var currentJobTracks = allRelatedTracks
-                .Where(t => t.PlaylistId == job.Id && t.TrackUniqueHash != trackUniqueHash)
-                .ToList();
-            currentJobTracks.AddRange(playlistTracks.Where(pt => pt.PlaylistId == job.Id));
-
-            job.SuccessfulCount = currentJobTracks.Count(t => t.Status == TrackStatus.Downloaded);
-            job.FailedCount = currentJobTracks.Count(t => t.Status == TrackStatus.Failed || t.Status == TrackStatus.Skipped);
+            if (!isInsideTransaction) await context.DisposeAsync();
         }
-
-        // 5. Update Library Health stats (Write-Behind Cache)
-        await UpdateLibraryHealthAsync(context);
-
-        // 6. Save all changes (track status and job counts) in a single transaction
-        await context.SaveChangesAsync();
-        _logger.LogInformation("Updated status for track {Hash}, affecting {TrackCount} playlist entries and recalculating {JobCount} jobs.", trackUniqueHash, playlistTracks.Count, jobsToUpdate.Count);
-
-        return distinctJobIds;
     }
 
     // ===== LibraryEntry Methods =====
@@ -1807,25 +1923,41 @@ public class DatabaseService
 
     public async Task SavePlaylistTrackAsync(PlaylistTrackEntity track)
     {
-        using var context = new AppDbContext();
-
-        // Check if track already exists in database to decide between Add (INSERT) or Update (UPDATE)
-        var exists = await context.PlaylistTracks.AnyAsync(t => t.Id == track.Id);
-
-        if (exists)
+        var context = _transactionContext ?? new AppDbContext();
+        try
         {
-            // Update existing track
-            context.PlaylistTracks.Update(track);
-        }
-        else
-        {
-            // Add new track
-            track.AddedAt = DateTime.UtcNow;
-            context.PlaylistTracks.Add(track);
-        }
+            if (_transactionContext == null) await _writeSemaphore.WaitAsync();
 
-        await UpdatePlaylistJobCountersAsync(context, track.PlaylistId);
-        await context.SaveChangesAsync();
+            try
+            {
+                // Check if track already exists in database to decide between Add (INSERT) or Update (UPDATE)
+                var exists = await context.PlaylistTracks.AnyAsync(t => t.Id == track.Id);
+
+                if (exists)
+                {
+                    // Update existing track
+                    context.PlaylistTracks.Update(track);
+                }
+                else
+                {
+                    // Add new track
+                    track.AddedAt = DateTime.UtcNow;
+                    context.PlaylistTracks.Add(track);
+                }
+
+                await UpdatePlaylistJobCountersAsync(context, track.PlaylistId);
+                
+                if (_transactionContext == null) await context.SaveChangesAsync();
+            }
+            finally
+            {
+                if (_transactionContext == null) _writeSemaphore.Release();
+            }
+        }
+        finally
+        {
+            if (_transactionContext == null) await context.DisposeAsync();
+        }
     }
 
     private static async Task UpdatePlaylistJobCountersAsync(AppDbContext context, Guid playlistId)

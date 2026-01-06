@@ -66,7 +66,6 @@
                     </Grid>
                     
                     <TextBlock Text="{Binding Processed, StringFormat='{}{0} of {1} items processed'}"
-                               BindingContext="{Binding}"
                                HorizontalAlignment="Center"
                                FontSize="11"
                                Foreground="#666"/>

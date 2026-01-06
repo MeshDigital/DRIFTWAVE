@@ -699,7 +699,8 @@ public partial class App : Application
                 sp.GetRequiredService<IEventBus>(),
                 sp.GetRequiredService<AppConfig>(),
                 sp.GetRequiredService<MetadataEnrichmentOrchestrator>(),
-                sp.GetRequiredService<AnalysisQueueService>()
+                sp.GetRequiredService<AnalysisQueueService>(),
+                sp.GetRequiredService<IBulkOperationCoordinator>()
             );
         });
         services.AddTransient<ViewModels.Library.TrackOperationsViewModel>();

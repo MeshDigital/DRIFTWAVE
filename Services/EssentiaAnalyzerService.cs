@@ -193,6 +193,12 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 using var process = new Process { StartInfo = startInfo };
                 process.Start();
                 
+                // Phase 11.5: Register with Job Object for Windows zombie prevention
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    ProcessJobTracker.RegisterProcess(process);
+                }
+
                 // Track process for cleanup
                 try 
                 {
