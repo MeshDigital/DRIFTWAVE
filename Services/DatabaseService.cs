@@ -3391,6 +3391,17 @@ public class DatabaseService
                 }
             }
             
+            // 5. AudioFeatures Table Columns
+            if (TableExists("AudioFeatures"))
+            {
+                if (!ColumnExists("AudioFeatures", "AiEmbeddingJson"))
+                {
+                    _logger.LogInformation("Patching Schema: Adding AiEmbeddingJson to AudioFeatures...");
+                    command.CommandText = @"ALTER TABLE ""AudioFeatures"" ADD COLUMN ""AiEmbeddingJson"" TEXT NULL;";
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+            
             _logger.LogInformation("Schema patching completed.");
         }
         catch (Exception ex)
