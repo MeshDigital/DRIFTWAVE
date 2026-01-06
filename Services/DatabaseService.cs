@@ -3305,6 +3305,35 @@ public class DatabaseService
                 await command.ExecuteNonQueryAsync();
             }
             
+            // 4. TechnicalDetails Table Columns (for existing tables)
+            if (TableExists("TechnicalDetails"))
+            {
+                if (!ColumnExists("TechnicalDetails", "IsPrepared"))
+                {
+                    _logger.LogInformation("Patching Schema: Adding IsPrepared to TechnicalDetails...");
+                    command.CommandText = @"ALTER TABLE ""TechnicalDetails"" ADD COLUMN ""IsPrepared"" INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
+                if (!ColumnExists("TechnicalDetails", "CurationConfidence"))
+                {
+                    _logger.LogInformation("Patching Schema: Adding CurationConfidence to TechnicalDetails...");
+                    command.CommandText = @"ALTER TABLE ""TechnicalDetails"" ADD COLUMN ""CurationConfidence"" INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
+                if (!ColumnExists("TechnicalDetails", "ProvenanceJson"))
+                {
+                    _logger.LogInformation("Patching Schema: Adding ProvenanceJson to TechnicalDetails...");
+                    command.CommandText = @"ALTER TABLE ""TechnicalDetails"" ADD COLUMN ""ProvenanceJson"" TEXT NULL;";
+                    await command.ExecuteNonQueryAsync();
+                }
+                if (!ColumnExists("TechnicalDetails", "IsReviewNeeded"))
+                {
+                    _logger.LogInformation("Patching Schema: Adding IsReviewNeeded to TechnicalDetails...");
+                    command.CommandText = @"ALTER TABLE ""TechnicalDetails"" ADD COLUMN ""IsReviewNeeded"" INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+            
             _logger.LogInformation("Schema patching completed.");
         }
         catch (Exception ex)
