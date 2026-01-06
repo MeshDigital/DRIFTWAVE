@@ -280,7 +280,7 @@ public class LibraryViewModel : INotifyPropertyChanged, IDisposable
         });
         CloseInspectorCommand = new RelayCommand<object>(_ => IsInspectorOpen = false); // NEW
         IsInspectorOpen = false; // NEW
-        AnalyzeAlbumCommand = new AsyncRelayCommand<PlaylistJob>(job => ExecuteAnalyzeAlbumAsync(job?.Name));
+        AnalyzeAlbumCommand = new AsyncRelayCommand<string>(ExecuteAnalyzeAlbumAsync);
         AnalyzeTrackCommand = new SLSKDONET.Views.RelayCommand<PlaylistTrackViewModel>(ExecuteAnalyzeTrack);
         ExportPlaylistCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportPlaylistAsync);
         AutoSortCommand = new AsyncRelayCommand(ExecuteAutoSortAsync);
