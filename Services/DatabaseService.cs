@@ -3383,6 +3383,12 @@ public class DatabaseService
                     command.CommandText = @"ALTER TABLE ""TechnicalDetails"" ADD COLUMN ""IsReviewNeeded"" INTEGER NOT NULL DEFAULT 0;";
                     await command.ExecuteNonQueryAsync();
                 }
+                if (!ColumnExists("TechnicalDetails", "PrimaryGenre"))
+                {
+                    _logger.LogInformation("Patching Schema: Adding PrimaryGenre to TechnicalDetails...");
+                    command.CommandText = @"ALTER TABLE ""TechnicalDetails"" ADD COLUMN ""PrimaryGenre"" TEXT NULL;";
+                    await command.ExecuteNonQueryAsync();
+                }
             }
             
             _logger.LogInformation("Schema patching completed.");
