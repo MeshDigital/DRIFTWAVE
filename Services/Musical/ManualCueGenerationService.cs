@@ -28,7 +28,8 @@ public class ManualCueGenerationService
     private readonly IUniversalCueService _universalCueService;
     private readonly AppConfig _appConfig;
     private readonly DatabaseService _databaseService;
-    private readonly ILibraryService _libraryService; // Added for playlist track retrieval
+    private readonly ILibraryService _libraryService;
+    private readonly WaveformAnalysisService _waveformService;
 
     public ManualCueGenerationService(
         ILogger<ManualCueGenerationService> logger,
@@ -38,7 +39,8 @@ public class ManualCueGenerationService
         IUniversalCueService universalCueService,
         AppConfig appConfig,
         DatabaseService databaseService,
-        ILibraryService libraryService)
+        ILibraryService libraryService,
+        WaveformAnalysisService waveformService)
     {
         _logger = logger;
         _essentiaService = essentiaService;
@@ -48,6 +50,7 @@ public class ManualCueGenerationService
         _appConfig = appConfig;
         _databaseService = databaseService;
         _libraryService = libraryService;
+        _waveformService = waveformService;
     }
 
     /// <summary>
@@ -158,8 +161,22 @@ public class ManualCueGenerationService
                 // Continue despite tagging failure? Yes.
             }
 
-            // 6. Save to Database 
-            await SaveTrackDataAsync(track, features, cues);
+            // 6. Generate Waveform (FFmpeg tri-band analysis)
+            WaveformAnalysisData? waveformData = null;
+            try
+            {
+                _logger.LogDebug("Generating waveform for {Hash}...", track.TrackUniqueHash);
+                waveformData = await _waveformService.GenerateWaveformAsync(track.ResolvedFilePath, cancellationToken);
+                _logger.LogDebug("Waveform generated: {PeakCount} points", waveformData.PeakData.Length);
+            }
+            catch (Exception waveEx)
+            {
+                _logger.LogWarning(waveEx, "Failed to generate waveform for {FilePath}", track.ResolvedFilePath);
+                // Continue without waveform data
+            }
+
+            // 7. Save to Database 
+            await SaveTrackDataAsync(track, features, cues, waveformData);
 
             return true;
         }
@@ -170,7 +187,7 @@ public class ManualCueGenerationService
         }
     }
 
-    private async Task SaveTrackDataAsync(PlaylistTrack track, AudioFeaturesEntity features, List<OrbitCue> cues)
+    private async Task SaveTrackDataAsync(PlaylistTrack track, AudioFeaturesEntity features, List<OrbitCue> cues, WaveformAnalysisData? waveformData)
     {
         // 1. Update global library track features
         var globalTrack = await _databaseService.FindTrackAsync(track.TrackUniqueHash);
@@ -185,17 +202,16 @@ public class ManualCueGenerationService
              await _databaseService.SaveTrackAsync(globalTrack);
         }
 
-        // 2. Update the specific playlist track entry
+        // 2. Persist AudioFeatures to database (for TrackInspector forensics)
+        await _databaseService.SaveAudioFeaturesAsync(features);
+
+        // 3. Update the specific playlist track entry
         track.CuePointsJson = globalTrack!.CuePointsJson;
         track.BPM = globalTrack.BPM;
         track.MusicalKey = globalTrack.MusicalKey;
         track.Energy = globalTrack.Energy;
         track.Danceability = globalTrack.Danceability;
         track.IsPrepared = true;
-        
-        // Convert PlaylistTrack model back to entity for saving
-        // This assumes DatabaseService has a way to save PlaylistTrack models or we map it here.
-        // Actually, DatabaseService.SavePlaylistTrackAsync takes a PlaylistTrackEntity.
         
         var entity = new PlaylistTrackEntity
         {
@@ -214,10 +230,25 @@ public class ManualCueGenerationService
             Danceability = track.Danceability,
             IsPrepared = track.IsPrepared,
             AddedAt = track.AddedAt
-            // Note: IsReviewNeeded is not persisted on PlaylistTrackEntity
         };
         
         await _databaseService.SavePlaylistTrackAsync(entity);
+
+        // 4. Persist TechnicalDetails with waveform data (if available)
+        if (waveformData != null)
+        {
+            var technicalDetails = await _databaseService.GetOrCreateTechnicalDetailsAsync(track.Id);
+            technicalDetails.WaveformData = waveformData.PeakData;
+            technicalDetails.RmsData = waveformData.RmsData;
+            technicalDetails.LowData = waveformData.LowData;
+            technicalDetails.MidData = waveformData.MidData;
+            technicalDetails.HighData = waveformData.HighData;
+            technicalDetails.CuePointsJson = System.Text.Json.JsonSerializer.Serialize(cues);
+            technicalDetails.IsPrepared = true;
+            technicalDetails.LastUpdated = DateTime.UtcNow;
+            
+            await _databaseService.SaveTechnicalDetailsAsync(technicalDetails);
+        }
     }
 }
 

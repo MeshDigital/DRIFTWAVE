@@ -1960,6 +1960,57 @@ public class DatabaseService
         }
     }
 
+    /// <summary>
+    /// Saves or updates an AudioFeatures entity (Essentia analysis results).
+    /// </summary>
+    public async Task SaveAudioFeaturesAsync(AudioFeaturesEntity features)
+    {
+        var context = _transactionContext ?? new AppDbContext();
+        try
+        {
+            if (_transactionContext == null) await _writeSemaphore.WaitAsync();
+
+            try
+            {
+                var existing = await context.AudioFeatures.FirstOrDefaultAsync(f => f.TrackUniqueHash == features.TrackUniqueHash);
+                if (existing != null)
+                {
+                    context.AudioFeatures.Remove(existing);
+                }
+                context.AudioFeatures.Add(features);
+
+                if (_transactionContext == null) await context.SaveChangesAsync();
+            }
+            finally
+            {
+                if (_transactionContext == null) _writeSemaphore.Release();
+            }
+        }
+        finally
+        {
+            if (_transactionContext == null) await context.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Gets existing TechnicalDetails or creates a new one for the given PlaylistTrack.
+    /// </summary>
+    public async Task<TrackTechnicalEntity> GetOrCreateTechnicalDetailsAsync(Guid playlistTrackId)
+    {
+        using var context = new AppDbContext();
+        var existing = await context.TechnicalDetails.FirstOrDefaultAsync(t => t.PlaylistTrackId == playlistTrackId);
+        
+        if (existing != null)
+            return existing;
+
+        return new TrackTechnicalEntity
+        {
+            Id = Guid.NewGuid(),
+            PlaylistTrackId = playlistTrackId,
+            LastUpdated = DateTime.UtcNow
+        };
+    }
+
     private static async Task UpdatePlaylistJobCountersAsync(AppDbContext context, Guid playlistId)
     {
         var job = await context.Projects.FirstOrDefaultAsync(j => j.Id == playlistId);
