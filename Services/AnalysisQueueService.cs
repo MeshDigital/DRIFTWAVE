@@ -590,7 +590,11 @@ public class AnalysisWorker : BackgroundService
         {
             if (track.TechnicalDetails == null)
             {
-                track.TechnicalDetails = new TrackTechnicalEntity { Id = track.Id };
+                track.TechnicalDetails = new TrackTechnicalEntity 
+                { 
+                    Id = Guid.NewGuid(),
+                    PlaylistTrackId = track.Id 
+                };
             }
             
             track.TechnicalDetails.WaveformData = result.WaveformData.PeakData;
