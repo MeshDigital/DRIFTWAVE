@@ -281,11 +281,11 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     data.Tonal?.KeyEdma?.Scale ?? "Unknown",
                     data.Tonal?.KeyEdma?.Strength ?? 0);
                 _logger.LogInformation("   ├─ Danceability: {Dance} | Voice/Instrumental: {Voice}",
-                    data.HighLevel?.Danceability?.AllDanceability ?? 0,
-                    data.HighLevel?.VoiceInstrumental?.AllVoice ?? 0);
+                    data.HighLevel?.Danceability?.All?.Danceable ?? 0,
+                    data.HighLevel?.VoiceInstrumental?.All?.Voice ?? 0);
                 _logger.LogInformation("   └─ Moods - Happy: {Happy} | Aggressive: {Aggressive}",
-                    data.HighLevel?.MoodHappy?.AllHappy ?? 0,
-                    data.HighLevel?.MoodAggressive?.AllAggressive ?? 0);
+                    data.HighLevel?.MoodHappy?.All?.Happy ?? 0,
+                    data.HighLevel?.MoodAggressive?.All?.Aggressive ?? 0);
 
                 // Map to AudioFeaturesEntity
                 var entity = new AudioFeaturesEntity
