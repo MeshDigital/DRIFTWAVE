@@ -322,7 +322,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     MoodConfidence = CalculateMoodConfidence(data.HighLevel),
 
                     // Advanced Harmonic Mixing
-                    ChordProgression = FormatChordProgression(data.Tonal?.ChordsKey),
+                    // ChordProgression = FormatChordProgression(data.Tonal?.ChordsKey), // Commented out - ChordsKey now JsonElement
                     
                     // Metadata
                     AnalysisVersion = ANALYSIS_VERSION,
