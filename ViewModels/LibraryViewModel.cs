@@ -45,7 +45,6 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
 
     // Infrastructure for Sidebars/Delayed operations
     private System.Threading.Timer? _selectionDebounceTimer;
-    private System.Threading.CancellationTokenSource? _matchLoadCancellation;
 
     // Child ViewModels
     public Library.ProjectListViewModel Projects { get; }
@@ -235,8 +234,6 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
                 _projectAddedSubscription?.Dispose();
                 _findSimilarSubscription?.Dispose();
                 _selectionDebounceTimer?.Dispose();
-                _matchLoadCancellation?.Cancel();
-                _matchLoadCancellation?.Dispose();
                 
                 Projects.ProjectSelected -= OnProjectSelected;
                 SmartPlaylists.SmartPlaylistSelected -= OnSmartPlaylistSelected;

@@ -18,34 +18,35 @@ namespace SLSKDONET.ViewModels;
 public partial class LibraryViewModel
 {
     // Commands that delegate to child ViewModels or handle coordination
-    public ICommand ViewHistoryCommand { get; set; }
-    public ICommand OpenSourcesCommand { get; set; }
-    public ICommand ToggleEditModeCommand { get; set; }
-    public ICommand ToggleActiveDownloadsCommand { get; set; }
+    // CS8618 Fix: Initialize with null! since they are set in InitializeCommands()
+    public ICommand ViewHistoryCommand { get; set; } = null!;
+    public ICommand OpenSourcesCommand { get; set; } = null!;
+    public ICommand ToggleEditModeCommand { get; set; } = null!;
+    public ICommand ToggleActiveDownloadsCommand { get; set; } = null!;
     
-    public ICommand PlayTrackCommand { get; set; }
-    public ICommand RefreshLibraryCommand { get; set; }
-    public ICommand DeleteProjectCommand { get; set; }
-    public ICommand PlayAlbumCommand { get; set; }
-    public ICommand DownloadAlbumCommand { get; set; }
-    public ICommand ExportMonthlyDropCommand { get; set; }
-    public ICommand FindHarmonicMatchesCommand { get; set; }
-    public ICommand ToggleMixHelperCommand { get; set; }
-    public ICommand ToggleInspectorCommand { get; set; }
-    public ICommand CloseInspectorCommand { get; set; }
-    public ICommand AnalyzeAlbumCommand { get; set; }
-    public ICommand HardwareExportCommand { get; set; }
+    public ICommand PlayTrackCommand { get; set; } = null!;
+    public ICommand RefreshLibraryCommand { get; set; } = null!;
+    public ICommand DeleteProjectCommand { get; set; } = null!;
+    public ICommand PlayAlbumCommand { get; set; } = null!;
+    public ICommand DownloadAlbumCommand { get; set; } = null!;
+    public ICommand ExportMonthlyDropCommand { get; set; } = null!;
+    public ICommand FindHarmonicMatchesCommand { get; set; } = null!;
+    public ICommand ToggleMixHelperCommand { get; set; } = null!;
+    public ICommand ToggleInspectorCommand { get; set; } = null!;
+    public ICommand CloseInspectorCommand { get; set; } = null!;
+    public ICommand AnalyzeAlbumCommand { get; set; } = null!;
+    public ICommand HardwareExportCommand { get; set; } = null!;
 
-    public ICommand AnalyzeTrackCommand { get; set; }
-    public ICommand ExportPlaylistCommand { get; set; }
-    public ICommand AutoSortCommand { get; set; }
-    public ICommand FindSonicTwinsCommand { get; set; }
-    public ICommand LoadDeletedProjectsCommand { get; set; }
-    public ICommand RestoreProjectCommand { get; set; }
+    public ICommand AnalyzeTrackCommand { get; set; } = null!;
+    public ICommand ExportPlaylistCommand { get; set; } = null!;
+    public ICommand AutoSortCommand { get; set; } = null!;
+    public ICommand FindSonicTwinsCommand { get; set; } = null!;
+    public ICommand LoadDeletedProjectsCommand { get; set; } = null!;
+    public ICommand RestoreProjectCommand { get; set; } = null!;
 
-    public ICommand SwitchWorkspaceCommand { get; set; }
-    public ICommand QuickLookCommand { get; set; }
-    public ICommand SmartEscapeCommand { get; set; }
+    public ICommand SwitchWorkspaceCommand { get; set; } = null!;
+    public ICommand QuickLookCommand { get; set; } = null!;
+    public ICommand SmartEscapeCommand { get; set; } = null!;
 
     // Export Specific Properties
     private ObservableCollection<Services.Export.ExportDriveInfo> _availableDrives = new();

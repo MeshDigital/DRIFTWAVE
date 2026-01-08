@@ -1,3 +1,5 @@
+// CS0618: CustomWeights is obsolete but still used for migration stability
+#pragma warning disable CS0618
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

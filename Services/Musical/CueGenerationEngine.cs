@@ -158,11 +158,11 @@ public class CueGenerationEngine
          // Reconstruct analysis data
          var data = new WaveformAnalysisData
          {
-             RmsData = technicalData.RmsData,
-             LowData = technicalData.LowData,
-             MidData = technicalData.MidData, // Mid is often Green
-             HighData = technicalData.HighData,
-             PeakData = technicalData.WaveformData // Assuming WaveformData is Peaks
+             RmsData = technicalData.RmsData ?? Array.Empty<byte>(),
+             LowData = technicalData.LowData ?? Array.Empty<byte>(),
+             MidData = technicalData.MidData ?? Array.Empty<byte>(),
+             HighData = technicalData.HighData ?? Array.Empty<byte>(),
+             PeakData = technicalData.WaveformData ?? Array.Empty<byte>()
          };
          
          // Estimate duration from RMS length (assuming 100 points/sec)
