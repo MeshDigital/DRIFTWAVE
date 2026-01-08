@@ -128,6 +128,7 @@ public class PlaylistTrack
     public double? Energy { get; set; }
     public double? Danceability { get; set; }
     public double? Valence { get; set; }
+    public string? MoodTag { get; set; }
 
     // Phase 3A: Dual-Truth Metadata
     public double? SpotifyBPM { get; set; }

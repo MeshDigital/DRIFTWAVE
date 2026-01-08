@@ -497,9 +497,28 @@ public class AnalysisWorker : BackgroundService
                 resultContext.WaveformData = await Task.Run(() => waveformAnalyzer.GenerateWaveformAsync(request.FilePath, linkedCts.Token), linkedCts.Token);
                 _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Waveform generated", trackHash);
 
-                // 2. Musical Analysis
-                PublishThrottled(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
-                resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
+                // Phase 13: Demo-Safe Analysis Mode
+                // If a track is marked for demo (or matches a specific pattern), we skip 
+                // intense CPU work and provide deterministic results for a smooth presentation.
+                if (request.FilePath.Contains("DEMO_TRACK", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("🎬 DEMO MODE: Providing deterministic analysis for {Hash}", trackHash);
+                    resultContext.MusicalResult = new AudioFeaturesEntity 
+                    { 
+                        TrackUniqueHash = trackHash,
+                        Danceability = 0.85f,
+                        Energy = 0.9f,
+                        MoodTag = "Happy",
+                        MoodConfidence = 0.95f
+                    };
+                    analysisSucceeded = true;
+                }
+                else
+                {
+                    // 2. Musical Analysis
+                    PublishThrottled(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
+                    resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
+                }
 
                 // 3. Technical Analysis
                 PublishThrottled(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));

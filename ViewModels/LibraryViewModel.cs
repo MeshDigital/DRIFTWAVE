@@ -148,6 +148,31 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
 
     partial void InitializeCommands();
 
+    public LibraryViewModel(
+        ILogger<LibraryViewModel> logger,
+        Library.ProjectListViewModel projects,
+        Library.TrackListViewModel tracks,
+        Library.TrackOperationsViewModel operations,
+        Library.SmartPlaylistViewModel smartPlaylists,
+        INavigationService navigationService,
+        ImportHistoryViewModel importHistoryViewModel,
+        ILibraryService libraryService,
+        IEventBus eventBus,
+        PlayerViewModel playerViewModel,
+        UpgradeScoutViewModel upgradeScout,
+        TrackInspectorViewModel trackInspector,
+        Services.Export.RekordboxService rekordboxService,
+        IDialogService dialogService,
+        INotificationService notificationService,
+        SpotifyEnrichmentService spotifyEnrichmentService,
+        HarmonicMatchService harmonicMatchService,
+        AnalysisQueueService analysisQueueService,
+        Services.Library.SmartSorterService smartSorterService,
+        LibraryCacheService libraryCacheService,
+        Services.Export.IHardwareExportService hardwareExportService,
+        LibrarySourcesViewModel librarySourcesViewModel,
+        IServiceProvider serviceProvider,
+        Services.AI.PersonalClassifierService personalClassifier,
         DatabaseService databaseService,
         SearchFilterViewModel searchFilters,
         ForensicLabViewModel forensicLab)

@@ -148,7 +148,7 @@ public partial class LibraryViewModel
                 // [NEW] Load currently selected track into Forensic Lab
                 if (Tracks.SelectedTracks.FirstOrDefault() is { } selectedTrack)
                 {
-                    _ = _forensicLab.LoadTrackAsync(selectedTrack.UniqueHash);
+                    _ = _forensicLab.LoadTrackAsync(selectedTrack.GlobalId);
                 }
                 break;
             case ActiveWorkspace.Industrial:

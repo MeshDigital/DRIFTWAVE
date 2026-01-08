@@ -71,28 +71,39 @@ public class SafetyFilterService : ISafetyFilterService
             return new SafetyCheckResult(false, "Banned Extension", $"Extension '{ext}' is not allowed.");
         }
 
-        // 2. Fake FLAC Detector (Heuristic: Size vs Duration)
-        if (ext == "flac" && candidate.Length > 0 && candidate.Size.HasValue)
+        // 2. The Accountant: Bitrate vs Size Math
+        // A 320kbps MP3 MUST be approx 2.4MB per minute. 
+        // If it's 1MB per minute, it's a 128k transcode lying about its header.
+        if (candidate.Bitrate > 0 && candidate.Length > 0 && candidate.Size.HasValue)
         {
-            double duration = candidate.Length.Value;
-            double sizeBytes = candidate.Size.Value;
+            double expectedBytes = (candidate.Bitrate * 1000.0 / 8.0) * candidate.Length.Value;
+            double threshold = expectedBytes * 0.65; // Allow 35% variance for VBR and headers
             
-            // Expected FLAC size (approx 900kbps avg, can vary)
-            double kbps = (sizeBytes * 8) / (duration * 1024);
-            
-            if (kbps < 400) // Lower than reasonable FLAC compression
+            if (candidate.Size.Value < threshold)
             {
-                return new SafetyCheckResult(false, "Suspected Fake FLAC", $"Suspicious Size: {kbps:F0}kbps (Typical FLAC > 700kbps)");
+                _logger.LogWarning("Fake Bitrate detected for {Track}: Size {Size} < Threshold {Threshold}", candidate.Title, candidate.Size.Value, threshold);
+                return new SafetyCheckResult(false, "Fake Bitrate (Size Mismatch)", $"Expected ~{expectedBytes / 1024 / 1024:F1}MB, got {candidate.Size.Value / 1024 / 1024:F1}MB");
             }
         }
 
-        // 3. Bitrate Check (Low Quality)
+        // 3. The Bouncer: Regex Blocklist
+        // Guard against null filename
+        if (!string.IsNullOrEmpty(candidate.Filename))
+        {
+            var bouncerRegex = new System.Text.RegularExpressions.Regex(@"\b(ringtone|snippet|preview|sample|teaser)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (bouncerRegex.IsMatch(candidate.Filename))
+            {
+                return new SafetyCheckResult(false, "Keyword Blocked", "Matches restricted content keywords (ringtone/sample/etc)");
+            }
+        }
+
+        // 4. Bitrate Check (Low Quality)
         if (candidate.Bitrate > 0 && candidate.Bitrate < 128)
         {
              return new SafetyCheckResult(false, "Low Quality", $"Bitrate {candidate.Bitrate}kbps is below 128kbps threshold.");
         }
         
-        // 4. Manual Blacklist (Keywords/Users)
+        // 5. Manual Blacklist (Keywords/Users)
         if (IsBlacklisted(candidate))
         {
              return new SafetyCheckResult(false, "Blacklisted", "Matches banned keyword or user.");

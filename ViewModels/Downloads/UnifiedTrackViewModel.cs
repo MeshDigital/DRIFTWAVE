@@ -323,6 +323,48 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public string PreparationStatus => IsPrepared ? "Prepared" : "Raw";
     public Avalonia.Media.IBrush PreparationColor => IsPrepared ? Avalonia.Media.Brushes.DodgerBlue : Avalonia.Media.Brushes.Gray;
 
+    // Phase 13C: Vibe Pills
+    public record VibePill(string Icon, string Label, Avalonia.Media.IBrush Color, string Description);
+    
+    public System.Collections.Generic.IEnumerable<VibePill> VibePills
+    {
+        get
+        {
+            var pills = new System.Collections.Generic.List<VibePill>();
+            
+            // 💃 Dance Pill (High Danceability)
+            if (Model.Danceability > 0.75)
+            {
+                pills.Add(new VibePill("💃", "Dance", Avalonia.Media.Brushes.DeepPink, "High Danceability detected by AI"));
+            }
+            
+            // 🎻 Inst Pill (Instrumental)
+            if (Model.QualityConfidence > 0.8) // High spectral quality often correlates with clean instrumentals/stable phase
+            {
+                 // Actually we'll use a specific threshold based on new fields if available
+                 // For now, let's use the MoodTag if it matches
+                 if (Model.MoodTag == "Relaxed")
+                 {
+                     pills.Add(new VibePill("🎻", "Inst", Avalonia.Media.Brushes.RoyalBlue, "Instrumental / Chill Vibe"));
+                 }
+            }
+
+            // 🔥 Hard Pill (Aggressive/High Energy)
+            if (Model.Energy > 0.8 || Model.MoodTag == "Aggressive")
+            {
+                pills.Add(new VibePill("🔥", "Hard", Avalonia.Media.Brushes.OrangeRed, "High Energy / Aggressive Vibe"));
+            }
+
+            // ✨ Vibe Pill (Primary Genre/Subgenre classification)
+            if (!string.IsNullOrEmpty(DetectedSubGenre))
+            {
+                pills.Add(new VibePill("✨", DetectedSubGenre, VibeColor, $"Genre: {DetectedSubGenre} (Conf: {SubGenreConfidence:P0})"));
+            }
+            
+            return pills;
+        }
+    }
+
     public WaveformAnalysisData WaveformData => new WaveformAnalysisData
     {
         PeakData = Model.WaveformData ?? Array.Empty<byte>(),
@@ -433,6 +475,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 Model.IsPrepared = updatedTrack.IsPrepared;
                 Model.PrimaryGenre = updatedTrack.PrimaryGenre;
                 Model.CuePointsJson = updatedTrack.CuePointsJson;
+                Model.MoodTag = updatedTrack.MoodTag;
                 Model.DetectedSubGenre = updatedTrack.DetectedSubGenre;
                 Model.SubGenreConfidence = updatedTrack.SubGenreConfidence;
                 
@@ -475,6 +518,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 this.RaisePropertyChanged(nameof(DetectedSubGenre));
                 this.RaisePropertyChanged(nameof(VibeColor));
                 this.RaisePropertyChanged(nameof(SubGenreConfidence));
+                this.RaisePropertyChanged(nameof(VibePills));
                 
                 // Curation & Trust
                 this.RaisePropertyChanged(nameof(CurationConfidence));

@@ -179,6 +179,16 @@ public class AudioFeaturesEntity
     /// </summary>
     public float MoodConfidence { get; set; }
 
+    /// <summary>
+    /// Specific confidence for the 'Happy' mood.
+    /// </summary>
+    public float HappyConfidence { get; set; }
+
+    /// <summary>
+    /// Specific confidence for the 'Aggressive' mood.
+    /// </summary>
+    public float AggressiveConfidence { get; set; }
+
     // ============================================
     // Advanced Harmonic Mixing
     // ============================================
