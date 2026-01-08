@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Models;
 using SLSKDONET.Data.Entities;
+using MathNet.Numerics;
+using NAudio.Wave;
+using MathNet.Numerics.IntegralTransforms;
 
 namespace SLSKDONET.Services;
 
@@ -20,28 +23,15 @@ public class SonicAnalysisResult
 {
     public double QualityConfidence { get; set; } // 0.0 - 1.0
     public int FrequencyCutoff { get; set; } // Hz
+    public double DynamicRange { get; set; } // DR Score (Peak - RMS Top 20%)
     public string SpectralHash { get; set; } = string.Empty;
     public bool IsTrustworthy { get; set; }
     public string? Details { get; set; }
 }
 
 /// <summary>
-/// Service for validating audio fidelity using spectral analysis (headless FFmpeg).
-/// 
-/// WHY: Detects transcoded/fake lossless files that pass size checks:
-/// - Upscaled MP3s claiming to be FLAC
-/// - 128kbps files re-encoded to "320kbps"
-/// - Lossy files with frequency cutoffs (16kHz brick wall)
-/// 
-/// HOW: FFmpeg spectral analysis extracts frequency data without decoding full audio.
-/// We look for the "cutoff frequency" where content stops (MP3 encoders cut high freqs).
-/// 
-/// Phase 8 Enhancement: Producer-Consumer pattern for batch processing to prevent CPU/IO spikes.
-/// 
-/// ARCHITECTURE:
-/// - Producer: Analysis requests queued to unbounded channel (never blocks caller)
-/// - Consumers: 2 worker threads (configurable) process queue with FFmpeg
-/// - WHY only 2 workers: FFmpeg is CPU-heavy (80-100% per process), 2 = balance speed/overhead
+/// Service for validating audio fidelity using spectral analysis (FFT) and Dynamic Range calculation.
+/// Uses NAudio for sample access and MathNet.Numerics for FFT.
 /// </summary>
 public class SonicIntegrityService : IDisposable
 {
@@ -51,7 +41,7 @@ public class SonicIntegrityService : IDisposable
     
     // Producer-Consumer pattern for batch analysis
     private readonly Channel<AnalysisRequest> _analysisQueue;
-    private readonly int _maxConcurrency = 2; // WHY: 2 = sweet spot for 4+ core CPUs
+    private readonly int _maxConcurrency = 2; 
     private readonly CancellationTokenSource _cts = new();
     private readonly List<Task> _workerTasks = new();
     private bool _isInitialized = false;
@@ -77,9 +67,6 @@ public class SonicIntegrityService : IDisposable
         _logger.LogInformation("SonicIntegrityService initialized with {Workers} concurrent workers", _maxConcurrency);
     }
 
-    /// <summary>
-    /// Validates FFmpeg availability. Should be called during app startup.
-    /// </summary>
     public async Task<bool> ValidateFfmpegAsync()
     {
         try
@@ -100,66 +87,29 @@ public class SonicIntegrityService : IDisposable
             await process.WaitForExitAsync();
             
             _isInitialized = process.ExitCode == 0;
-            
-            if (_isInitialized)
-            {
-                _logger.LogInformation("FFmpeg validation successful");
-            }
-            else
-            {
-                _logger.LogWarning("FFmpeg validation failed (exit code: {Code})", process.ExitCode);
-            }
-            
             return _isInitialized;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "FFmpeg not found in PATH");
-            _isInitialized = false;
+            _logger.LogError(ex, "FFmpeg validation failed");
             return false;
         }
     }
 
-    /// <summary>
-    /// Returns true if FFmpeg is available and validated.
-    /// </summary>
     public bool IsFfmpegAvailable() => _isInitialized;
 
-    /// <summary>
-    /// Performs spectral analysis on an audio file to detect upscaling or low-quality VBR.
-    /// Uses Producer-Consumer pattern to queue analysis and prevent CPU spikes.
-    /// </summary>
     public async Task<SonicAnalysisResult> AnalyzeTrackAsync(string filePath, string? correlationId = null)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Audio file not found for analysis", filePath);
 
-        if (!_isInitialized)
-        {
-            _logger.LogWarning("FFmpeg not available, skipping sonic analysis for {File}", Path.GetFileName(filePath));
-             if (correlationId != null)
-                 _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "FFmpeg validation failed - skipping sonic check");
-            return new SonicAnalysisResult 
-            { 
-                IsTrustworthy = true, // Assume trustworthy if can't analyze
-                Details = "FFmpeg not available - analysis skipped" 
-            };
-        }
-
-        // Create request with completion source
         var tcs = new TaskCompletionSource<SonicAnalysisResult>();
         var request = new AnalysisRequest(filePath, correlationId ?? Guid.NewGuid().ToString(), tcs);
         
-        // Queue for processing
         await _analysisQueue.Writer.WriteAsync(request);
-        
-        // Wait for result
         return await tcs.Task;
     }
 
-    /// <summary>
-    /// Worker task that processes queued analysis requests.
-    /// </summary>
     private async Task ProcessAnalysisQueueAsync(CancellationToken cancellationToken)
     {
         await foreach (var request in _analysisQueue.Reader.ReadAllAsync(cancellationToken))
@@ -173,8 +123,7 @@ public class SonicIntegrityService : IDisposable
             {
                 _logger.LogError(ex, "Analysis failed for {File}", Path.GetFileName(request.FilePath));
                 
-                // Log failure via forensic logger
-                 _forensicLogger.Error(request.CorrelationId, ForensicStage.IntegrityCheck, "Analysis worker crashed", null, ex);
+                _forensicLogger.Error(request.CorrelationId, ForensicStage.IntegrityCheck, "Analysis worker crashed", null, ex);
 
                 request.CompletionSource.SetResult(new SonicAnalysisResult 
                 { 
@@ -183,174 +132,193 @@ public class SonicIntegrityService : IDisposable
                 });
             }
         }
-
     }
 
-    /// <summary>
-    /// Core analysis logic (extracted from original AnalyzeTrackAsync).
-    /// </summary>
     private async Task<SonicAnalysisResult> PerformAnalysisAsync(string filePath, string correlationId, CancellationToken ct)
     {
         try
         {
-            _logger.LogInformation("Starting sonic integrity analysis for: {File}", Path.GetFileName(filePath));
-            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, "Starting spectral energy distribution scan");
+            _logger.LogInformation("Starting deep forensic analysis for: {File}", Path.GetFileName(filePath));
+            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, "Starting spectral scan & dynamics check");
 
-            // SPECTRAL ANALYSIS SCIENCE:
-            // WHY these specific frequencies:
-            // - MP3 encoders use "psychoacoustic" cutoffs to save space
-            // - 16kHz = 128kbps cutoff (most humans can't hear above this)
-            // - 19kHz = 256kbps cutoff ("transparent" for most music)
-            // - 21kHz = 320kbps/lossless preserves near-ultrasonic content
-            // 
-            // HOW we detect fakes:
-            // - Real 320kbps: energy at 19kHz+ is -30 to -45 dB
-            // - Upscaled 128kbps: energy at 16kHz+ is < -70 dB (brick wall)
-            // - The "brick wall" is unmistakable - it's like a cliff in the spectrogram
-            
-            // Stage 1: Check energy above 16kHz (Cutoff for 128kbps)
-            // WHY: 128kbps MP3 hard-cuts everything above ~16kHz to save bits
-            // If energy < -55dB here, it's either 128kbps or an upscale
-            double energy16k = await GetEnergyAboveFrequencyAsync(filePath, 16000, ct);
-            
-            // Stage 2: Check energy above 19kHz (Cutoff for 256k/320k)
-            double energy19k = await GetEnergyAboveFrequencyAsync(filePath, 19000, ct);
-
-            // Stage 3: Check energy above 21kHz (True Lossless/High-Res)
-            double energy21k = await GetEnergyAboveFrequencyAsync(filePath, 21000, ct);
-
-            _logger.LogDebug("Energy Profile for {File}: 16k={E16}dB, 19k={E19}dB, 21k={E21}dB", 
-                Path.GetFileName(filePath), energy16k, energy19k, energy21k);
+            return await Task.Run(() => 
+            {
+                // 1. Setup Analysis Window
+                // We analyze a 30s chunk from the middle
+                const int analysisDurationSeconds = 30;
                 
-            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, 
-                $"Spectral Energy: 16k={energy16k:F1}dB | 19k={energy19k:F1}dB | 21k={energy21k:F1}dB");
+                using var reader = new AudioFileReader(filePath);
+                var totalDuration = reader.TotalTime.TotalSeconds;
+                var startPosition = totalDuration > analysisDurationSeconds 
+                    ? (totalDuration / 2) - (analysisDurationSeconds / 2) 
+                    : 0;
+                
+                reader.CurrentTime = TimeSpan.FromSeconds(startPosition);
+                
+                // Buffers
+                int sampleRate = reader.WaveFormat.SampleRate;
+                int channels = reader.WaveFormat.Channels;
+                int fftSize = 4096; // 10.7Hz resolution at 44.1kHz
+                var buffer = new float[fftSize];
+                
+                // Statistics
+                var spectrumAccumulator = new double[fftSize / 2];
+                int fftCount = 0;
+                
+                // Dynamic Range
+                double maxPeak = 0;
+                var rmsValues = new List<double>();
+                
+                // samples required for 30s
+                long totalSamplesToRead = (long)(analysisDurationSeconds * sampleRate * channels);
+                long samplesReadTotal = 0;
+                
+                // Processing Loop
+                while (samplesReadTotal < totalSamplesToRead)
+                {
+                    int read = reader.Read(buffer, 0, fftSize);
+                    if (read == 0) break;
+                    
+                    samplesReadTotal += read;
 
-            int cutoff = 0;
-            double confidence = 1.0;
-            bool trustworthy = true;
-            string details = "";
+                    // 1. Dynamic Range Stats (per block)
+                    double sumSquares = 0;
+                    for (int i = 0; i < read; i++)
+                    {
+                        float abs = Math.Abs(buffer[i]);
+                        if (abs > maxPeak) maxPeak = abs;
+                        sumSquares += buffer[i] * buffer[i];
+                    }
+                    rmsValues.Add(Math.Sqrt(sumSquares / read));
 
-            // FORENSIC EVALUATION:
-            // WHY -55dB threshold:
-            // - Natural music content at 16kHz: -20 to -40 dB (cymbals, hi-hats)
-            // - MP3 128kbps cutoff: -70 to -90 dB (encoder removed everything)
-            // - -55dB = midpoint where we're confident it's a cutoff, not just quiet music
-            if (energy16k < -55)
-            {
-                cutoff = 16000;
-                confidence = 0.3; // 30% trustworthy = "probably fake"
-                trustworthy = energy16k > -70; // WHY: -90dB = absolute zero (hard fake)
-                details = "FAKED: Low-quality upscale (128kbps profile)";
-                _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "Severe high-frequency cutoff detected (16kHz)");
-            }
-            else if (energy19k < -55)
-            {
-                cutoff = 19000;
-                confidence = 0.7;
-                details = "MID-QUALITY: 192kbps profile detected";
-                 _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, "Moderate high-frequency attenuation (19kHz)");
-            }
-            else if (energy21k < -50)
-            {
-                cutoff = 21000;
-                confidence = 0.9;
-                details = "HIGH-QUALITY: 320kbps profile detected";
-            }
-            else
-            {
-                cutoff = 22050; // Standard Full Spectrum
-                confidence = 1.0;
-                details = "AUDIOPHILE: Full frequency spectrum confirmed";
-            }
+                    // 2. FFT Analysis (Mono mixdown for spectrum)
+                    // Only run FFT if we have a full buffer
+                    if (read == fftSize)
+                    {
+                        var complexBuffer = new System.Numerics.Complex[fftSize];
+                        var window = Window.Hann(fftSize);
+                        
+                        for (int i = 0; i < fftSize; i++)
+                        {
+                            complexBuffer[i] = new System.Numerics.Complex(buffer[i] * window[i], 0); 
+                        }
 
-            // Simple spectral hash based on energy ratios
-            string spectralHash = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{energy16k:F1}|{energy19k:F1}")).Substring(0, 8);
-            
-            _forensicLogger.Info(correlationId, ForensicStage.IntegrityCheck, $"Analysis Conclusion: {details}");
+                        // Perform FFT
+                        Fourier.Forward(complexBuffer, FourierOptions.Matlab);
+                        
+                        // Accumulate Magnitude
+                        for (int i = 0; i < fftSize / 2; i++)
+                        {
+                            spectrumAccumulator[i] += complexBuffer[i].Magnitude;
+                        }
+                        fftCount++;
+                    }
+                }
+                
+                // -- CALCULATE RESULTS -- //
+                
+                // A. Frequency Cutoff
+                int cutoffFreq = 22050; // Default
+                if (fftCount > 0)
+                {
+                    // Normalize spectrum
+                    for(int i=0; i < spectrumAccumulator.Length; i++) spectrumAccumulator[i] /= fftCount;
+                    
+                    // Find 99% Energy Rolloff
+                    double totalEnergy = spectrumAccumulator.Sum();
+                    double currentEnergy = 0;
+                    int binIndex = spectrumAccumulator.Length - 1;
+                    
+                    for (int i = 0; i < spectrumAccumulator.Length; i++)
+                    {
+                        currentEnergy += spectrumAccumulator[i];
+                        if (currentEnergy / totalEnergy > 0.99) // 99% of energy is below this bin
+                        {
+                            binIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    double freqPerBin = (double)sampleRate / fftSize;
+                    cutoffFreq = (int)(binIndex * freqPerBin);
+                    
+                    _logger.LogDebug($"Detected Cutoff: {cutoffFreq} Hz (Bin {binIndex})");
+                }
+                
+                // B. Dynamic Range (Simplified implementation of DR meter)
+                double drScore = 0;
+                if (rmsValues.Count > 0)
+                {
+                    rmsValues.Sort();
+                    // Take top 20% RMS values
+                    int top20Start = (int)(rmsValues.Count * 0.8);
+                    double top20RmsSum = 0;
+                    for(int i = top20Start; i < rmsValues.Count; i++) top20RmsSum += rmsValues[i];
+                    
+                    double avgTop20Rms = top20RmsSum / (rmsValues.Count - top20Start);
+                    
+                    double peakDb = 20 * Math.Log10(maxPeak);
+                    double rmsDb = 20 * Math.Log10(avgTop20Rms);
+                    
+                    drScore = peakDb - rmsDb;
+                    _logger.LogDebug($"DR Calc: Peak {peakDb:F1}dB, RMS {rmsDb:F1}dB = DR {drScore:F1}");
+                }
 
-            return new SonicAnalysisResult
-            {
-                QualityConfidence = confidence,
-                FrequencyCutoff = cutoff,
-                SpectralHash = spectralHash,
-                IsTrustworthy = trustworthy,
-                Details = details
-            };
+                // C. Interpret Results
+                bool isFake = cutoffFreq < 17000; // Hard cutoff at 16k
+                bool isBrickwalled = drScore < 6;
+                string details = "";
+                double confidence = 1.0;
+                
+                if (isFake)
+                {
+                    details = $"FAKE FLAC: {cutoffFreq/1000}kHz cutoff detected";
+                    confidence = 0.2;
+                     _forensicLogger.Warning(correlationId, ForensicStage.IntegrityCheck, details);
+                }
+                else if (cutoffFreq < 19500)
+                {
+                    details = $"Possible Transcode: {cutoffFreq/1000}kHz cutoff";
+                    confidence = 0.6;
+                }
+                else
+                {
+                    details = "Verified Spectrum";
+                }
+                
+                if (isBrickwalled)
+                {
+                    details += $" | Low Dynamic Range (DR {drScore:F0})";
+                }
+                
+                return new SonicAnalysisResult
+                {
+                    FrequencyCutoff = cutoffFreq,
+                    DynamicRange = drScore,
+                    IsTrustworthy = !isFake,
+                    QualityConfidence = confidence,
+                    Details = details,
+                    SpectralHash = $"{cutoffFreq}-{drScore:F1}"
+                };
+
+            }, ct);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Sonic analysis failed for {File}", filePath);
-             _forensicLogger.Error(correlationId, ForensicStage.IntegrityCheck, "Spectral analysis failed", null, ex);
-            return new SonicAnalysisResult { IsTrustworthy = false, Details = "Analysis error: " + ex.Message };
+            _logger.LogError(ex, "Deep forensic analysis failed");
+            _forensicLogger.Error(correlationId, ForensicStage.IntegrityCheck, "Analysis crashed", null, ex);
+            throw;
         }
     }
 
-    private async Task<double> GetEnergyAboveFrequencyAsync(string filePath, int freq, CancellationToken ct)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = _ffmpegPath,
-            // Phase 4: Hardware Acceleration
-            Arguments = $"{SystemInfoHelper.GetFfmpegHwAccelArgs()} -i \"{filePath}\" -af \"highpass=f={freq},volumedetect\" -f null -",
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = new Process { StartInfo = startInfo };
-        var output = new StringBuilder();
-        process.ErrorDataReceived += (s, e) => { if (e.Data != null) output.AppendLine(e.Data); };
-
-        process.Start();
-        process.BeginErrorReadLine();
-        
-        try
-        {
-            await process.WaitForExitAsync(ct);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning("Killing zombie FFmpeg process due to cancellation");
-            try 
-            { 
-                 process.Kill(); 
-                 await process.WaitForExitAsync(); // Ensure it's dead
-            } 
-            catch {}
-            throw; // Re-throw to abort analysis
-        }
-
-        string result = output.ToString();
-        // Parse "max_volume: -24.5 dB"
-        var match = System.Text.RegularExpressions.Regex.Match(result, @"max_volume:\s+(-?\d+\.?\d*)\s+dB");
-        if (match.Success && double.TryParse(match.Groups[1].Value, out double vol))
-        {
-            return vol;
-        }
-
-        return -91.0; // Assume silence if parsing fails
-    }
-
-    /// <summary>
-    /// Generates a visual spectrogram using FFmpeg's showspectrumpic filter.
-    /// Phase 8/13B: Visual Truth.
-    /// </summary>
-    /// <param name="inputPath">Path to source audio file.</param>
-    /// <param name="outputPath">Target path for the PNG image.</param>
-    /// <returns>True if successful.</returns>
     public async Task<bool> GenerateSpectrogramAsync(string inputPath, string outputPath)
     {
         if (!_isInitialized) return false;
 
         try
         {
-            // SPEK-style visualization:
-            // - s=1024x512: Resolution
-            // - mode=separate: Separate channels? No, combined is usually better for quick checks, but separate shows stereo width. Let's use combined for cleaner UI.
-            // - color=rainbow: Classic heatmap
-            // - scale=log: Logarithmic intensity
-            // - legend=1: Show frequency/time axes (Critical for verification)
-            var args = $"-y -i \"{inputPath}\" -lavfi showspectrumpic=s=1024x512:mode=combined:color=rainbow:scale=log:legend=1 \"{outputPath}\"";
+            // Standard ffmpeg visualization
+             var args = $"-y -i \"{inputPath}\" -lavfi showspectrumpic=s=1024x512:mode=combined:color=rainbow:scale=log:legend=1 \"{outputPath}\"";
 
             var startInfo = new ProcessStartInfo
             {
@@ -362,27 +330,14 @@ public class SonicIntegrityService : IDisposable
             };
 
             using var process = new Process { StartInfo = startInfo };
-            
-            // Capture errors just in case
-            var errorOutput = new StringBuilder();
-            process.ErrorDataReceived += (s, e) => { if (e.Data != null) errorOutput.AppendLine(e.Data); };
-            
             process.Start();
-            process.BeginErrorReadLine();
-            
             await process.WaitForExitAsync();
-
-            if (process.ExitCode != 0)
-            {
-                _logger.LogError("Spectrogram generation failed (Exit {Code}): {Error}", process.ExitCode, errorOutput);
-                return false;
-            }
 
             return File.Exists(outputPath);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Spectrogram generation failed for {File}", inputPath);
+            _logger.LogError(ex, "Spectrogram generation failed");
             return false;
         }
     }
@@ -391,21 +346,9 @@ public class SonicIntegrityService : IDisposable
     {
         _cts.Cancel();
         _analysisQueue.Writer.Complete();
-        
-        try
-        {
-            Task.WaitAll(_workerTasks.ToArray(), TimeSpan.FromSeconds(5));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error waiting for worker tasks to complete");
-        }
-        
+        try { Task.WaitAll(_workerTasks.ToArray(), TimeSpan.FromSeconds(5)); } catch {}
         _cts.Dispose();
     }
 
-    /// <summary>
-    /// Internal request model for the Producer-Consumer queue.
-    /// </summary>
     private record AnalysisRequest(string FilePath, string CorrelationId, TaskCompletionSource<SonicAnalysisResult> CompletionSource);
 }

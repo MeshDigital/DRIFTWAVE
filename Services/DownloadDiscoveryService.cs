@@ -22,6 +22,7 @@ public class DownloadDiscoveryService
     private readonly AppConfig _config;
     private readonly IEventBus _eventBus;
     private readonly TrackForensicLogger _forensicLogger;
+    private readonly ISafetyFilterService _safetyFilter;
 
     public DownloadDiscoveryService(
         ILogger<DownloadDiscoveryService> logger,
@@ -29,7 +30,8 @@ public class DownloadDiscoveryService
         SearchResultMatcher matcher,
         AppConfig config,
         IEventBus eventBus,
-        TrackForensicLogger forensicLogger)
+        TrackForensicLogger forensicLogger,
+        ISafetyFilterService safetyFilter)
     {
         _logger = logger;
         _searchOrchestrator = searchOrchestrator;
@@ -37,6 +39,7 @@ public class DownloadDiscoveryService
         _config = config;
         _eventBus = eventBus;
         _forensicLogger = forensicLogger;
+        _safetyFilter = safetyFilter;
     }
 
     public record DiscoveryResult(Track? BestMatch, SearchAttemptLog? Log)
@@ -141,12 +144,27 @@ public class DownloadDiscoveryService
                     continue;
                 }
 
-                // Phase 14: Forensic Gatekeeping (Operation Forensic Core)
-                // If it's a mathematical fake, we skip it entirely for the initial "High Quality" pass.
-                // It might be reconsidered in Relaxation Tier 2 if we are desperate.
-                if (MetadataForensicService.IsFake(searchTrack))
+                // Phase 14: Forensic Gatekeeping (The Bouncer)
+                // Audit Trail: Log why we rejected this candidate
+                var targetDurationSeconds = track.CanonicalDuration.HasValue ? track.CanonicalDuration.Value / 1000 : (int?)null;
+                var safety = _safetyFilter.EvaluateCandidate(searchTrack, query, targetDurationSeconds);
+                
+                // Track entity usually has Length in seconds. PlaylistTrack has CanonicalDuration (ms) or Duration (ms). 
+                // Let's check what PlaylistTrack has. It has 'Duration' (Timespan?) or 'CanonicalDuration'.
+                // Checking previous context or assuming standard int duration.
+                // PlaylistTrack likely has 'CanonicalDuration' (int? ms).
+                // Let's check strict validation below.
+                
+                if (!safety.IsSafe)
                 {
                     log.RejectedByForensics++;
+                    // Log the rejection to the persistent audit trail
+                    _forensicLogger.LogRejection(
+                        trackId: track.TrackUniqueHash,
+                        filename: searchTrack.Filename,
+                        reason: safety.Reason,
+                        details: safety.TechnicalDetails ?? $"Bitrate: {searchTrack.Bitrate}kbps"
+                    );
                     continue; 
                 }
 

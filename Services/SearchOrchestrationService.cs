@@ -123,13 +123,14 @@ public class SearchOrchestrationService
             DownloadMode.Normal,
             cancellationToken))
         {
-            // GATEKEEPER CHECK (Week 2/4)
-            // Filter out unsafe/banned/irrelevant results before they even reach the ranking engine
-            if (!_safetyFilter.IsSafe(track, normalizedQuery))
-            {
-                // _logger.LogTrace("Gatekeeper rejected track: {Filename}", track.Filename);
-                continue;
-            }
+            // GATEKEEPER CHECK (Phase 14A: The Bouncer)
+            // Evaluates safety and sets IsFlagged property, but does NOT filter out results.
+            // UI will handle "Ghosting" of flagged tracks.
+            _safetyFilter.EvaluateSafety(track, normalizedQuery);
+
+            /* OLD: Filtering
+            if (!_safetyFilter.IsSafe(track, normalizedQuery)) { continue; }
+            */
 
             // Rank on-the-fly
             ResultSorter.CalculateRank(track, searchTrack, evaluator);

@@ -30,9 +30,28 @@ namespace SLSKDONET.ViewModels
         private readonly Services.HarmonicMatchService _harmonicMatchService;
         private readonly Services.ILibraryService _libraryService;
         private readonly Services.Tagging.IUniversalCueService _cueService;
+        private readonly Services.TrackForensicLogger _forensicLogger;
         private readonly TrackOperationsViewModel _trackOperations; // Phase 11.6
         private readonly ILogger<TrackInspectorViewModel> _logger;
         private readonly CompositeDisposable _disposables = new();
+
+        public void Dispose()
+        {
+            _forensicLogger.LogGenerated -= OnForensicLogGenerated;
+            _disposables.Dispose();
+        }
+
+        private void OnForensicLogGenerated(object? sender, ForensicLogEntry entry)
+        {
+            if (Track == null || (entry.TrackIdentifier != Track.TrackUniqueHash && entry.CorrelationId != Track.TrackUniqueHash))
+                return;
+
+            RxApp.MainThreadScheduler.Schedule(() =>
+            {
+                ForensicLogs.Insert(0, entry);
+            });
+        }
+
         private Data.Entities.AudioAnalysisEntity? _analysis;
         public AudioFeaturesEntity? AudioFeatures => _audioFeatures;
         private Data.Entities.AudioFeaturesEntity? _audioFeatures; // Phase 4: Musical Intelligence
@@ -79,6 +98,8 @@ namespace SLSKDONET.ViewModels
             set => SetProperty(ref _isGeneratingSpectrogram, value);
         }
 
+
+
         // Pro DJ Features
         public ObservableCollection<Services.HarmonicMatchResult> MixesWellMatches { get; } = new();
         public ObservableCollection<PlaylistTrack> OtherVersions { get; } = new();
@@ -118,6 +139,7 @@ namespace SLSKDONET.ViewModels
             Services.HarmonicMatchService harmonicMatchService,
             Services.ILibraryService libraryService,
             Services.Tagging.IUniversalCueService cueService,
+            Services.TrackForensicLogger forensicLogger,
             TrackOperationsViewModel trackOperations,
             ILogger<TrackInspectorViewModel> logger)
         {
@@ -129,9 +151,13 @@ namespace SLSKDONET.ViewModels
             _harmonicMatchService = harmonicMatchService;
             _libraryService = libraryService;
             _cueService = cueService;
+            _forensicLogger = forensicLogger;
             _trackOperations = trackOperations;
             _logger = logger;
 
+            // Subscribe to live forensic logs
+            _forensicLogger.LogGenerated += OnForensicLogGenerated;
+            
             // Phase 12.6: Listen for global track selection
             _eventBus.GetEvent<TrackSelectionChangedEvent>()
                 .ObserveOn(RxApp.MainThreadScheduler)
@@ -310,15 +336,19 @@ namespace SLSKDONET.ViewModels
                     
                     var outputPath = Path.Combine(cacheDir, $"{Track.TrackUniqueHash}.png");
                     
+                    // Tip 1: Generate if missing
                     if (!File.Exists(outputPath))
                     {
-                        await _sonicIntegrityService.GenerateSpectrogramAsync(Track.ResolvedFilePath, outputPath);
+                        var success = await _sonicIntegrityService.GenerateSpectrogramAsync(Track.ResolvedFilePath, outputPath);
+                        if (!success) throw new Exception("FFmpeg generation failed");
                     }
                     
                     if (File.Exists(outputPath))
                     {
-                         // Basic load. For production, consider async loading to avoid UI freeze on large images
-                         SpectrogramBitmap = new Bitmap(outputPath);
+                         // UI Tip: Load static image
+                         // Use Task.Run to avoid UI freeze during decoding
+                         var bitmap = await Task.Run(() => new Bitmap(outputPath));
+                         SpectrogramBitmap = bitmap;
                     }
                 }
                 catch (Exception ex)
@@ -330,6 +360,7 @@ namespace SLSKDONET.ViewModels
                     IsGeneratingSpectrogram = false;
                 }
             });
+
             OpenInLabCommand = ReactiveCommand.Create(() =>
             {
                 if (Track != null && !string.IsNullOrEmpty(Track.TrackUniqueHash))
@@ -922,9 +953,6 @@ namespace SLSKDONET.ViewModels
             }
         }
 
-        public void Dispose()
-        {
-            _disposables?.Dispose();
-        }
+
     }
 }

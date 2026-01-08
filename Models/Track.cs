@@ -92,6 +92,16 @@ public class Track
     public string UniqueHash => $"{Artist?.ToLower().Replace(" ", "")}-{Title?.ToLower().Replace(" ", "")}".TrimStart('-').TrimEnd('-');
 
     /// <summary>
+    /// True if the "Bouncer" (SafetyFilter) flagged this track (e.g., Fake FLAC, suspicion).
+    /// </summary>
+    public bool IsFlagged { get; set; }
+
+    /// <summary>
+    /// The reason why the track was flagged (e.g., "Suspicious Size", "Banned User").
+    /// </summary>
+    public string? FlagReason { get; set; }
+
+    /// <summary>
     /// Gets the file extension from the filename.
     /// </summary>
     public string GetExtension()

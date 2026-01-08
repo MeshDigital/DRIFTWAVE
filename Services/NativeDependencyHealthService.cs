@@ -119,7 +119,6 @@ public class NativeDependencyHealthService
         // Logic from EssentiaAnalyzerService regarding path precedence
         var toolsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "Essentia", ESSENTIA_EXECUTABLE);
         string finalPath = toolsPath;
-        bool usingFallback = false;
 
         if (!File.Exists(toolsPath))
         {

@@ -197,7 +197,7 @@
                     <DataGridTemplateColumn Header="Trust" Width="60" SortMemberPath="TrustScore">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                 <Border Background="Transparent" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip.Tip="{Binding ForensicAssessment}">
+                                 <Border Background="Transparent" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip.Tip="{Binding ForensicAssessment}" Opacity="{Binding Opacity}">
                                     <TextBlock Text="{Binding TrustScore}" FontWeight="Bold" Foreground="{Binding TrustColor}"/>
                                 </Border>
                             </DataTemplate>
@@ -208,7 +208,7 @@
                     <DataGridTemplateColumn Header="Track Details" Width="*" SortMemberPath="Filename">
                          <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate DataType="vm:AnalyzedSearchResultViewModel">
-                                <StackPanel Margin="8,6" Background="{Binding ItemBackground}">
+                                <StackPanel Margin="8,6" Background="{Binding ItemBackground}" Opacity="{Binding Opacity}">
                                     <TextBlock Text="{Binding Filename}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{Binding ForegroundColor}"/>
                                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
                                          <Border Background="#333" CornerRadius="3" Padding="3,0">
@@ -238,6 +238,7 @@
                                         Classes="pill" 
                                         FontSize="11" 
                                         Padding="8,4"
+                                        Opacity="{Binding Opacity}"
                                         HorizontalAlignment="Center"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>

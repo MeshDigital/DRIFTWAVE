@@ -66,6 +66,16 @@ public class TrackForensicLogger : IForensicLogger, IDisposable
     }
     
     /// <summary>
+    /// Logs a rejected search candidate with specific reason and technical details.
+    /// Phase 14: Search Audit Trail
+    /// </summary>
+    public void LogRejection(string trackId, string filename, string reason, string details)
+    {
+        var data = new { Filename = filename, Reason = reason, TechnicalDetails = details };
+        LogInternal(trackId, "Discovery", "Warning", $"Rejected candidate: {reason}", trackId, data);
+    }
+    
+    /// <summary>
     /// Logs a timed operation (auto-calculates duration)
     /// </summary>
     public IDisposable TimedOperation(string correlationId, string stage, string operation, string? trackId = null)

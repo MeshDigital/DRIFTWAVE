@@ -71,6 +71,9 @@ namespace SLSKDONET.ViewModels
         // Trust Bar Visualization (Width 0-100)
         public double TrustBarWidth => TrustScore;
 
+        // Opacity for Ghosting (The Bouncer Phase 14A)
+        public double Opacity => IsFake ? 0.3 : 1.0;
+
         public AnalyzedSearchResultViewModel(SearchResult result)
         {
             _result = result;
@@ -79,7 +82,15 @@ namespace SLSKDONET.ViewModels
             TrustScore = MetadataForensicService.CalculateTrustScore(result.Model);
             ForensicAssessment = MetadataForensicService.GetForensicAssessment(result.Model);
             IsGoldenMatch = MetadataForensicService.IsGoldenMatch(result.Model);
-            IsFake = MetadataForensicService.IsFake(result.Model);
+            
+            // Phase 14A: The Bouncer Integration
+            // Combine existing forensic checks with new SafetyFilter flags
+            IsFake = MetadataForensicService.IsFake(result.Model) || result.Model.IsFlagged;
+            
+            if (result.Model.IsFlagged)
+            {
+                ForensicAssessment = result.Model.FlagReason ?? "Flagged by Bouncer";
+            }
             
             // Sync with base SearchResult for Filter & Badge logic
             if (IsFake) _result.IntegrityStatus = "Suspect";
