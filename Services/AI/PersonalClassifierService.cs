@@ -6,7 +6,11 @@ using Microsoft.ML;
 using Microsoft.ML.Data;
 using Microsoft.ML.Trainers.LightGbm;
 
-namespace SLSKDONET.Services.AI;public class PersonalClassifierService
+using SLSKDONET.Data.Entities;
+
+namespace SLSKDONET.Services.AI;
+
+public class PersonalClassifierService
 {
     private readonly MLContext _mlContext;
     private ITransformer? _trainedModel;
@@ -164,7 +168,7 @@ namespace SLSKDONET.Services.AI;public class PersonalClassifierService
     public List<(string TrackHash, float Similarity)> FindSimilarTracks(
         float[] targetVector, 
         float targetBpm, 
-        List<Data.Entities.AudioFeaturesEntity> candidates, 
+        List<AudioFeaturesEntity> candidates, 
         int limit = 50)
     {
         if (targetVector == null || targetVector.Length != 128) return new();

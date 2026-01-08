@@ -179,6 +179,16 @@
                        <TextBlock Text="✓ VERIFIED" FontSize="9" FontWeight="Bold" Foreground="#00FF00"/>
                    </Border>
 
+                   <!-- Discovery Match Badge (Phase 4+) -->
+                   <Border Background="#209C27B0" CornerRadius="2" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center"
+                           BorderBrush="#9C27B0" BorderThickness="1"
+                           IsVisible="{Binding DiscoveryReason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                       <StackPanel Orientation="Horizontal" Spacing="4">
+                           <TextBlock Text="✨" FontSize="10" VerticalAlignment="Center"/>
+                           <TextBlock Text="{Binding DiscoveryReason}" FontSize="9" FontWeight="Bold" Foreground="#D05CE3" VerticalAlignment="Center"/>
+                       </StackPanel>
+                   </Border>
+
                    <!-- Preparation Badge (Phase 10) -->
                    <Border Classes="PrepBadge" 
                            Background="{Binding PreparationColor}" 

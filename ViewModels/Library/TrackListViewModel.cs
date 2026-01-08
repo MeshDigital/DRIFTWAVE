@@ -214,6 +214,8 @@ public class TrackListViewModel : ReactiveObject, IDisposable
     // ListBox Selection Binding
     public ObservableCollection<PlaylistTrackViewModel> SelectedTracks { get; } = new();
 
+    public PlaylistTrackViewModel? LeadSelectedTrack => SelectedTracks.FirstOrDefault();
+
     // Phase 15: Style Filters
     public ObservableCollection<StyleFilterItem> StyleFilters { get; } = new();
 
@@ -633,6 +635,7 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         HasSelectedTracks = count > 0;
         HasMultiSelection = count > 1;
         SelectedCountText = $"{count} tracks selected";
+        this.RaisePropertyChanged(nameof(LeadSelectedTrack));
     }
 
     private async Task ExecuteBulkDownloadAsync()

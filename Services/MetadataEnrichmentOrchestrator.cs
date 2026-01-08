@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using SLSKDONET.Services.Repositories;
 using SLSKDONET.Models;
 using SLSKDONET.Events;
+using SLSKDONET.Data.Entities;
 
 namespace SLSKDONET.Services;
 
@@ -109,7 +110,7 @@ public class MetadataEnrichmentOrchestrator : IDisposable
         }
     }
 
-    private async Task ProcessTaskAsync(Data.Entities.EnrichmentTaskEntity task)
+    private async Task ProcessTaskAsync(EnrichmentTaskEntity task)
     {
         try
         {

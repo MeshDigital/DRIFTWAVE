@@ -72,7 +72,7 @@ public partial class ImportHistoryViewModel : INotifyPropertyChanged
         // _ = LoadHistoryAsync();
     }
 
-    private async Task LoadHistoryAsync()
+    public async Task LoadHistoryAsync()
     {
         if (IsLoading) return;
         IsLoading = true;

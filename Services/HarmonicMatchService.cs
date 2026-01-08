@@ -98,7 +98,7 @@ public class HarmonicMatchService
     ///     - Energy matching = gradual build/cooldown (DJ storytelling)
     /// </param>
     /// <returns>List of compatible tracks with compatibility scores</returns>
-    public async Task<List<HarmonicMatchResult>> GetHarmonicMatchesAsync(
+    public async Task<List<HarmonicMatchResult>> FindMatchesAsync(
         Guid seedTrackId, 
         int limit = 20,
         bool includeBpmRange = true,

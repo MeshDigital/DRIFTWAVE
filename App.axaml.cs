@@ -618,6 +618,8 @@ public partial class App : Application
 
         // Database
         services.AddDbContextFactory<AppDbContext>();
+        services.AddSingleton<SchemaMigratorService>();
+        services.AddSingleton<SLSKDONET.Services.Repositories.ITrackRepository, SLSKDONET.Services.Repositories.TrackRepository>();
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<DashboardService>(); // [NEW] HomePage Intelligence
         services.AddSingleton<IMetadataService, MetadataService>();

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using SLSKDONET.Configuration;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
+using SLSKDONET.Data;
 
 namespace SLSKDONET.Services;
 
@@ -34,11 +35,11 @@ public class LibraryUpgradeScout
     /// Scans the library for tracks that could benefit from a quality upgrade.
     /// Returns a list of candidates based on bitrate and trustworthiness.
     /// </summary>
-    public async Task<List<Data.TrackEntity>> GetUpgradeCandidatesAsync()
+    public async Task<List<TrackEntity>> GetUpgradeCandidatesAsync()
     {
         // TODO: Phase 8 Package 3 - Implement when DatabaseService LoadAllTracksAsync is available
         _logger.LogWarning("LibraryUpgradeScout.GetUpgradeCandidatesAsync() not yet fully implemented");
-        return new List<Data.TrackEntity>();
+        return new List<TrackEntity>();
         
         /* Original implementation - requires LoadAllTracksAsync() method
         try
@@ -57,13 +58,13 @@ public class LibraryUpgradeScout
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to scan library for upgrade candidates.");
-            return new List<Data.TrackEntity>();
+            return new List<TrackEntity>();
         }
         */
     }
 
     /*
-    private bool IsUpgradeCandidate(Data.TrackEntity track)
+    private bool IsUpgradeCandidate(TrackEntity track)
     {
         // Don't propose tracks that are already in the middle of being upgraded/downloaded
         if (track.State == "Downloading" || track.State == "Searching") return false;

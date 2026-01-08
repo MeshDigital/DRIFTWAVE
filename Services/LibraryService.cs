@@ -1090,4 +1090,15 @@ public class LibraryService : ILibraryService
             throw;
         }
     }
+
+    public async Task<AudioFeaturesEntity?> GetAudioFeaturesByHashAsync(string uniqueHash)
+    {
+        return await _databaseService.GetAudioFeaturesByHashAsync(uniqueHash);
+    }
+
+    public async Task<List<LibraryEntry>> GetTracksAddedSinceAsync(DateTime since)
+    {
+        var all = await LoadAllLibraryEntriesAsync();
+        return all.Where(e => e.AddedAt >= since).ToList();
+    }
 }

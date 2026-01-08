@@ -65,6 +65,12 @@ public class LibraryCacheService
         _trackCache.Clear();
     }
     
+    public Task ClearCacheAsync()
+    {
+        ClearCache();
+        return Task.CompletedTask;
+    }
+    
     private bool IsItemStale(DateTime timestamp) => DateTime.UtcNow - timestamp > _cacheLifetime;
 
     private void EnforceLimits()

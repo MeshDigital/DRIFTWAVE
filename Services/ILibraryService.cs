@@ -187,5 +187,8 @@ public interface ILibraryService
     // Phase 11.5: Verification
     Task MarkTrackAsVerifiedAsync(string trackHash);
     
+    // Phase 16.2: Vibe Match
+    Task<AudioFeaturesEntity?> GetAudioFeaturesByHashAsync(string uniqueHash);
 
+    Task<List<LibraryEntry>> GetTracksAddedSinceAsync(DateTime since);
 }

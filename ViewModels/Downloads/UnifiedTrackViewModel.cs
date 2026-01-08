@@ -313,6 +313,14 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
         ? $"{_currentSpeed / 1024 / 1024:F1} MB/s" 
         : $"{_currentSpeed / 1024:F0} KB/s";
 
+    // Phase 4+: Discovery Features
+    private string? _discoveryReason;
+    public string? DiscoveryReason
+    {
+        get => _discoveryReason;
+        set => this.RaiseAndSetIfChanged(ref _discoveryReason, value);
+    }
+
     // Event Handlers
     private void OnStateChanged(TrackStateChangedEvent e)
     {

@@ -396,7 +396,7 @@ namespace SLSKDONET.ViewModels
                 var libraryEntry = await _libraryService.FindLibraryEntryAsync(Track.TrackUniqueHash);
                 if (libraryEntry != null)
                 {
-                    var matches = await _harmonicMatchService.GetHarmonicMatchesAsync(libraryEntry.Id, limit: 5);
+                    var matches = await _harmonicMatchService.FindMatchesAsync(libraryEntry.Id, limit: 5);
                     foreach (var match in matches)
                     {
                         MixesWellMatches.Add(match);
