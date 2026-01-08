@@ -6,6 +6,7 @@ using SLSKDONET.Services.Repositories;
 using SLSKDONET.Models;
 using SLSKDONET.Events;
 using SLSKDONET.Data.Entities;
+using SLSKDONET.Data;
 
 namespace SLSKDONET.Services;
 
@@ -161,6 +162,9 @@ public class MetadataEnrichmentOrchestrator : IDisposable
                 trackEntity.Valence = model.Valence;
                 trackEntity.IsEnriched = true;
                 
+                // Phase 13C: Apply Tri-State Auto-Tagging after enrichment
+                await ApplyAutoTaggingAsync(trackEntity);
+                
                 await _databaseService.SaveTrackAsync(trackEntity);
                 _eventBus.Publish(new TrackMetadataUpdatedEvent(trackEntity.GlobalId));
                 _logger.LogInformation("✨ Enriched: {Artist} - {Title}", trackEntity.Artist, trackEntity.Title);
@@ -168,6 +172,11 @@ public class MetadataEnrichmentOrchestrator : IDisposable
             else
             {
                 _logger.LogDebug("No metadata match found for {Artist} - {Title}", trackEntity.Artist, trackEntity.Title);
+                
+                // Even if not enriched via Spotify, try auto-tagging if analysis results exist
+                await ApplyAutoTaggingAsync(trackEntity);
+                await _databaseService.SaveTrackAsync(trackEntity);
+                
                 // We still mark task as completed because we tried.
             }
         }
@@ -176,6 +185,58 @@ public class MetadataEnrichmentOrchestrator : IDisposable
             _logger.LogError(ex, "Task execution failed for {TaskId}", task.Id);
             await _taskRepository.MarkFailedAsync(task.Id, ex.Message);
             throw; // Re-throw to loop handler if needed, or swallow here
+        }
+    }
+
+    private async Task ApplyAutoTaggingAsync(TrackEntity track)
+    {
+        try
+        {
+            var features = await _databaseService.GetAudioFeaturesByHashAsync(track.GlobalId);
+            if (features == null) return;
+
+            var tags = new List<string>();
+            if (!string.IsNullOrEmpty(track.Genres))
+            {
+                tags.AddRange(track.Genres.Split(", ", StringSplitOptions.RemoveEmptyEntries));
+            }
+
+            // Phase 13C: Tri-State Auto-Tagging Logic
+            
+            // #club-ready: High Energy + High Danceability
+            if (features.Energy > 0.8f && features.Danceability > 0.7f)
+            {
+                if (!tags.Contains("#club-ready")) tags.Add("#club-ready");
+            }
+
+            // #brain-dance: Relaxed/Electronic vibe + Moderate Energy
+            if ((features.MoodTag == "Relaxed" || features.MoodTag == "Electronic") && features.Energy < 0.6f)
+            {
+                if (!tags.Contains("#brain-dance")) tags.Add("#brain-dance");
+            }
+
+            // #euphoric: Happy mood with high confidence
+            if (features.MoodTag == "Happy" && features.MoodConfidence > 0.8f)
+            {
+                if (!tags.Contains("#euphoric")) tags.Add("#euphoric");
+            }
+
+            // #melancholic: Sad mood with high confidence
+            if (features.MoodTag == "Sad" && features.MoodConfidence > 0.8f)
+            {
+                if (!tags.Contains("#melancholic")) tags.Add("#melancholic");
+            }
+
+            var updatedGenres = string.Join(", ", tags.Distinct());
+            if (track.Genres != updatedGenres)
+            {
+                track.Genres = updatedGenres;
+                _logger.LogInformation("🏷️ Auto-tagged {Artist} - {Title}: {Tags}", track.Artist, track.Title, updatedGenres);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Auto-tagging failed for {Hash}", track.GlobalId);
         }
     }
 

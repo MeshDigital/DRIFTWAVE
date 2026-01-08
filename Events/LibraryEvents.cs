@@ -17,3 +17,12 @@ public class LibraryMetadataEnrichedEvent
         EnrichedCount = enrichedCount;
     }
 }
+
+public class SearchRequestedEvent
+{
+    public string Query { get; }
+    public SearchRequestedEvent(string query)
+    {
+        Query = query;
+    }
+}

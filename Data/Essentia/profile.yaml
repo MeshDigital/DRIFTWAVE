@@ -10,3 +10,7 @@ highlevel:
         - "Tools/Essentia/models/danceability-msd-musicnn-1.pb"
         - "Tools/Essentia/models/mood_happy-msd-musicnn-1.pb"
         - "Tools/Essentia/models/mood_aggressive-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/mood_sad-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/mood_relaxed-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/mood_party-msd-musicnn-1.pb"
+        - "Tools/Essentia/models/mood_electronic-msd-musicnn-1.pb"

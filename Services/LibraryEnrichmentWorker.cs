@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Data;
 using SLSKDONET.Models;
+using SLSKDONET.Services.AI;
 
 namespace SLSKDONET.Services;
 
@@ -19,6 +20,7 @@ public class LibraryEnrichmentWorker : IDisposable
     private readonly ILogger<LibraryEnrichmentWorker> _logger;
     private readonly DatabaseService _databaseService;
     private readonly SpotifyEnrichmentService _enrichmentService;
+    private readonly IStyleClassifierService _styleClassifier;
     private readonly IEventBus _eventBus;
     private readonly Configuration.AppConfig _config;
     private CancellationTokenSource? _cts;
@@ -33,12 +35,14 @@ public class LibraryEnrichmentWorker : IDisposable
         ILogger<LibraryEnrichmentWorker> logger,
         DatabaseService databaseService,
         SpotifyEnrichmentService enrichmentService,
+        IStyleClassifierService styleClassifier,
         IEventBus eventBus,
         Configuration.AppConfig config)
     {
         _logger = logger;
         _databaseService = databaseService;
         _enrichmentService = enrichmentService;
+        _styleClassifier = styleClassifier;
         _eventBus = eventBus;
         _config = config;
     }
@@ -332,6 +336,59 @@ public class LibraryEnrichmentWorker : IDisposable
             {
                  _logger.LogError(ex, "Stage 3 (Genre Enrichment) failed");
             }
+        }
+
+        // --- STAGE 4: Style Classification (Sonic Taxonomy) ---
+        // Find tracks with embeddings but no detected sub-genre
+        var allFeatures = await _databaseService.LoadAllAudioFeaturesAsync();
+        var needingClassification = allFeatures
+            .Where(f => !string.IsNullOrEmpty(f.AiEmbeddingJson) && string.IsNullOrEmpty(f.DetectedSubGenre))
+            .Take(BatchSize * 4)
+            .ToList();
+
+        if (needingClassification.Any())
+        {
+            _logger.LogInformation("Enrichment Stage 4: Classifying {Count} tracks based on sonic profile", needingClassification.Count);
+            int localClassified = 0;
+
+            foreach (var feature in needingClassification)
+            {
+                try
+                {
+                    var prediction = await _styleClassifier.PredictAsync(feature);
+                    
+                    if (prediction.Confidence > 0.3f) // Threshold for auto-assignment
+                    {
+                        // Update AudioFeatures entity
+                        feature.DetectedSubGenre = prediction.StyleName;
+                        feature.SubGenreConfidence = prediction.Confidence;
+                        feature.PredictedVibe = prediction.StyleName;
+                        feature.PredictionConfidence = prediction.Confidence;
+                        feature.GenreDistributionJson = System.Text.Json.JsonSerializer.Serialize(prediction.Distribution);
+
+                        // Sync to Library/Playlist entities
+                        var enrichmentResult = new Models.TrackEnrichmentResult
+                        {
+                            Success = true,
+                            DetectedSubGenre = prediction.StyleName,
+                            SubGenreConfidence = prediction.Confidence
+                        };
+
+                        await _databaseService.UpdateLibraryEntryEnrichmentAsync(feature.TrackUniqueHash, enrichmentResult);
+                        
+                        // Notify UI
+                        _eventBus.Publish(new TrackMetadataUpdatedEvent(feature.TrackUniqueHash));
+                        localClassified++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Stage 4 (Style Classification) failed for {Hash}", feature.TrackUniqueHash);
+                }
+            }
+
+            enrichedCount += localClassified;
+            if (localClassified > 0) didWork = true;
         }
 
         if (enrichedCount > 0)

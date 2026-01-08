@@ -20,6 +20,10 @@ public class TrackEnrichmentResult
     // Genre Support (Stage 3)
     public System.Collections.Generic.List<string>? Genres { get; set; }
     
+    // Style Classification (Stage 4)
+    public string? DetectedSubGenre { get; set; }
+    public float? SubGenreConfidence { get; set; }
+
     public bool Success { get; set; }
     public string? Error { get; set; }
 }

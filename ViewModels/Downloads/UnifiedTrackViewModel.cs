@@ -118,6 +118,13 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
          
          FindSimilarCommand = ReactiveCommand.Create(FindSimilar);
          FindSimilarAiCommand = ReactiveCommand.Create(FindSimilarAi);
+         FilterByVibeCommand = ReactiveCommand.Create(() => 
+         {
+             if (!string.IsNullOrEmpty(DetectedSubGenre))
+             {
+                 _eventBus.Publish(new SearchRequestedEvent(DetectedSubGenre));
+             }
+         });
     }
     
     private void FindSimilar()
@@ -132,8 +139,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
         _eventBus.Publish(new FindSimilarRequestEvent(Model, useAi: true));
     }
 
-    public ICommand FindSimilarCommand { get; }
-    public ICommand FindSimilarAiCommand { get; }
+
 
     // IDisplayableTrack Implementation
     public string GlobalId => Model.TrackUniqueHash;
@@ -285,6 +291,34 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public bool IsEnriched => Model.IsEnriched;
     public bool IsPrepared => Model.IsPrepared;
     public string? PrimaryGenre => Model.PrimaryGenre;
+    public string? DetectedSubGenre => Model.DetectedSubGenre;
+    public float? SubGenreConfidence => Model.SubGenreConfidence;
+
+    // Phase 12.7: Vibe Color Mapping
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Avalonia.Media.IBrush> _vibeColorCache = new();
+    public Avalonia.Media.IBrush VibeColor => GetVibeColor(DetectedSubGenre);
+
+    private Avalonia.Media.IBrush GetVibeColor(string? genre)
+    {
+        if (string.IsNullOrEmpty(genre)) return Avalonia.Media.Brushes.Transparent;
+        if (_vibeColorCache.TryGetValue(genre, out var brush)) return brush;
+
+        // On-demand load from Style Lab (Phase 15 integration)
+        Task.Run(async () => 
+        {
+            var styles = await _libraryService.GetStyleDefinitionsAsync();
+            foreach (var style in styles)
+            {
+                if (Avalonia.Media.Color.TryParse(style.ColorHex, out var color))
+                {
+                    _vibeColorCache[style.Name] = new Avalonia.Media.SolidColorBrush(color);
+                }
+            }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => this.RaisePropertyChanged(nameof(VibeColor)));
+        });
+
+        return Avalonia.Media.Brushes.Gray;
+    }
 
     public string PreparationStatus => IsPrepared ? "Prepared" : "Raw";
     public Avalonia.Media.IBrush PreparationColor => IsPrepared ? Avalonia.Media.Brushes.DodgerBlue : Avalonia.Media.Brushes.Gray;
@@ -308,6 +342,9 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public ICommand CancelCommand { get; }
     public ICommand RetryCommand { get; }
     public ICommand CleanCommand { get; }
+    public ICommand FilterByVibeCommand { get; }
+    public ICommand FindSimilarCommand { get; }
+    public ICommand FindSimilarAiCommand { get; }
 
     // Internal State
     private long _totalBytes;
@@ -396,6 +433,8 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 Model.IsPrepared = updatedTrack.IsPrepared;
                 Model.PrimaryGenre = updatedTrack.PrimaryGenre;
                 Model.CuePointsJson = updatedTrack.CuePointsJson;
+                Model.DetectedSubGenre = updatedTrack.DetectedSubGenre;
+                Model.SubGenreConfidence = updatedTrack.SubGenreConfidence;
                 
                 // Sync Waveform bands
                 Model.LowData = updatedTrack.LowData;
@@ -433,8 +472,9 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
                 this.RaisePropertyChanged(nameof(PreparationStatus));
                 this.RaisePropertyChanged(nameof(PreparationColor));
                 this.RaisePropertyChanged(nameof(PrimaryGenre));
-                
-                this.RaisePropertyChanged(nameof(PrimaryGenre));
+                this.RaisePropertyChanged(nameof(DetectedSubGenre));
+                this.RaisePropertyChanged(nameof(VibeColor));
+                this.RaisePropertyChanged(nameof(SubGenreConfidence));
                 
                 // Curation & Trust
                 this.RaisePropertyChanged(nameof(CurationConfidence));

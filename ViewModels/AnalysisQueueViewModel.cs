@@ -147,8 +147,24 @@ public class AnalysisQueueViewModel : ReactiveObject, IDisposable
         set => this.RaiseAndSetIfChanged(ref _testStatus, value);
     }
 
+    // Demo Prep Mode
+    private bool _isPrepRunning;
+    public bool IsPrepRunning
+    {
+        get => _isPrepRunning;
+        set => this.RaiseAndSetIfChanged(ref _isPrepRunning, value);
+    }
+
+    private string _prepStatus = "Scan library for unanalyzed tracks";
+    public string PrepStatus
+    {
+        get => _prepStatus;
+        set => this.RaiseAndSetIfChanged(ref _prepStatus, value);
+    }
+
     public ReactiveCommand<AnalysisJobViewModel, Unit> InspectTrackCommand { get; }
     public ReactiveCommand<Unit, Unit> RunBrainTestCommand { get; }
+    public ReactiveCommand<Unit, Unit> PerformDemoPrepCommand { get; }
 
     // Operation "All-Seeing Eye": Forensic Lab Mode
     private bool _isLabModeActive;
@@ -221,6 +237,7 @@ public class AnalysisQueueViewModel : ReactiveObject, IDisposable
 
         InspectTrackCommand = ReactiveCommand.Create<AnalysisJobViewModel>(InspectTrack);
         RunBrainTestCommand = ReactiveCommand.CreateFromTask(RunBrainTestAsync);
+        PerformDemoPrepCommand = ReactiveCommand.CreateFromTask(PerformDemoPrepAsync);
         ToggleForensicStreamCommand = ReactiveCommand.Create(() => { IsForensicStreamExpanded = !IsForensicStreamExpanded; });
         CloseLabCommand = ReactiveCommand.Create(() => 
         {
@@ -514,6 +531,26 @@ public class AnalysisQueueViewModel : ReactiveObject, IDisposable
         finally
         {
             IsTestRunning = false;
+        }
+    }
+
+    private async Task PerformDemoPrepAsync()
+    {
+        IsPrepRunning = true;
+        PrepStatus = "Scanning library...";
+        
+        try
+        {
+            await _queueService.PerformDemoPrepAsync();
+            PrepStatus = "Demo Prep started - tracks enqueued";
+        }
+        catch (Exception ex)
+        {
+            PrepStatus = $"❌ Prep failed: {ex.Message}";
+        }
+        finally
+        {
+            IsPrepRunning = false;
         }
     }
 

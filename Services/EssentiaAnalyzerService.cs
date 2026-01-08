@@ -219,23 +219,39 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 }
                 
                 // Phase 4.1: Set BelowNormal priority to prevent UI stutter
-                // Phase 4.1: Set BelowNormal priority to prevent UI stutter
                 SystemInfoHelper.ConfigureProcessPriority(process, ProcessPriorityClass.BelowNormal);
 
+                // Phase 13A: Hardening & Demo Stability - Watchdog Implementation
+                // Create a linked token source that cancels after a hard timeout (45s)
+                // This prevents a single corrupt track or slow decode from hanging the entire queue.
+                using var watchdogCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                watchdogCts.CancelAfter(TimeSpan.FromSeconds(ANALYSIS_TIMEOUT_SECONDS));
+
                 // Register cancellation to kill process
-                await using var ctr = cancellationToken.Register(() => 
+                await using var ctr = watchdogCts.Token.Register(() => 
                 {
                     try 
                     { 
                         if (!process.HasExited) 
                         {
                             process.Kill(); 
-                            _forensicLogger.Warning(cid, ForensicStage.MusicalAnalysis, "Process killed due to cancellation", trackUniqueHash);
+                            _logger.LogWarning("Analysis timed out or cancelled for {Hash}. Killing process.", trackUniqueHash);
+                            _forensicLogger.Warning(cid, ForensicStage.MusicalAnalysis, "Process killed due to watchdog timeout or cancellation", trackUniqueHash);
                         }
                     } catch { }
                 });
 
-                await process.WaitForExitAsync(cancellationToken);
+                try 
+                {
+                    await process.WaitForExitAsync(watchdogCts.Token);
+                }
+                catch (OperationCanceledException) when (watchdogCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    // This was specifically the watchdog timeout
+                    _logger.LogError("Analysis timed out for {Hash} after {Timeout}s", trackUniqueHash, ANALYSIS_TIMEOUT_SECONDS);
+                    _forensicLogger.Error(cid, ForensicStage.MusicalAnalysis, $"Analysis timed out after {ANALYSIS_TIMEOUT_SECONDS}s", trackUniqueHash);
+                    return null;
+                }
 
                 if (process.ExitCode != 0)
                 {
@@ -303,7 +319,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     // Sonic Characteristics
                     // Phase 13A: Improved Energy mapping (combines RMS intensity and Loudness)
                     Energy = data.LowLevel?.Rms?.Mean * 10 ?? (data.LowLevel?.AverageLoudness > -8 ? 0.9f : (data.LowLevel?.AverageLoudness > -12 ? 0.7f : 0.5f)),
-                    Danceability = data.Rhythm?.Danceability ?? 0,
+                    Danceability = data.HighLevel?.Danceability?.All?.Danceable ?? data.Rhythm?.Danceability ?? 0,
                     LoudnessLUFS = data.LowLevel?.AverageLoudness ?? 0,
                     SpectralCentroid = data.LowLevel?.SpectralCentroid?.Mean ?? 0,
                     SpectralComplexity = data.LowLevel?.SpectralComplexity?.Mean ?? 0,
@@ -471,13 +487,15 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
         {
             ["Happy"] = highLevel.MoodHappy?.All?.Happy ?? 0,
             ["Aggressive"] = highLevel.MoodAggressive?.All?.Aggressive ?? 0,
-            ["Calm"] = highLevel.MoodHappy?.All?.NotHappy ?? 0, // Inverse of happy = calm
-            ["Intense"] = highLevel.MoodAggressive?.All?.NotAggressive ?? 0 // Inverse
+            ["Sad"] = highLevel.MoodSad?.All?.Sad ?? 0,
+            ["Relaxed"] = highLevel.MoodRelaxed?.All?.Relaxed ?? 0,
+            ["Party"] = highLevel.MoodParty?.All?.Party ?? 0,
+            ["Electronic"] = highLevel.MoodElectronic?.All?.Electronic ?? 0
         };
 
-        // Return highest confidence mood
+        // Return highest confidence mood if above 0.4 threshold
         var topMood = moods.OrderByDescending(m => m.Value).FirstOrDefault();
-        return topMood.Value > 0.5f ? topMood.Key : "Neutral";
+        return topMood.Value > 0.4f ? topMood.Key : "Neutral";
     }
 
     private static float CalculateMoodConfidence(HighLevelData? highLevel)
@@ -488,7 +506,11 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
         return new[]
         {
             highLevel.MoodHappy?.Probability ?? 0,
-            highLevel.MoodAggressive?.Probability ?? 0
+            highLevel.MoodAggressive?.Probability ?? 0,
+            highLevel.MoodSad?.Probability ?? 0,
+            highLevel.MoodRelaxed?.Probability ?? 0,
+            highLevel.MoodParty?.Probability ?? 0,
+            highLevel.MoodElectronic?.Probability ?? 0
         }.Max();
     }
 

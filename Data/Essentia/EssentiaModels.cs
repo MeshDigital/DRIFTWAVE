@@ -101,6 +101,18 @@ public class HighLevelData
     [JsonPropertyName("mood_aggressive")]
     public ModelPrediction? MoodAggressive { get; set; }
 
+    [JsonPropertyName("mood_sad")]
+    public ModelPrediction? MoodSad { get; set; }
+
+    [JsonPropertyName("mood_relaxed")]
+    public ModelPrediction? MoodRelaxed { get; set; }
+
+    [JsonPropertyName("mood_party")]
+    public ModelPrediction? MoodParty { get; set; }
+
+    [JsonPropertyName("mood_electronic")]
+    public ModelPrediction? MoodElectronic { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, System.Text.Json.JsonElement>? ExtensionData { get; set; }
 }
@@ -142,4 +154,28 @@ public class ModelClasses
 
     [JsonPropertyName("not_aggressive")]
     public float NotAggressive { get; set; }
+
+    [JsonPropertyName("sad")]
+    public float Sad { get; set; }
+
+    [JsonPropertyName("not_sad")]
+    public float NotSad { get; set; }
+
+    [JsonPropertyName("relaxed")]
+    public float Relaxed { get; set; }
+
+    [JsonPropertyName("not_relaxed")]
+    public float NotRelaxed { get; set; }
+
+    [JsonPropertyName("party")]
+    public float Party { get; set; }
+
+    [JsonPropertyName("not_party")]
+    public float NotParty { get; set; }
+
+    [JsonPropertyName("electronic")]
+    public float Electronic { get; set; }
+
+    [JsonPropertyName("not_electronic")]
+    public float NotElectronic { get; set; }
 }

@@ -195,6 +195,11 @@ public class TrackRepository : ITrackRepository
                         existing.Valence = result.Valence;
                         existing.Danceability = result.Danceability;
                         if (!string.IsNullOrEmpty(result.MusicalKey)) existing.MusicalKey = result.MusicalKey;
+                        
+                        // Phase 12.7: Style Classification
+                        if (!string.IsNullOrEmpty(result.DetectedSubGenre)) existing.DetectedSubGenre = result.DetectedSubGenre;
+                        if (result.SubGenreConfidence > 0) existing.SubGenreConfidence = result.SubGenreConfidence;
+
                         existing.IsEnriched = true;
                     }
                 }
@@ -241,6 +246,10 @@ public class TrackRepository : ITrackRepository
                         track.Valence = result.Valence;
                         track.Danceability = result.Danceability;
                         if (!string.IsNullOrEmpty(result.MusicalKey)) track.MusicalKey = result.MusicalKey;
+
+                        // Phase 12.7: Style Classification
+                        if (!string.IsNullOrEmpty(result.DetectedSubGenre)) track.DetectedSubGenre = result.DetectedSubGenre;
+                        if (result.SubGenreConfidence > 0) track.SubGenreConfidence = result.SubGenreConfidence;
                     }
                 }
                 track.IsEnriched = true;

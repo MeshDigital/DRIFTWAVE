@@ -44,6 +44,7 @@ public class AnalysisQueueService : INotifyPropertyChanged
     private readonly Channel<AnalysisRequest> _channel;
     private readonly IEventBus _eventBus;
     private readonly ILogger<AnalysisQueueService> _logger;
+    private readonly IDbContextFactory<AppDbContext> _dbFactory;
     private int _queuedCount = 0;
     private int _processedCount = 0;
     private string? _currentTrackHash = null;
@@ -111,10 +112,11 @@ public class AnalysisQueueService : INotifyPropertyChanged
         }
     }
 
-    public AnalysisQueueService(IEventBus eventBus, ILogger<AnalysisQueueService> logger)
+    public AnalysisQueueService(IEventBus eventBus, ILogger<AnalysisQueueService> logger, IDbContextFactory<AppDbContext> dbFactory)
     {
         _eventBus = eventBus;
         _logger = logger;
+        _dbFactory = dbFactory;
         // WHY: Unbounded channel instead of bounded:
         // - Producer (DownloadManager) should NEVER block on enqueue
         // - Analysis is non-critical: if queue grows to 1000, it just takes longer
@@ -129,6 +131,48 @@ public class AnalysisQueueService : INotifyPropertyChanged
         Interlocked.Increment(ref _queuedCount);
         OnPropertyChanged(nameof(QueuedCount));
         PublishStatusEvent();
+    }
+
+    /// <summary>
+    /// Phase 13A: Demo Prep utility.
+    /// Scans the library for tracks that have not been analyzed and enqueues them.
+    /// </summary>
+    public async Task PerformDemoPrepAsync()
+    {
+        _logger.LogInformation("🚀 Musical Brain: Starting Demo Prep (Scanning library for unanalyzed tracks)...");
+
+        try
+        {
+            using var context = await _dbFactory.CreateDbContextAsync();
+            
+            // Find tracks in library that don't have audio features yet
+            // This ensures we have BPM, Energy, Mood etc for the entire library
+            var unanalyzedTracks = await context.LibraryEntries
+                .Where(le => !context.AudioFeatures.Any(af => af.TrackUniqueHash == le.UniqueHash))
+                .ToListAsync();
+
+            _logger.LogInformation("🧠 Demo Prep: Found {Count} unanalyzed tracks in library.", unanalyzedTracks.Count);
+
+            int enqueuedCount = 0;
+            foreach (var track in unanalyzedTracks)
+            {
+                if (File.Exists(track.FilePath))
+                {
+                    QueueAnalysis(track.FilePath, track.UniqueHash);
+                    enqueuedCount++;
+                }
+                else
+                {
+                    _logger.LogWarning("Demo Prep: Skipping missing file {Path}", track.FilePath);
+                }
+            }
+
+            _logger.LogInformation("✅ Demo Prep: Enqueued {Count} tracks for analysis.", enqueuedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to perform Demo Prep");
+        }
     }
 
     public void NotifyProcessingStarted(string trackHash, string fileName)

@@ -13,6 +13,7 @@ using SLSKDONET.Data.Entities;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using Avalonia.Threading;
+using SLSKDONET.Events;
 
 namespace SLSKDONET.ViewModels;
 
@@ -210,6 +211,7 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
         
         _projectAddedSubscription = _eventBus.GetEvent<ProjectAddedEvent>().Subscribe(OnProjectAdded);
         _findSimilarSubscription = _eventBus.GetEvent<FindSimilarRequestEvent>().Subscribe(OnFindSimilarRequest);
+        _searchRequestedSubscription = _eventBus.GetEvent<SearchRequestedEvent>().Subscribe(OnSearchRequested);
         
         // Startup background tasks
         Task.Run(() => _libraryService.SyncLibraryEntriesFromTracksAsync()).ConfigureAwait(false);
@@ -217,6 +219,7 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
 
     private readonly IDisposable _projectAddedSubscription;
     private readonly IDisposable _findSimilarSubscription;
+    private readonly IDisposable _searchRequestedSubscription;
 
     public void Dispose()
     {
@@ -233,6 +236,7 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
                 _disposables.Dispose();
                 _projectAddedSubscription?.Dispose();
                 _findSimilarSubscription?.Dispose();
+                _searchRequestedSubscription?.Dispose();
                 _selectionDebounceTimer?.Dispose();
                 
                 Projects.ProjectSelected -= OnProjectSelected;
@@ -280,5 +284,23 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
             MusicalKey = entity.MusicalKey,
             Bitrate = entity.Bitrate
         };
+    }
+
+    private void OnSearchRequested(SearchRequestedEvent evt)
+    {
+        _logger.LogInformation("🔍 Cross-Component Search Requested: {Query}", evt.Query);
+        
+        // Use Dispatcher to ensure UI updates on main thread
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => 
+        {
+            // Update search query
+            Tracks.SearchText = evt.Query;
+            
+            // Clear project selection to show "All Tracks"
+            Projects.SelectedProject = null;
+            
+            // Navigate to Library if not already there (MainViewModel handles this if we publish event)
+            // But we are usually already in Library.
+        });
     }
 }

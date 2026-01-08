@@ -83,6 +83,10 @@ public class TrackEntity
     // Phase 13: Per-Track Filter Overrides
     public string? PreferredFormats { get; set; }
     public int? MinBitrateOverride { get; set; }
+
+    // Phase 12.7: Style Classification
+    public string? DetectedSubGenre { get; set; }
+    public float? SubGenreConfidence { get; set; }
 }
 
 /// <summary>
@@ -219,6 +223,7 @@ public class PlaylistTrackEntity
     
     // Phase 15
     public string? DetectedSubGenre { get; set; }
+    public float? SubGenreConfidence { get; set; } // Phase 12.7
     public string? PrimaryGenre { get; set; } // Phase 10
 
     // Filter Overrides
@@ -304,4 +309,8 @@ public class LibraryEntryEntity
     public bool IsPrepared { get; set; } = false; // Phase 10
     public string? PrimaryGenre { get; set; } // Phase 10
     public string? CuePointsJson { get; set; } // Phase 10
+
+    // Phase 12.7: Style Classification
+    public string? DetectedSubGenre { get; set; }
+    public float? SubGenreConfidence { get; set; }
 }

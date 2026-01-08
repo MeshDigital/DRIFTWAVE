@@ -204,9 +204,19 @@
                    </Border>
                    
                    <!-- Primary Genre Tag (Pill) -->
-                   <Border Background="{DynamicResource TertiaryBackgroundBrush}" CornerRadius="10" Padding="8,1" IsVisible="{Binding PrimaryGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                   <Border Background="{DynamicResource TertiaryBackgroundBrush}" CornerRadius="10" Padding="8,1" Margin="0,0,6,0" IsVisible="{Binding PrimaryGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                        <TextBlock Text="{Binding PrimaryGenre}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
                    </Border>
+
+                   <!-- Vibe Pill (AI Sonic Classification - Phase 12.7) -->
+                   <Button Background="{Binding VibeColor}" 
+                           Command="{Binding FilterByVibeCommand}"
+                           BorderThickness="0" CornerRadius="10" Padding="8,1" Margin="0,0,6,0" 
+                           IsVisible="{Binding DetectedSubGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           ToolTip.Tip="{Binding SubGenreConfidence, StringFormat='AI Confidence: {0:P0}. Click to filter by this vibe.'}">
+                       <TextBlock Text="{Binding DetectedSubGenre, StringFormat='✨ {0}'}" FontSize="10" 
+                                  Foreground="White" FontWeight="Heavy" Opacity="0.9"/>
+                   </Button>
 
                    <!-- Year Tag (Pill) -->
                    <Border Background="#1AFFFFFF" CornerRadius="10" Padding="8,1" IsVisible="{Binding YearDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">

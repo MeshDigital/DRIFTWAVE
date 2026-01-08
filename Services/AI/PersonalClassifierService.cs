@@ -135,7 +135,7 @@ public class PersonalClassifierService
     /// <summary>
     /// Predicts the vibe/genre from an audio embedding.
     /// </summary>
-    public (string Vibe, float Confidence) Predict(float[] embedding)
+    public virtual (string Vibe, float Confidence) Predict(float[] embedding)
     {
         if (_predictionEngine == null || embedding == null || embedding.Length != 128)
             return ("Unknown (No Model)", 0f);

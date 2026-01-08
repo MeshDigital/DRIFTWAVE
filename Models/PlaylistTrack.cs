@@ -77,9 +77,14 @@ public class PlaylistTrack
     public int TrackNumber { get; set; }
 
     /// <summary>
-    /// Timestamp when this track was added to the playlist.
+    /// The specific sub-genre detected by the Style Classifier (Phase 12.7).
     /// </summary>
     public string? DetectedSubGenre { get; set; }
+
+    /// <summary>
+    /// Confidence score for the detected sub-genre (0.0 - 1.0).
+    /// </summary>
+    public float? SubGenreConfidence { get; set; }
 
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 
