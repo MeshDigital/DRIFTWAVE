@@ -117,15 +117,23 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
          _artwork = new ArtworkProxy(_artworkCache, Model.AlbumArtUrl);
          
          FindSimilarCommand = ReactiveCommand.Create(FindSimilar);
+         FindSimilarAiCommand = ReactiveCommand.Create(FindSimilarAi);
     }
     
     private void FindSimilar()
     {
         if (Model == null) return;
-        _eventBus.Publish(new FindSimilarRequestEvent(Model));
+        _eventBus.Publish(new FindSimilarRequestEvent(Model, useAi: false));
+    }
+
+    private void FindSimilarAi()
+    {
+        if (Model == null) return;
+        _eventBus.Publish(new FindSimilarRequestEvent(Model, useAi: true));
     }
 
     public ICommand FindSimilarCommand { get; }
+    public ICommand FindSimilarAiCommand { get; }
 
     // IDisplayableTrack Implementation
     public string GlobalId => Model.TrackUniqueHash;

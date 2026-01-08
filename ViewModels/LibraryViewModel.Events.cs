@@ -185,4 +185,109 @@ public partial class LibraryViewModel
 
         return matches.OrderByDescending(m => m.Score).Take(20).ToList();
     }
+
+    /// <summary>
+    /// Handles the event triggered by "Find Similar" context menu.
+    /// Dispatches to either Algorithmic (Sonic Twin) or AI (Vibe Match) search.
+    /// </summary>
+    private async void OnFindSimilarRequest(FindSimilarRequestEvent e)
+    {
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            try
+            {
+                IsLoadingMatches = true;
+                MixHelperSeedTrack = new PlaylistTrackViewModel(e.SeedTrack);
+                
+                // Switch Sidebar to Vision
+                IsMixHelperVisible = true;
+
+                List<SonicMatch> matches;
+
+                if (e.UseAi)
+                {
+                    _notificationService.Show("AI Search", "Analyzing neural embeddings...", NotificationType.Information);
+                    matches = await GetAiMatchesInternalAsync(e.SeedTrack);
+                }
+                else
+                {
+                    matches = await GetSonicMatchesInternalAsync(e.SeedTrack);
+                }
+
+                HarmonicMatches.Clear();
+                foreach (var match in matches)
+                {
+                    // "Sonic Twin" or "Vibe Match" label based on mode
+                    string label = e.UseAi ? $"Vibe: {match.Score:F0}%" : "Sonic Twin";
+                    var vm = new HarmonicMatchViewModel(match.Entry, match.Score, label);
+                    HarmonicMatches.Add(vm);
+                }
+                
+                if (!matches.Any())
+                {
+                    _notificationService.Show("No Matches", "No similar tracks found in library.", NotificationType.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Find Similar request failed");
+                _notificationService.Show("Search Error", ex.Message, NotificationType.Error);
+            }
+            finally
+            {
+                IsLoadingMatches = false;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Phase 12.6: Uses the Personal Classifier (AI) to find matches based on vector embeddings.
+    /// </summary>
+    private async Task<List<SonicMatch>> GetAiMatchesInternalAsync(PlaylistTrack track)
+    {
+        var matches = new List<SonicMatch>();
+        
+        // 1. Get seed embedding
+        var seedFeatures = await _databaseService.GetAudioFeaturesByHashAsync(track.TrackUniqueHash);
+        
+        if (seedFeatures == null || string.IsNullOrEmpty(seedFeatures.AiEmbeddingJson))
+        {
+            _notificationService.Show("Analysis Required", "This track hasn't been analyzed by the AI yet.", NotificationType.Warning);
+            return matches;
+        }
+
+        float[]? seedVector = null;
+        try 
+        {
+            seedVector = System.Text.Json.JsonSerializer.Deserialize<float[]>(seedFeatures.AiEmbeddingJson);
+        }
+        catch { return matches; }
+
+        if (seedVector == null || seedVector.Length != 128) return matches;
+
+        // 2. Load candidates (All features)
+        var candidates = await _databaseService.LoadAllAudioFeaturesAsync();
+        
+        // 3. Perform Vector Search via Classifier Service
+        var similarTracks = _personalClassifier.FindSimilarTracks(
+            seedVector, 
+            (float)(track.BPM ?? 120),
+            candidates, 
+            limit: 20
+        );
+
+        // 4. Hydrate results
+        foreach (var (hash, score) in similarTracks)
+        {
+            if (hash == track.TrackUniqueHash) continue;
+
+            var entry = await _libraryService.FindLibraryEntryAsync(hash);
+            if (entry != null)
+            {
+                matches.Add(new SonicMatch { Entry = entry, Score = score * 100.0 });
+            }
+        }
+
+        return matches;
+    }
 }

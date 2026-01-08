@@ -41,6 +41,7 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
     private readonly LibraryCacheService _libraryCacheService;
     private readonly IServiceProvider _serviceProvider;
     private readonly Services.Export.IHardwareExportService _hardwareExportService;
+    private readonly DatabaseService _databaseService;
 
     // Infrastructure for Sidebars/Delayed operations
     private System.Threading.Timer? _selectionDebounceTimer;
@@ -170,8 +171,9 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
         LibrarySourcesViewModel librarySourcesViewModel,
         IServiceProvider serviceProvider,
         DownloadManager downloadManager, // Added parameter
-        Services.AI.PersonalClassifierService personalClassifier, // Changed from IServiceProvider lookup to direct injection
-        SearchFilterViewModel searchFilters) // Added parameter
+        Services.AI.PersonalClassifierService personalClassifier,
+        DatabaseService databaseService,
+        SearchFilterViewModel searchFilters)
     {
         _logger = logger;
         _navigationService = navigationService;
@@ -190,6 +192,7 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
         _libraryCacheService = libraryCacheService;
         _hardwareExportService = hardwareExportService;
         _serviceProvider = serviceProvider;
+        _databaseService = databaseService;
         LibrarySourcesViewModel = librarySourcesViewModel;
 
         Projects = projects;
@@ -207,12 +210,14 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
         Tracks.SelectedTracks.CollectionChanged += OnTrackSelectionChanged;
         
         _projectAddedSubscription = _eventBus.GetEvent<ProjectAddedEvent>().Subscribe(OnProjectAdded);
+        _findSimilarSubscription = _eventBus.GetEvent<FindSimilarRequestEvent>().Subscribe(OnFindSimilarRequest);
         
         // Startup background tasks
         Task.Run(() => _libraryService.SyncLibraryEntriesFromTracksAsync()).ConfigureAwait(false);
     }
 
     private readonly IDisposable _projectAddedSubscription;
+    private readonly IDisposable _findSimilarSubscription;
 
     public void Dispose()
     {
@@ -228,6 +233,7 @@ public partial class LibraryViewModel : INotifyPropertyChanged, IDisposable
             {
                 _disposables.Dispose();
                 _projectAddedSubscription?.Dispose();
+                _findSimilarSubscription?.Dispose();
                 _selectionDebounceTimer?.Dispose();
                 _matchLoadCancellation?.Cancel();
                 _matchLoadCancellation?.Dispose();
