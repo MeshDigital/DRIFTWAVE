@@ -122,6 +122,7 @@ public class TrackRepository : ITrackRepository
     {
         using var context = new AppDbContext();
         return await context.PlaylistTracks
+            .Include(t => t.TechnicalDetails) // FIX: Load waveform band data
             .Where(t => t.PlaylistId == playlistId)
             .OrderBy(t => t.SortOrder)
             .ToListAsync();

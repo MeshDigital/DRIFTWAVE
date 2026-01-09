@@ -775,12 +775,12 @@ public class LibraryService : ILibraryService
             SpotifyAlbumId = entity.SpotifyAlbumId,
             SpotifyArtistId = entity.SpotifyArtistId,
             AlbumArtUrl = entity.AlbumArtUrl,
-            // HEAVY DATA REFACTOR: Lazy loaded via TechnicalDetails
-            WaveformData = Array.Empty<byte>(), 
-            RmsData = Array.Empty<byte>(),
-            LowData = Array.Empty<byte>(),
-            MidData = Array.Empty<byte>(),
-            HighData = Array.Empty<byte>(),
+            // Load waveform bands from TechnicalDetails (Lazy loaded via Include in Repository)
+            WaveformData = entity.TechnicalDetails?.WaveformData ?? Array.Empty<byte>(), 
+            RmsData = entity.TechnicalDetails?.RmsData ?? Array.Empty<byte>(),
+            LowData = entity.TechnicalDetails?.LowData ?? Array.Empty<byte>(),
+            MidData = entity.TechnicalDetails?.MidData ?? Array.Empty<byte>(),
+            HighData = entity.TechnicalDetails?.HighData ?? Array.Empty<byte>(),
             ArtistImageUrl = entity.ArtistImageUrl,
             Genres = entity.Genres,
             Popularity = entity.Popularity,

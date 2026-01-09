@@ -205,6 +205,11 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
         }
     }
     
+    // Aliases for StandardTrackRow.axaml compatibility (binds to ArtistName/TrackTitle)
+    public string ArtistName => !string.IsNullOrWhiteSpace(Artist) ? Artist : "Unknown Artist";
+    public string TrackTitle => !string.IsNullOrWhiteSpace(Title) ? Title : "Unknown Title";
+    public string AlbumName => !string.IsNullOrWhiteSpace(Album) ? Album : "Unknown Album";
+    
     public string? Genres => GenresDisplay;
     public int Popularity => Model.Popularity ?? 0;
     public string? Duration => DurationDisplay;
@@ -438,6 +443,9 @@ public class PlaylistTrackViewModel : INotifyPropertyChanged, Library.ILibraryNo
              OnPropertyChanged(nameof(Artist));
              OnPropertyChanged(nameof(Title));
              OnPropertyChanged(nameof(Album));
+             OnPropertyChanged(nameof(ArtistName)); // Alias for StandardTrackRow
+             OnPropertyChanged(nameof(TrackTitle)); // Alias for StandardTrackRow
+             OnPropertyChanged(nameof(AlbumName));  // Alias for StandardTrackRow
              OnPropertyChanged(nameof(CoverArtUrl));
              OnPropertyChanged(nameof(ArtworkBitmap));
              OnPropertyChanged(nameof(SpotifyTrackId));

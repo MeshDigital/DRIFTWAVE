@@ -1898,63 +1898,112 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                                 _logger.LogWarning(ex, "âš ï¸ Audio analysis failed (non-critical)");
                             }
 
-                            // C. Atomic Database Update (All or Nothing)
-                            try
+                            // C. Atomic Database Update (All or Nothing) with Retry Logic
+                            int maxRetries = 3;
+                            for (int attempt = 1; attempt <= maxRetries; attempt++)
                             {
-                                using var db = new AppDbContext();
-                                
-                                // C1. Save Technical Analysis (if successful)
-                                if (analysis != null)
+                                try
                                 {
-                                    var existing = await db.AudioAnalysis
-                                        .FirstOrDefaultAsync(a => a.TrackUniqueHash == analysisParams.Hash);
-                                    if (existing != null) 
-                                        db.AudioAnalysis.Remove(existing);
+                                    using var db = new AppDbContext();
                                     
-                                    db.AudioAnalysis.Add(analysis);
-                                    _logger.LogInformation("ðŸ”Š Audio analysis saved for {Track}", ctx.Model.Title);
-                                }
-
-                                // C2. Update ALL PlaylistTrack instances with waveform & metrics
-                                var trackInstances = await db.PlaylistTracks
-                                    .Include(t => t.TechnicalDetails)
-                                    .Where(t => t.TrackUniqueHash == analysisParams.Hash)
-                                    .ToListAsync();
-
-                                foreach (var track in trackInstances)
-                                {
-                                    // Waveform data for UI
-                                    if (waveform != null && waveform.PeakData.Length > 0)
+                                    // C1. Save Technical Analysis (Upsert pattern)
+                                    // FIX: Do not remove/add, just update existing to avoid FK conflicts
+                                    if (analysis != null)
                                     {
-                                        if (track.TechnicalDetails == null)
-                                            track.TechnicalDetails = new global::SLSKDONET.Data.Entities.TrackTechnicalEntity { Id = track.Id, PlaylistTrackId = track.Id };
-                                            
-                                        track.TechnicalDetails.WaveformData = waveform.PeakData;
-                                        track.TechnicalDetails.RmsData = waveform.RmsData;
-                                        track.TechnicalDetails.LowData = waveform.LowData;
-                                        track.TechnicalDetails.MidData = waveform.MidData;
-                                        track.TechnicalDetails.HighData = waveform.HighData;
+                                        var existing = await db.AudioAnalysis
+                                            .FirstOrDefaultAsync(a => a.TrackUniqueHash == analysisParams.Hash);
+                                        
+                                        if (existing != null) 
+                                        {
+                                            // Update existing
+                                            existing.LoudnessLufs = analysis.LoudnessLufs;
+                                            existing.TruePeakDb = analysis.TruePeakDb;
+                                            existing.DynamicRange = analysis.DynamicRange;
+                                            existing.Bitrate = analysis.Bitrate;
+                                            existing.SampleRate = analysis.SampleRate;
+                                            existing.Channels = analysis.Channels;
+                                            existing.DurationMs = analysis.DurationMs;
+                                            existing.Codec = analysis.Codec;
+                                            // IsVbr and HasHighFreqContent not in Entity
+                                            existing.FrequencyCutoff = analysis.FrequencyCutoff;
+                                            existing.SpectralHash = analysis.SpectralHash;
+                                            existing.AnalyzedAt = DateTime.UtcNow;
+                                        }
+                                        else
+                                        {
+                                            // Insert new
+                                            db.AudioAnalysis.Add(analysis);
+                                        }
+                                        _logger.LogInformation("ðŸ”Š Audio analysis staged for {Track}", ctx.Model.Title);
+                                    }
+
+                                    // C2. Update ALL PlaylistTrack instances with waveform & metrics
+                                    var trackInstances = await db.PlaylistTracks
+                                        .Include(t => t.TechnicalDetails)
+                                        .Where(t => t.TrackUniqueHash == analysisParams.Hash)
+                                        .ToListAsync();
+
+                                    foreach (var track in trackInstances)
+                                    {
+                                        // Waveform data for UI
+                                        if (waveform != null && waveform.PeakData.Length > 0)
+                                        {
+                                            if (track.TechnicalDetails == null)
+                                            {
+                                                var newTech = new TrackTechnicalEntity();
+                                                newTech.Id = track.Id;
+                                                newTech.PlaylistTrackId = track.Id;
+                                                track.TechnicalDetails = newTech;
+                                            }
+                                                
+                                            track.TechnicalDetails.WaveformData = waveform.PeakData;
+                                            track.TechnicalDetails.RmsData = waveform.RmsData;
+                                            track.TechnicalDetails.LowData = waveform.LowData;
+                                            track.TechnicalDetails.MidData = waveform.MidData;
+                                            track.TechnicalDetails.HighData = waveform.HighData;
+                                        }
+                                    }
+
+                                    await db.SaveChangesAsync();
+                                    _logger.LogInformation("âœ… Analysis persisted for {Count} playlist instances", trackInstances.Count);
+
+                                    // D. Notify UI (Success)
+                                    _eventBus.Publish(new TrackAnalysisCompletedEvent(analysisParams.Hash, true));
+
+                                    // E. Queue for Musical Intelligence (Phase 4 - Essentia)
+                                    if (analysis != null)
+                                    {
+                                        _analysisQueue.QueueAnalysis(analysisParams.Path, analysisParams.Hash);
+                                        _logger.LogInformation("ðŸ§  Queued for musical analysis: {Title}", ctx.Model.Title);
+                                    }
+                                    
+                                    // Break retry loop on success
+                                    break; 
+                                }
+                                catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+                                {
+                                    if (attempt == maxRetries)
+                                    {
+                                        _logger.LogError("â Œ Failed to persist analysis results after {Retries} attempts due to concurrency", maxRetries);
+                                        _eventBus.Publish(new TrackAnalysisCompletedEvent(
+                                            analysisParams.Hash, false, "Concurrency error persisting results"));
+                                        // Re-throw if you want to escalate, or just swallow/log as terminal failure
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("âš  Concurrency conflict saving analysis. Retrying... (Attempt {Attempt}/{Max})", attempt, maxRetries);
+                                        await Task.Delay(250 * attempt); // Progressive backoff
                                     }
                                 }
-
-                                await db.SaveChangesAsync();
-                                _logger.LogInformation("âœ… Analysis persisted for {Count} playlist instances", trackInstances.Count);
-
-                                // D. Notify UI (Success)
-                                _eventBus.Publish(new TrackAnalysisCompletedEvent(analysisParams.Hash, true));
-
-                                // E. Queue for Musical Intelligence (Phase 4 - Essentia)
-                                if (analysis != null)
+                                catch (Exception dbEx)
                                 {
-                                    _analysisQueue.QueueAnalysis(analysisParams.Path, analysisParams.Hash);
-                                    _logger.LogInformation("ðŸ§  Queued for musical analysis: {Title}", ctx.Model.Title);
+                                    _logger.LogError(dbEx, "â Œ Failed to persist analysis results on attempt {Attempt}", attempt);
+                                    if (attempt == maxRetries)
+                                    {
+                                         _eventBus.Publish(new TrackAnalysisCompletedEvent(
+                                            analysisParams.Hash, false, dbEx.Message));
+                                    }
                                 }
-                            }
-                            catch (Exception dbEx)
-                            {
-                                _logger.LogError(dbEx, "âŒ Failed to persist analysis results");
-                                _eventBus.Publish(new TrackAnalysisCompletedEvent(
-                                    analysisParams.Hash, false, dbEx.Message));
                             }
                         }
                         catch (Exception ex)

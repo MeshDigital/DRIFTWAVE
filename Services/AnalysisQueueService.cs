@@ -487,7 +487,8 @@ public class AnalysisWorker : BackgroundService
 
                 _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
 
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                // Match timeout to EssentiaAnalyzerService (120s) + buffer for Waveform/IO
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, timeoutCts.Token);
 
                 // 1. Generate Waveform

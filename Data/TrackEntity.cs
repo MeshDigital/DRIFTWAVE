@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SLSKDONET.Models;
+using SLSKDONET.Data.Entities;
 
 namespace SLSKDONET.Data;
 
@@ -176,7 +177,7 @@ public class PlaylistTrackEntity
     // public string? AiEmbeddingJson { get; set; }
     
     // Navigation Property for Lazy Loading
-    public Entities.TrackTechnicalEntity? TechnicalDetails { get; set; }
+    public TrackTechnicalEntity? TechnicalDetails { get; set; }
 
     public string? ArtistImageUrl { get; set; }
     public string? Genres { get; set; }
