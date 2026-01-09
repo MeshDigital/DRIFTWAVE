@@ -588,6 +588,9 @@ public partial class App : Application
         
         // Harmonic matching service (DJ feature)
         services.AddSingleton<HarmonicMatchService>();
+        
+        // Phase 18: Sonic Match Engine - AI-powered vibe similarity
+        services.AddSingleton<Services.AI.ISonicMatchService, Services.AI.SonicMatchService>();
 
         // Phase 2.5: Path provider for safe folder structure
         services.AddSingleton<PathProviderService>();
