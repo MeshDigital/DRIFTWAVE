@@ -306,8 +306,17 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                     
                     // Sonic Characteristics
                     // Phase 13A: Improved Energy mapping (combines RMS intensity and Loudness)
-                    Energy = data.LowLevel?.Rms?.Mean * 10 ?? (data.LowLevel?.AverageLoudness > -8 ? 0.9f : (data.LowLevel?.AverageLoudness > -12 ? 0.7f : 0.5f)),
-                    Danceability = data.HighLevel?.Danceability?.All?.Danceable ?? data.Rhythm?.Danceability ?? 0,
+                    // Clamp to 0-1 to prevent UI overflow (e.g., 112%)
+                    Energy = Math.Clamp(
+                        data.LowLevel?.Rms?.Mean * 10 ?? (data.LowLevel?.AverageLoudness > -8 ? 0.9f : (data.LowLevel?.AverageLoudness > -12 ? 0.7f : 0.5f)),
+                        0f, 1f),
+                    Danceability = Math.Clamp(
+                        data.HighLevel?.Danceability?.All?.Danceable ?? data.Rhythm?.Danceability ?? 0,
+                        0f, 1f),
+                    // NEW: Intensity metric (composite of onset rate + spectral complexity)
+                    Intensity = Math.Clamp(
+                        ((data.Rhythm?.OnsetRate ?? 0) / 15f * 0.5f) + ((data.LowLevel?.SpectralComplexity?.Mean ?? 0) / 100f * 0.5f),
+                        0f, 1f),
                     LoudnessLUFS = data.LowLevel?.AverageLoudness ?? 0,
                     SpectralCentroid = data.LowLevel?.SpectralCentroid?.Mean ?? 0,
                     SpectralComplexity = data.LowLevel?.SpectralComplexity?.Mean ?? 0,
@@ -321,7 +330,9 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                         data.LowLevel?.AverageLoudness ?? 0),
 
                     // Phase 13C: AI Layer (Vocals & Mood)
-                    InstrumentalProbability = data.HighLevel?.VoiceInstrumental?.All?.Instrumental ?? 0,
+                    // TF models may not be loaded - use heuristic fallback based on spectral features
+                    InstrumentalProbability = data.HighLevel?.VoiceInstrumental?.All?.Instrumental 
+                        ?? EstimateInstrumentalProbability(data.LowLevel, data.Rhythm),
                     MoodTag = DetermineMoodTag(data.HighLevel),
                     MoodConfidence = CalculateMoodConfidence(data.HighLevel),
 
@@ -349,7 +360,41 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                                 // Calculate L2 Norm (Magnitude) for efficient Cosine Similarity
                                 entity.EmbeddingMagnitude = (float)Math.Sqrt(embedding.Sum(x => x * x));
                             }
-                            break;
+                        }
+                        
+                        // Phase 17: EDM Specialist - genre_electronic
+                        if (kvp.Key.Contains("genre_electronic", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var (subgenre, confidence) = ExtractElectronicSubgenre(kvp.Value);
+                            entity.ElectronicSubgenre = subgenre;
+                            entity.ElectronicSubgenreConfidence = confidence;
+                            _logger.LogDebug("🎵 EDM Subgenre: {Subgenre} ({Confidence:P0})", subgenre, confidence);
+                        }
+                        
+                        // Phase 17: EDM Specialist - tonal_atonal (DJ Tool Detection)
+                        if (kvp.Key.Contains("tonal_atonal", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var (tonal, atonal) = ExtractTonalAtonal(kvp.Value);
+                            entity.TonalProbability = tonal;
+                            entity.IsDjTool = atonal > 0.8f; // High atonal = DJ Tool / Drum Loop
+                            _logger.LogDebug("🎵 Tonal: {Tonal:P0}, IsDjTool: {IsDjTool}", tonal, entity.IsDjTool);
+                        }
+                        
+                        // Phase 17: EDM Specialist - arousal_valence OR emomusic (2D Vibe Map)
+                        // arousal_valence preferred, emomusic as fallback
+                        if (kvp.Key.Contains("arousal_valence", StringComparison.OrdinalIgnoreCase) ||
+                            kvp.Key.Contains("emomusic", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var (arousal, valence) = ExtractArousalValence(kvp.Value);
+                            entity.Arousal = arousal;
+                            entity.Valence = valence;
+                            
+                            // Derive MoodTag from arousal_valence quadrant
+                            entity.MoodTag = MapArousalValenceToMood(arousal, valence);
+                            entity.MoodConfidence = 0.8f; // Fixed confidence for continuous model
+                            
+                            _logger.LogDebug("🎵 Vibe Map: Arousal={Arousal}, Valence={Valence} -> {Mood}", 
+                                arousal, valence, entity.MoodTag);
                         }
                     }
                 }
@@ -466,6 +511,46 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
         return dynamicComplexity < 2.0f && loudnessLUFS > -7.0f;
     }
 
+    /// <summary>
+    /// Heuristic fallback for vocal/instrumental classification when TensorFlow models unavailable.
+    /// Uses spectral characteristics that correlate with vocal presence:
+    /// - Higher spectral centroid often indicates vocals (human voice is spectrally bright)
+    /// - Lower dynamic complexity often indicates more instrumental content
+    /// - Higher spectral complexity typically means more instrumental layering
+    /// Returns value 0-1 where 0=fully vocal, 1=fully instrumental
+    /// </summary>
+    private static float EstimateInstrumentalProbability(LowLevelData? lowLevel, RhythmData? rhythm)
+    {
+        if (lowLevel == null) return 0.5f; // Default to uncertain
+        
+        float instrumental = 0.5f; // Start neutral
+        
+        // Spectral Centroid: Human voice typically has centroid 1000-4000 Hz
+        // Higher values suggest more instrumental content (synths, percussion)
+        var centroid = lowLevel.SpectralCentroid?.Mean ?? 0;
+        if (centroid > 4000) instrumental += 0.15f;      // High = more instrumental
+        else if (centroid > 2000) instrumental += 0.0f;  // Voice range = neutral
+        else if (centroid > 500) instrumental -= 0.1f;   // Mid-low = possibly vocal
+        
+        // Dynamic Complexity: Vocals tend to have moderate dynamics
+        // Very low dynamics (brickwalled) often = instrumental EDM
+        var dynamics = lowLevel.DynamicComplexity;
+        if (dynamics < 1.5f) instrumental += 0.1f;  // Crushed = likely instrumental
+        else if (dynamics > 4.0f) instrumental -= 0.1f; // High dynamics = possibly vocal
+        
+        // Spectral Complexity: More layers often = instrumental
+        var complexity = lowLevel.SpectralComplexity?.Mean ?? 0;
+        if (complexity > 40) instrumental += 0.1f;
+        else if (complexity < 15) instrumental -= 0.1f;
+        
+        // Onset Rate: Vocals have fewer distinct onsets than drums/synths
+        var onsets = rhythm?.OnsetRate ?? 0;
+        if (onsets > 8) instrumental += 0.1f;   // Busy = instrumental
+        else if (onsets < 3) instrumental -= 0.05f; // Sparse = possibly vocal ballad
+        
+        return Math.Clamp(instrumental, 0.0f, 1.0f);
+    }
+
     private static string DetermineMoodTag(HighLevelData? highLevel)
     {
         if (highLevel == null) return string.Empty;
@@ -557,6 +642,119 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
             return null;
         }
     }
+
+    // ============================================
+    // Phase 17: EDM Specialist Model Helpers
+    // ============================================
+
+    /// <summary>
+    /// Extracts electronic subgenre from genre_electronic model output.
+    /// </summary>
+    private static (string subgenre, float confidence) ExtractElectronicSubgenre(JsonElement element)
+    {
+        try
+        {
+            // Structure: { "all": { "dnb": 0.95, "house": 0.02, "techno": 0.01, ... } }
+            if (element.TryGetProperty("all", out var allProp))
+            {
+                var genres = new Dictionary<string, float>
+                {
+                    ["DnB"] = TryGetFloat(allProp, "dnb") ?? TryGetFloat(allProp, "drum_and_bass") ?? 0,
+                    ["House"] = TryGetFloat(allProp, "house") ?? 0,
+                    ["Techno"] = TryGetFloat(allProp, "techno") ?? 0,
+                    ["Trance"] = TryGetFloat(allProp, "trance") ?? 0,
+                    ["Ambient"] = TryGetFloat(allProp, "ambient") ?? 0
+                };
+
+                var top = genres.OrderByDescending(g => g.Value).First();
+                return (top.Key, top.Value);
+            }
+        }
+        catch { }
+        return ("Unknown", 0);
+    }
+
+    /// <summary>
+    /// Extracts tonal/atonal probabilities from tonal_atonal model output.
+    /// </summary>
+    private static (float tonal, float atonal) ExtractTonalAtonal(JsonElement element)
+    {
+        try
+        {
+            // Structure: { "all": { "tonal": 0.7, "atonal": 0.3 } }
+            if (element.TryGetProperty("all", out var allProp))
+            {
+                float tonal = TryGetFloat(allProp, "tonal") ?? 0.5f;
+                float atonal = TryGetFloat(allProp, "atonal") ?? 0.5f;
+                return (tonal, atonal);
+            }
+        }
+        catch { }
+        return (0.5f, 0.5f);
+    }
+
+    /// <summary>
+    /// Extracts arousal/valence values from arousal_valence model output.
+    /// </summary>
+    private static (float arousal, float valence) ExtractArousalValence(JsonElement element)
+    {
+        try
+        {
+            // Structure: { "all": { "arousal": 6.5, "valence": 3.2 } }
+            // Range is typically 1-9
+            if (element.TryGetProperty("all", out var allProp))
+            {
+                float arousal = TryGetFloat(allProp, "arousal") ?? 5f;
+                float valence = TryGetFloat(allProp, "valence") ?? 5f;
+                return (arousal, valence);
+            }
+        }
+        catch { }
+        return (5f, 5f); // Neutral default
+    }
+
+    /// <summary>
+    /// Maps arousal/valence coordinates to a mood tag.
+    /// Based on Russell's Circumplex Model of Affect.
+    /// </summary>
+    private static string MapArousalValenceToMood(float arousal, float valence)
+    {
+        // Normalize to 0-1 range (assuming input is 1-9)
+        float a = (arousal - 1) / 8f;
+        float v = (valence - 1) / 8f;
+
+        // Quadrant mapping:
+        // High Arousal + High Valence = Energetic/Happy (Festival)
+        // High Arousal + Low Valence = Tense/Aggressive (Dark Techno)
+        // Low Arousal + High Valence = Calm/Peaceful (Chill/Sunset)
+        // Low Arousal + Low Valence = Sad/Depressed (Downtempo)
+
+        if (a > 0.6f && v > 0.6f) return "Festival";
+        if (a > 0.6f && v < 0.4f) return "Dark";
+        if (a < 0.4f && v > 0.6f) return "Chill";
+        if (a < 0.4f && v < 0.4f) return "Melancholic";
+        if (a > 0.5f) return "Energetic";
+        if (v > 0.5f) return "Uplifting";
+        return "Neutral";
+    }
+
+    /// <summary>
+    /// Safely extracts a float from a JsonElement property.
+    /// </summary>
+    private static float? TryGetFloat(JsonElement element, string propertyName)
+    {
+        try
+        {
+            if (element.TryGetProperty(propertyName, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number)
+                    return prop.GetSingle();
+            }
+        }
+        catch { }
+        return null;
+    }
+
 
     public void Dispose()
     {

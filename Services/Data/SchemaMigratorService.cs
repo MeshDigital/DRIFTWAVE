@@ -373,6 +373,113 @@ public class SchemaMigratorService
                 _logger.LogInformation("AudioFeatures table doesn't exist yet, skipping (will be created with column)");
             }
 
+            // 6. Phase 17: EDM Specialist Columns for AudioFeatures
+            // Using force-add pattern - try to add and catch duplicate errors
+            _logger.LogInformation("Phase 17: Checking EDM specialist columns for AudioFeatures...");
+            
+            var edmColumns = new[]
+            {
+                ("Arousal", "REAL NOT NULL DEFAULT 5"),
+                ("Valence", "REAL NOT NULL DEFAULT 5"),
+                ("ElectronicSubgenre", "TEXT NULL DEFAULT ''"),
+                ("ElectronicSubgenreConfidence", "REAL NOT NULL DEFAULT 0"),
+                ("IsDjTool", "INTEGER NOT NULL DEFAULT 0"),
+                ("TonalProbability", "REAL NOT NULL DEFAULT 0.5"),
+                ("Intensity", "REAL NOT NULL DEFAULT 0")
+            };
+
+            foreach (var (columnName, columnDef) in edmColumns)
+            {
+                try
+                {
+                    command.CommandText = $@"ALTER TABLE ""AudioFeatures"" ADD COLUMN ""{columnName}"" {columnDef};";
+                    await command.ExecuteNonQueryAsync();
+                    _logger.LogInformation("✅ Added column {Column} to AudioFeatures", columnName);
+                }
+                catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column"))
+                {
+                    // Column already exists, skip silently
+                }
+                catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("no such table"))
+                {
+                    _logger.LogWarning("AudioFeatures table doesn't exist yet, will be created by EF Core");
+                    break; // No point continuing if table doesn't exist
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to add column {Column} to AudioFeatures", columnName);
+                }
+            }
+
+            // 7. Phase 17: TrackPhrases Table
+            if (!TableExists("TrackPhrases"))
+            {
+                _logger.LogInformation("Patching Schema: Creating TrackPhrases table...");
+                command.CommandText = @"
+                    CREATE TABLE ""TrackPhrases"" (
+                        ""Id"" INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ""TrackUniqueHash"" TEXT NOT NULL,
+                        ""Type"" INTEGER NOT NULL,
+                        ""StartTimeSeconds"" REAL NOT NULL,
+                        ""EndTimeSeconds"" REAL NOT NULL,
+                        ""EnergyLevel"" REAL NOT NULL DEFAULT 0,
+                        ""Confidence"" REAL NOT NULL DEFAULT 0,
+                        ""OrderIndex"" INTEGER NOT NULL DEFAULT 0,
+                        ""Label"" TEXT NULL
+                    );
+                    CREATE INDEX ""IX_TrackPhrases_TrackUniqueHash"" ON ""TrackPhrases"" (""TrackUniqueHash"");
+                ";
+                await command.ExecuteNonQueryAsync();
+            }
+
+            // 8. Phase 17: GenreCueTemplates Table
+            if (!TableExists("GenreCueTemplates"))
+            {
+                _logger.LogInformation("Patching Schema: Creating GenreCueTemplates table...");
+                command.CommandText = @"
+                    CREATE TABLE ""GenreCueTemplates"" (
+                        ""Id"" INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ""GenreName"" TEXT NOT NULL,
+                        ""DisplayName"" TEXT NULL,
+                        ""IsBuiltIn"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue1Target"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue1OffsetBars"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue1Color"" TEXT NOT NULL DEFAULT '#FF0000',
+                        ""Cue1Label"" TEXT NULL,
+                        ""Cue2Target"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue2OffsetBars"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue2Color"" TEXT NOT NULL DEFAULT '#00FF00',
+                        ""Cue2Label"" TEXT NULL,
+                        ""Cue3Target"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue3OffsetBars"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue3Color"" TEXT NOT NULL DEFAULT '#0000FF',
+                        ""Cue3Label"" TEXT NULL,
+                        ""Cue4Target"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue4OffsetBars"" INTEGER NOT NULL DEFAULT 0,
+                        ""Cue4Color"" TEXT NOT NULL DEFAULT '#FFFF00',
+                        ""Cue4Label"" TEXT NULL,
+                        ""Cue5Target"" INTEGER NULL,
+                        ""Cue5OffsetBars"" INTEGER NULL,
+                        ""Cue5Color"" TEXT NULL,
+                        ""Cue5Label"" TEXT NULL,
+                        ""Cue6Target"" INTEGER NULL,
+                        ""Cue6OffsetBars"" INTEGER NULL,
+                        ""Cue6Color"" TEXT NULL,
+                        ""Cue6Label"" TEXT NULL,
+                        ""Cue7Target"" INTEGER NULL,
+                        ""Cue7OffsetBars"" INTEGER NULL,
+                        ""Cue7Color"" TEXT NULL,
+                        ""Cue7Label"" TEXT NULL,
+                        ""Cue8Target"" INTEGER NULL,
+                        ""Cue8OffsetBars"" INTEGER NULL,
+                        ""Cue8Color"" TEXT NULL,
+                        ""Cue8Label"" TEXT NULL
+                    );
+                    CREATE INDEX ""IX_GenreCueTemplates_GenreName"" ON ""GenreCueTemplates"" (""GenreName"");
+                ";
+                await command.ExecuteNonQueryAsync();
+            }
+
             _logger.LogInformation("Schema patching completed.");
         }
         catch (Exception ex)

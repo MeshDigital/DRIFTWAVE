@@ -34,6 +34,8 @@ public class AppDbContext : DbContext
     public DbSet<Entities.LibraryActionLogEntity> LibraryActionLogs { get; set; } // Phase 16.1: Ledger
     public DbSet<Entities.BlacklistedItemEntity> Blacklist { get; set; } // Phase 7: Forensic Duplication
     public DbSet<Entities.LibraryFolderEntity> LibraryFolders { get; set; } // Library Folder Scanner
+    public DbSet<Entities.TrackPhraseEntity> TrackPhrases { get; set; } // Phase 17: Cue Generation
+    public DbSet<Entities.GenreCueTemplateEntity> GenreCueTemplates { get; set; } // Phase 17: Cue Generation
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -52,6 +54,12 @@ public class AppDbContext : DbContext
         optionsBuilder.UseSqlite(connectionString, options =>
         {
             options.CommandTimeout(30); // 30 second timeout for long operations
+        })
+        .ConfigureWarnings(warnings =>
+        {
+            // Suppress this warning since we use runtime schema patching via SchemaMigratorService
+            // instead of code-first migrations for flexibility
+            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning);
         });
     }
 

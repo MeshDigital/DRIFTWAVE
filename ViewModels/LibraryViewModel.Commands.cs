@@ -168,7 +168,19 @@ public partial class LibraryViewModel
             IsLoading = true;
             await _libraryCacheService.ClearCacheAsync();
             await Projects.LoadProjectsAsync();
-            _notificationService.Show("Library Refreshed", "Project list updated from database.", NotificationType.Success);
+            
+            // Phase 18: Also reload tracks for the currently selected project
+            if (SelectedProject != null)
+            {
+                await Tracks.LoadProjectTracksAsync(SelectedProject);
+                _notificationService.Show("Library Refreshed", 
+                    $"Project '{SelectedProject.SourceTitle}' reloaded with {Tracks.CurrentProjectTracks.Count} tracks.", 
+                    NotificationType.Success);
+            }
+            else
+            {
+                _notificationService.Show("Library Refreshed", "Project list updated from database.", NotificationType.Success);
+            }
         }
         catch (Exception ex)
         {

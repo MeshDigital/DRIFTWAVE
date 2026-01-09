@@ -13,7 +13,8 @@
     </Design.DataContext>
 
     <!-- 5-Sector Forensic Lab Layout -->
-    <Grid RowDefinitions="180,*,200">
+    <Grid>
+        <Grid RowDefinitions="180,*,200">
         
         <!-- ============================================ -->
         <!-- TOP SECTOR: Waveform & Transport -->
@@ -61,7 +62,7 @@
         <!-- ============================================ -->
         <!-- MIDDLE ROW: 3-Column Layout -->
         <!-- ============================================ -->
-        <Grid Grid.Row="1" ColumnDefinitions="350,*,350">
+        <Grid Grid.Row="1" ColumnDefinitions="300,*,300">
             
             <!-- ============================================ -->
             <!-- LEFT SECTOR: Rhythmic & Tonal -->
@@ -173,147 +174,202 @@
             </Border>
 
             <!-- ============================================ -->
-            <!-- CENTER SECTOR: AI & Vibe (Phase 13) -->
+            <!-- CENTER SECTOR: Tabbed Analysis (Phase 13) -->
             <!-- ============================================ -->
             <Border Grid.Column="1" 
                     Background="#1A1A1A" 
-                    Padding="20">
-                <ScrollViewer>
-                    <StackPanel Spacing="24">
-                        <!-- Header -->
-                        <TextBlock Text="AI &amp; VIBE ANALYSIS" 
-                                   FontSize="11" 
-                                   FontWeight="Bold" 
-                                   Foreground="#666" 
-                                   LetterSpacing="1"/>
-
-                        <!-- Vocal Presence -->
-                        <StackPanel Spacing="8">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="VOCAL PRESENCE" FontSize="10" Foreground="#666"/>
-                                <TextBlock Grid.Column="1" 
-                                           Text="{Binding VocalPresenceLabel}" 
-                                           FontSize="11" 
-                                           Foreground="#4EC9B0"
-                                           FontWeight="SemiBold"/>
-                            </Grid>
-                            <Border Background="#0A0A0A" 
-                                    Height="120" 
-                                    CornerRadius="8"
-                                    Padding="16">
-                                <Grid>
-                                    <!-- Radial Gauge Placeholder -->
-                                    <Viewbox Width="100" Height="100">
-                                        <Canvas Width="100" Height="100">
-                                            <!-- Background circle -->
-                                            <Ellipse Width="100" Height="100" 
-                                                     Stroke="#333" 
-                                                     StrokeThickness="8"
-                                                     Fill="Transparent"/>
-                                            <!-- Foreground arc (simplified, needs arc path) -->
-                                            <Ellipse Width="100" Height="100" 
-                                                     Stroke="#9C27B0" 
-                                                     StrokeThickness="8"
-                                                     Fill="Transparent"/>
-                                            <!-- Center text -->
-                                            <TextBlock Text="{Binding InstrumentalProbability, StringFormat='{}{0:P0}'}" 
-                                                       Canvas.Left="50" 
-                                                       Canvas.Top="50"
-                                                       FontSize="20"
-                                                       FontWeight="Bold"
-                                                       Foreground="White"
-                                                       TextAlignment="Center"/>
-                                        </Canvas>
-                                    </Viewbox>
+                    Padding="16">
+                <TabControl TabStripPlacement="Top">
+                    <TabControl.Styles>
+                        <Style Selector="TabItem">
+                            <Setter Property="FontSize" Value="11"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Padding" Value="16,8"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="#888"/>
+                        </Style>
+                        <Style Selector="TabItem:selected">
+                            <Setter Property="Foreground" Value="#4EC9B0"/>
+                        </Style>
+                    </TabControl.Styles>
+                    
+                    <!-- ===== VIBE TAB ===== -->
+                    <TabItem Header="🎵 Vibe">
+                        <ScrollViewer Margin="0,16,0,0">
+                            <StackPanel Spacing="20">
+                                <!-- Danceability -->
+                                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="90,*,50">
+                                    <TextBlock Text="Danceability" 
+                                               Foreground="#AAA" 
+                                               VerticalAlignment="Center" 
+                                               FontSize="12"/>
+                                    <ProgressBar Grid.Column="1" 
+                                                 Value="{Binding Danceability}" 
+                                                 Maximum="1" 
+                                                 Height="10" 
+                                                 Margin="12,0"
+                                                 Foreground="#9C27B0" 
+                                                 Background="#333" 
+                                                 CornerRadius="5"/>
+                                    <TextBlock Grid.Column="2" 
+                                               Text="{Binding Danceability, StringFormat='{}{0:P0}'}" 
+                                               Foreground="White" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold" 
+                                               TextAlignment="Right"/>
                                 </Grid>
-                            </Border>
-                        </StackPanel>
 
-                        <!-- Mood Tags -->
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="MOOD CLASSIFICATION" FontSize="10" Foreground="#666"/>
-                            <Border Background="#0A0A0A" 
-                                    CornerRadius="4" 
-                                    Padding="16">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="{Binding MoodTag}" 
-                                               FontSize="24" 
-                                               FontWeight="Bold" 
-                                               Foreground="#FF9800"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock Text="{Binding MoodConfidence, StringFormat='Confidence: {0:P0}'}" 
-                                               FontSize="11" 
-                                               Foreground="#AAA"
-                                               HorizontalAlignment="Center"/>
+                                <!-- Energy -->
+                                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="90,*,50">
+                                    <TextBlock Text="Energy" 
+                                               Foreground="#AAA" 
+                                               VerticalAlignment="Center" 
+                                               FontSize="12"/>
+                                    <ProgressBar Grid.Column="1" 
+                                                 Value="{Binding Energy}" 
+                                                 Maximum="1" 
+                                                 Height="10" 
+                                                 Margin="12,0"
+                                                 Foreground="#FF5252" 
+                                                 Background="#333" 
+                                                 CornerRadius="5"/>
+                                    <TextBlock Grid.Column="2" 
+                                               Text="{Binding Energy, StringFormat='{}{0:P0}'}" 
+                                               Foreground="White" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold" 
+                                               TextAlignment="Right"/>
+                                </Grid>
+
+                                <!-- Intensity (NEW) -->
+                                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="90,*,50">
+                                    <TextBlock Text="Intensity" 
+                                               Foreground="#AAA" 
+                                               VerticalAlignment="Center" 
+                                               FontSize="12"/>
+                                    <ProgressBar Grid.Column="1" 
+                                                 Value="{Binding Intensity}" 
+                                                 Maximum="1" 
+                                                 Height="10" 
+                                                 Margin="12,0"
+                                                 Foreground="#FF9800" 
+                                                 Background="#333" 
+                                                 CornerRadius="5"/>
+                                    <TextBlock Grid.Column="2" 
+                                               Text="{Binding Intensity, StringFormat='{}{0:P0}'}" 
+                                               Foreground="White" 
+                                               FontSize="12" 
+                                               FontWeight="SemiBold" 
+                                               TextAlignment="Right"/>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    
+                    <!-- ===== MOOD TAB ===== -->
+                    <TabItem Header="🎭 Mood">
+                        <ScrollViewer Margin="0,16,0,0">
+                            <StackPanel Spacing="20">
+                                <!-- Vocal Presence -->
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="VOCAL PRESENCE" FontSize="10" Foreground="#666"/>
+                                        <TextBlock Grid.Column="1" 
+                                                   Text="{Binding VocalPresenceLabel}" 
+                                                   FontSize="11" 
+                                                   Foreground="#4EC9B0"
+                                                   FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <Border Background="#0A0A0A" 
+                                            Height="100" 
+                                            CornerRadius="8"
+                                            Padding="16">
+                                        <Viewbox Width="80" Height="80">
+                                            <Canvas Width="100" Height="100">
+                                                <Ellipse Width="100" Height="100" 
+                                                         Stroke="#333" 
+                                                         StrokeThickness="8"
+                                                         Fill="Transparent"/>
+                                                <Ellipse Width="100" Height="100" 
+                                                         Stroke="#9C27B0" 
+                                                         StrokeThickness="8"
+                                                         Fill="Transparent"/>
+                                                <TextBlock Text="{Binding InstrumentalProbability, StringFormat='{}{0:P0}'}" 
+                                                           Canvas.Left="25" 
+                                                           Canvas.Top="38"
+                                                           FontSize="18"
+                                                           FontWeight="Bold"
+                                                           Foreground="White"/>
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
 
-                        <!-- Danceability & Energy -->
-                        <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="100,*,50">
-                            <!-- Danceability -->
-                            <TextBlock Text="Danceability" 
-                                       Foreground="#AAA" 
-                                       VerticalAlignment="Center" 
-                                       FontSize="12"/>
-                            <ProgressBar Grid.Column="1" 
-                                         Value="{Binding Danceability}" 
-                                         Maximum="1" 
-                                         Height="8" 
-                                         Margin="12,0"
-                                         Foreground="#9C27B0" 
-                                         Background="#222" 
-                                         CornerRadius="4"/>
-                            <TextBlock Grid.Column="2" 
-                                       Text="{Binding Danceability, StringFormat='{}{0:P0}'}" 
-                                       Foreground="White" 
-                                       FontSize="12" 
-                                       FontWeight="SemiBold" 
-                                       TextAlignment="Right"/>
-
-                            <!-- Energy -->
-                            <TextBlock Grid.Row="1" 
-                                       Text="Energy" 
-                                       Foreground="#AAA" 
-                                       VerticalAlignment="Center" 
-                                       FontSize="12"
-                                       Margin="0,12"/>
-                            <ProgressBar Grid.Row="1" 
-                                         Grid.Column="1" 
-                                         Value="{Binding Energy}" 
-                                         Maximum="1" 
-                                         Height="8" 
-                                         Margin="12"
-                                         Foreground="#FF5252" 
-                                         Background="#222" 
-                                         CornerRadius="4"/>
-                            <TextBlock Grid.Row="1" 
-                                       Grid.Column="2" 
-                                       Text="{Binding Energy, StringFormat='{}{0:P0}'}" 
-                                       Foreground="White" 
-                                       FontSize="12" 
-                                       FontWeight="SemiBold" 
-                                       TextAlignment="Right"
-                                       Margin="0,12"/>
-                        </Grid>
-
-                        <!-- Subgenre Radar (Phase 13D placeholder) -->
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="SUBGENRE RADAR (Future: Phase 13D)" 
-                                       FontSize="10" 
-                                       Foreground="#444"/>
-                            <Border Background="#0A0A0A" 
-                                    Height="150" 
-                                    CornerRadius="4">
-                                <TextBlock Text="[Style Embedding Visualization]" 
-                                           Foreground="#444" 
-                                           HorizontalAlignment="Center" 
-                                           VerticalAlignment="Center"
-                                           FontStyle="Italic"/>
-                            </Border>
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
+                                <!-- Mood Classification -->
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="MOOD CLASSIFICATION" FontSize="10" Foreground="#666"/>
+                                    <Border Background="#0A0A0A" 
+                                            CornerRadius="4" 
+                                            Padding="16">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="{Binding MoodTag}" 
+                                                       FontSize="28" 
+                                                       FontWeight="Bold" 
+                                                       Foreground="#FF9800"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding MoodConfidence, StringFormat='Confidence: {0:P0}'}" 
+                                                       FontSize="11" 
+                                                       Foreground="#AAA"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                    
+                    <!-- ===== AI TAB ===== -->
+                    <TabItem Header="🧠 AI">
+                        <ScrollViewer Margin="0,16,0,0">
+                            <StackPanel Spacing="20">
+                                <!-- Subgenre Radar -->
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="SUBGENRE RADAR" 
+                                               FontSize="10" 
+                                               Foreground="#666"/>
+                                    <Border Background="#0A0A0A" 
+                                            Height="150" 
+                                            CornerRadius="4">
+                                        <TextBlock Text="[Style Embedding Visualization]" 
+                                                   Foreground="#444" 
+                                                   HorizontalAlignment="Center" 
+                                                   VerticalAlignment="Center"
+                                                   FontStyle="Italic"/>
+                                    </Border>
+                                </StackPanel>
+                                
+                                <!-- AI Model Info -->
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="MODEL INFO" 
+                                               FontSize="10" 
+                                               Foreground="#666"/>
+                                    <Border Background="#0A0A0A" 
+                                            CornerRadius="4" 
+                                            Padding="12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Essentia + TensorFlow" 
+                                                       FontSize="12" 
+                                                       Foreground="#4EC9B0"/>
+                                            <TextBlock Text="MusicNN / EffNet Models" 
+                                                       FontSize="10" 
+                                                       Foreground="#666"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
             </Border>
 
             <!-- ============================================ -->
@@ -445,5 +501,6 @@
                        FontSize="12" 
                        HorizontalAlignment="Center"/>
         </StackPanel>
+    </Grid>
     </Grid>
 </UserControl>

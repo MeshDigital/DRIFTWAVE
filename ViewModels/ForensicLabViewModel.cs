@@ -69,6 +69,28 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
         set => SetProperty(ref _isPlaying, value);
     }
 
+    // Waveform Band Data (for WaveformControl binding)
+    private byte[]? _lowData;
+    public byte[]? LowData
+    {
+        get => _lowData;
+        set => SetProperty(ref _lowData, value);
+    }
+
+    private byte[]? _midData;
+    public byte[]? MidData
+    {
+        get => _midData;
+        set => SetProperty(ref _midData, value);
+    }
+
+    private byte[]? _highData;
+    public byte[]? HighData
+    {
+        get => _highData;
+        set => SetProperty(ref _highData, value);
+    }
+
     // ============================================
     // Left Sector: Rhythmic & Tonal
     // ============================================
@@ -174,6 +196,13 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
     {
         get => _energy;
         set => SetProperty(ref _energy, value);
+    }
+
+    private float _intensity;
+    public float Intensity
+    {
+        get => _intensity;
+        set => SetProperty(ref _intensity, value);
     }
 
     // Future: Style embeddings for subgenre radar
@@ -331,9 +360,30 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
 
             LoadingStatus = "Loading Phase 13 AI data...";
 
-            // Use libraryEntry for waveform data (Phase 0 stored)
-            if (libraryEntry.WaveformData != null && libraryEntry.RmsData != null)
+            // Load waveform data from PlaylistTrack.TechnicalDetails (where DownloadManager stores it)
+            var playlistTrack = await db.PlaylistTracks
+                .Include(t => t.TechnicalDetails)
+                .FirstOrDefaultAsync(t => t.TrackUniqueHash == trackHash);
+                
+            if (playlistTrack?.TechnicalDetails != null)
             {
+                var tech = playlistTrack.TechnicalDetails;
+                WaveformData = new WaveformAnalysisData
+                {
+                    PeakData = tech.WaveformData ?? Array.Empty<byte>(),
+                    RmsData = tech.RmsData ?? Array.Empty<byte>(),
+                    DurationSeconds = libraryEntry.DurationSeconds ?? 0
+                };
+                Duration = TimeSpan.FromSeconds(libraryEntry.DurationSeconds ?? 0);
+                
+                // Load band data for WaveformControl
+                LowData = tech.LowData;
+                MidData = tech.MidData;
+                HighData = tech.HighData;
+            }
+            else if (libraryEntry.WaveformData != null && libraryEntry.RmsData != null)
+            {
+                // Fallback to LibraryEntry (older data)
                 WaveformData = new WaveformAnalysisData
                 {
                     PeakData = libraryEntry.WaveformData,
@@ -361,15 +411,23 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
                 MoodConfidence = audioFeatures.MoodConfidence;
                 Danceability = audioFeatures.Danceability;
                 Energy = audioFeatures.Energy;
+                Intensity = audioFeatures.Intensity;
 
                 IsDynamicCompressed = audioFeatures.IsDynamicCompressed;
                 LoudnessLUFS = audioFeatures.LoudnessLUFS;
                 DynamicRange = audioFeatures.DynamicComplexity;
 
                 // Store raw JSON output (if available)
-                // TODO: Store Essentia JSON in database for debugging
-                EssentiaJsonOutput = "// Raw Essentia JSON not yet stored in DB\n" +
-                                   $"// BPM: {BpmValue:F1}, Key: {CamelotKey}, Mood: {MoodTag}";
+                EssentiaJsonOutput = $"// ✅ Analysis data loaded from DB\n" +
+                                   $"// BPM: {BpmValue:F1}, Key: {CamelotKey}, Mood: {MoodTag}\n" +
+                                   $"// Danceability: {Danceability:P0}, Energy: {Energy:P0}";
+            }
+            else
+            {
+                // No analysis data found - track not analyzed yet
+                EssentiaJsonOutput = "// ⚠ This track has NOT been analyzed yet.\n" +
+                                   "// To analyze: Right-click track > Queue for Analysis\n" +
+                                   "// Or check 'Auto-Analyze Downloads' in Settings.";
             }
 
             LoadingStatus = "Loading Phase 14 forensic data...";

@@ -70,10 +70,13 @@ public class AudioFeaturesEntity
     /// </summary>
     public float Danceability { get; set; }
     
+    // Note: Valence moved to EDM Specialist Models section (arousal_valence model)
+
     /// <summary>
-    /// Valence score (0.0 - 1.0). Higher = more positive/happy.
+    /// Intensity score (0.0 - 1.0). Composite of onset rate + spectral complexity.
+    /// Higher = more sonically complex/intense.
     /// </summary>
-    public float Valence { get; set; }
+    public float Intensity { get; set; }
 
     /// <summary>
     /// Spectral centroid (Hz). Indicates "brightness" of the sound.
@@ -169,8 +172,8 @@ public class AudioFeaturesEntity
     public float InstrumentalProbability { get; set; }
 
     /// <summary>
-    /// "Vibe" classification (Happy, Aggressive, Relaxed, etc.).
-    /// Derived from aggregation of mood model outputs.
+    /// "Vibe" classification (Happy, Aggressive, Relaxed, etc.)
+    /// Derived from arousal_valence model mapping.
     /// </summary>
     public string MoodTag { get; set; } = string.Empty;
 
@@ -179,15 +182,44 @@ public class AudioFeaturesEntity
     /// </summary>
     public float MoodConfidence { get; set; }
 
-    /// <summary>
-    /// Specific confidence for the 'Happy' mood.
-    /// </summary>
-    public float HappyConfidence { get; set; }
+    // ============================================
+    // EDM Specialist Models (Phase 17)
+    // ============================================
 
     /// <summary>
-    /// Specific confidence for the 'Aggressive' mood.
+    /// Arousal (Energy/Intensity) from arousal_valence model.
+    /// Range: 1-9 (1=calm, 9=energetic)
     /// </summary>
-    public float AggressiveConfidence { get; set; }
+    public float Arousal { get; set; }
+
+    /// <summary>
+    /// Valence (Emotion) from arousal_valence model.
+    /// Range: 1-9 (1=negative/dark, 9=positive/uplifting)
+    /// </summary>
+    public float Valence { get; set; }
+
+    /// <summary>
+    /// Electronic subgenre from 'genre_electronic-musicnn-msd-2.pb'.
+    /// Values: "DnB", "House", "Techno", "Trance", "Ambient", "Unknown"
+    /// </summary>
+    public string ElectronicSubgenre { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Confidence score for ElectronicSubgenre (0.0 - 1.0).
+    /// </summary>
+    public float ElectronicSubgenreConfidence { get; set; }
+
+    /// <summary>
+    /// True if track is primarily rhythmic/percussive (no melody).
+    /// From 'tonal_atonal-musicnn-msd-1.pb' (Atonal > 0.8).
+    /// Used to flag "DJ Tools" or "Drum Loops".
+    /// </summary>
+    public bool IsDjTool { get; set; }
+
+    /// <summary>
+    /// Tonal probability (0.0 - 1.0). Higher = more melodic.
+    /// </summary>
+    public float TonalProbability { get; set; }
 
     // ============================================
     // Advanced Harmonic Mixing

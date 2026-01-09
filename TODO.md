@@ -2759,3 +2759,176 @@ public QualityFlags Flags { get; set; }
 - Clean MVVM architecture
 
 **Next Step**: Implement Phase 1 (6 hours) for 90% parity
+
+---
+
+# 🧬 PHASE 17: THE EDM SCIENTIST
+
+> *"From Generic Music Analysis to Genre-Aware Intelligence"*
+> 
+> January 9, 2026 - A pivotal discovery session
+
+---
+
+## 📖 The Story
+
+### Where We Were: The Blind Approach
+
+Before today, our analysis pipeline was **genre-agnostic**. We used a handful of Essentia models:
+
+- `discogs-effnet` - 519-class general genre classification
+- `voice_instrumental` - Vocal detection
+- `danceability` - Single danceability score
+- 6 individual `mood_*` models - Happy, Sad, Aggressive, etc. (slow, redundant)
+
+**The Problem**: This approach treated DnB the same as Jazz. It couldn't:
+- Distinguish between House and Techno (both are "Electronic")
+- Identify DJ Tools vs. full tracks
+- Provide meaningful emotional mapping for dance music
+
+### The Discovery: EDM Specialist Models
+
+We analyzed our model inventory and discovered **hidden gems**:
+
+```
+Tools/Essentia/models/
+├── genre_electronic-musicnn-msd-2.pb   <-- EDM SPECIALIST (DnB/House/Techno/Trance/Ambient)
+├── tonal_atonal-musicnn-msd-2.pb       <-- DJ TOOL DETECTOR
+├── emomusic-msd-musicnn-2.pb           <-- Better than 6 mood models
+└── 38 other models...
+```
+
+### The Upgrade: Arousal/Valence 2D Vibe Map
+
+Instead of discrete labels ("Happy", "Sad"), we now use **Russell's Circumplex Model**:
+
+```
+                    HIGH AROUSAL (9)
+                         ↑
+              ┌─────────────────────────┐
+              │ Dark     │   Festival   │
+              │ (Techno) │   (Mainstage)│
+              │          │              │
+LOW VALENCE ←─┼──────────┼──────────────┼→ HIGH VALENCE
+    (1)       │          │              │      (9)
+              │Melancholic│    Chill    │
+              │(Downtempo)│  (Sunset)   │
+              └─────────────────────────┘
+                         ↓
+                    LOW AROUSAL (1)
+```
+
+---
+
+## 🔧 What Was Implemented
+
+### 1. Updated `profile.yaml`
+
+```yaml
+highlevel:
+    compute: true
+    tensorflow_models:
+        # CORE BASICS
+        - "models/discogs-effnet-bs64-1.pb"
+        - "models/voice_instrumental-msd-musicnn-1.pb"
+        - "models/danceability-msd-musicnn-1.pb"
+        
+        # EDM SPECIALISTS (NEW)
+        - "models/genre_electronic-musicnn-msd-2.pb"
+        - "models/tonal_atonal-musicnn-msd-1.pb"
+        - "models/arousal_valence-muse-musicnn-msd-1.pb"  # Missing - needs download
+```
+
+### 2. New `AudioFeaturesEntity` Properties
+
+| Property | Type | Source Model | Purpose |
+|----------|------|--------------|---------|
+| `Arousal` | float (1-9) | arousal_valence | Energy/Intensity axis |
+| `Valence` | float (1-9) | arousal_valence | Emotional tone axis |
+| `ElectronicSubgenre` | string | genre_electronic | "DnB", "House", "Techno", etc. |
+| `ElectronicSubgenreConfidence` | float | genre_electronic | Confidence score |
+| `IsDjTool` | bool | tonal_atonal | True if Atonal > 0.8 |
+| `TonalProbability` | float | tonal_atonal | Melodic content score |
+
+### 3. Updated `EssentiaAnalyzerService.cs`
+
+New helper methods parse the model outputs:
+
+- `ExtractElectronicSubgenre()` - Picks highest confidence genre
+- `ExtractTonalAtonal()` - Returns tonal/atonal probabilities
+- `ExtractArousalValence()` - Returns 2D coordinates
+- `MapArousalValenceToMood()` - Maps quadrant to label (Festival/Dark/Chill/Melancholic)
+
+---
+
+## 📦 Model Inventory (41 Files)
+
+### Currently Integrated
+| Model | Size | Status |
+|-------|------|--------|
+| `discogs-effnet-bs64-1.pb` | 18 MB | ✅ Active |
+| `voice_instrumental-msd-musicnn-1.pb` | 82 KB | ✅ Active |
+| `danceability-msd-musicnn-1.pb` | 82 KB | ✅ Active |
+| `genre_electronic-musicnn-msd-2.pb` | 3.2 MB | ✅ NEW |
+| `tonal_atonal-musicnn-msd-2.pb` | 3.2 MB | ✅ NEW |
+
+### Available But Not Used
+| Model | Size | Potential Use |
+|-------|------|---------------|
+| `emomusic-msd-musicnn-2.pb` | 82 KB | Alternative emotion detector |
+| `genre_discogs400-discogs-effnet-1.pb` | 2 MB | 400-class genre (overkill) |
+| `mtg_jamendo_genre-discogs-effnet-1.pb` | 2.8 MB | Jamendo tagging |
+| `crepe-full-1.pb` | 89 MB | Pitch detection (slow) |
+| `spleeter-5s-3.pb` | 197 MB | Stem separation (very slow) |
+
+### ⚠️ Missing (Needs Download)
+| Model | Purpose |
+|-------|---------|
+| `arousal_valence-muse-musicnn-msd-1.pb` | 2D Vibe Map (referenced but not present) |
+
+---
+
+## 🔮 What's Next: Phase 17.1
+
+### Genre-Aware Cue Points (Completed Architecture)
+
+Created entities and services for genre-specific DJ cue generation:
+
+| Component | Status |
+|-----------|--------|
+| `TrackPhraseEntity.cs` | ✅ Created |
+| `GenreCueTemplateEntity.cs` | ✅ Created |
+| `PhraseDetectionService.cs` | ✅ Created |
+| `CueGenerationService.cs` | ✅ Created |
+| Default Templates (DnB, House, Techno, Dubstep, Trance) | ✅ Created |
+| UI Integration | ⏳ Pending |
+
+### Phase 17.2: Forensic Lab Upgrades
+
+- [ ] **Vibe Radar**: 2D scatter plot of Arousal vs. Valence
+- [ ] **Subgenre Badge**: Show detected electronic subgenre
+- [ ] **DJ Tool Flag**: Visual indicator for rhythmic-only tracks
+- [ ] **Cue Point Timeline**: Visual phrase markers on waveform
+
+---
+
+## 🎯 Key Learnings
+
+1. **MAEST ≠ Maersk**: The "Maersk" model is actually MAEST (Music Audio Efficient Spectrogram Transformer) - a heavy Transformer model, not a shipping company.
+
+2. **Specialist > Generalist**: `genre_electronic` is better for EDM than `discogs-effnet` because it's trained only on electronic music.
+
+3. **Continuous > Discrete**: `arousal_valence` (1 model) replaces 6 `mood_*` models and provides richer data.
+
+4. **Tonal/Atonal = DJ Tool Detection**: A brilliant hack - if a track is >80% atonal, it's likely a drum loop or DJ tool.
+
+---
+
+## ✅ Build Status
+
+```
+Build succeeded with 15 warning(s) in 12.1s
+0 Errors
+```
+
+All new code is integrated and compiling. Ready for runtime testing.
