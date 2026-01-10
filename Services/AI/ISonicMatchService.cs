@@ -39,6 +39,11 @@ public class SonicMatch
     public double Distance { get; set; }
     
     /// <summary>
+    /// Human-readable reason for the match (Twin Vibe, Energy Match, etc.)
+    /// </summary>
+    public string MatchReason { get; set; } = "Compatible";
+    
+    /// <summary>
     /// Similarity as a percentage (100% = identical, 0% = completely different)
     /// </summary>
     public double SimilarityPercent => Math.Max(0, 100 - (Distance * 10));
@@ -48,4 +53,5 @@ public class SonicMatch
     public float Valence { get; set; }
     public float Danceability { get; set; }
     public string? MoodTag { get; set; }
+    public double Bpm { get; set; }
 }
