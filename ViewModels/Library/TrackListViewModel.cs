@@ -282,6 +282,9 @@ public class TrackListViewModel : ReactiveObject, IDisposable
     public System.Windows.Input.ICommand BulkRetryCommand { get; }
     public System.Windows.Input.ICommand BulkCancelCommand { get; }
     public System.Windows.Input.ICommand BulkReEnrichCommand { get; }
+    
+    // Phase 18: Sonic Match - Find Similar Vibe
+    public System.Windows.Input.ICommand FindSimilarCommand { get; }
 
     public TrackListViewModel(
         ILogger<TrackListViewModel> logger,
@@ -322,6 +325,9 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         BulkRetryCommand = ReactiveCommand.CreateFromTask(ExecuteBulkRetryAsync);
         BulkCancelCommand = ReactiveCommand.CreateFromTask(ExecuteBulkCancelAsync);
         BulkReEnrichCommand = ReactiveCommand.CreateFromTask(ExecuteBulkReEnrichAsync);
+        
+        // Phase 18: Find Similar - triggers sonic match search
+        FindSimilarCommand = ReactiveCommand.Create<PlaylistTrackViewModel>(ExecuteFindSimilar);
 
         // Selection Change Tracking
         _selectedTracks.CollectionChanged += OnSelectionChanged;
@@ -839,5 +845,28 @@ public class TrackListViewModel : ReactiveObject, IDisposable
     private void OnGlobalTrackUpdated(object? sender, PlaylistTrackViewModel e)
     {
         // Track updates are handled by the ViewModel itself via binding
+    }
+
+    /// <summary>
+    /// Phase 18: Publishes FindSimilarRequestEvent to trigger sonic match search.
+    /// </summary>
+    private void ExecuteFindSimilar(PlaylistTrackViewModel? track)
+    {
+        if (track == null) 
+        {
+            // If no parameter, use lead selected track
+            track = LeadSelectedTrack;
+        }
+        
+        if (track == null || track.Model == null)
+        {
+            _logger.LogWarning("FindSimilar called with no track selected");
+            return;
+        }
+
+        _logger.LogInformation("🎵 Find Similar: Publishing event for {Artist} - {Title}", track.Artist, track.Title);
+        
+        // Use existing Models.FindSimilarRequestEvent with PlaylistTrack and UseAi=true for AI matching
+        _eventBus.Publish(new FindSimilarRequestEvent(track.Model, useAi: true));
     }
 }

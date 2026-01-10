@@ -78,7 +78,11 @@
                     </MenuItem.Icon>
                 </MenuItem>
 
-                <MenuItem Header="Find Similar (AI)" Command="{Binding FindSimilarAiCommand}" IsVisible="{Binding IsCompleted}">
+                <MenuItem Header="Find Similar Vibe (AI)" 
+                          Command="{Binding $parent[ListBox].DataContext.FindSimilarCommand}" 
+                          CommandParameter="{Binding}"
+                          IsVisible="{Binding IsCompleted}"
+                          InputGesture="Ctrl+M">
                     <MenuItem.Icon>
                         <PathIcon Data="{StaticResource brain_circuit_regular}" Width="16" Height="16"/>
                     </MenuItem.Icon>
