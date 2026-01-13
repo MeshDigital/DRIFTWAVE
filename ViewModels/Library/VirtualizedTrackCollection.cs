@@ -148,6 +148,27 @@ public class VirtualizedTrackCollection : IList<PlaylistTrackViewModel>, INotify
 
     public bool IsReadOnly => true;
 
+    /// <summary>
+    /// Returns a subset of items for non-virtualized views to prevent UI freezing.
+    /// </summary>
+    public IEnumerable<PlaylistTrackViewModel> GetSubset(int count)
+    {
+        // Force load first page if not loaded
+        if (!_pages.ContainsKey(0))
+        {
+             // We can't await here easily, so we rely on the async load to trigger later
+             // For now, return what we have or empty placeholders
+             LoadPageAsync(0).ConfigureAwait(false);
+        }
+        
+        // Return mostly placeholders if not loaded, but this prevents the crash 
+        // by only iterating 'count' times instead of 'Count' times
+        for (int i = 0; i < Math.Min(count, Count); i++)
+        {
+            yield return this[i];
+        }
+    }
+
     public void Add(PlaylistTrackViewModel item) => throw new NotSupportedException();
     public void Clear() => throw new NotSupportedException();
     public bool Contains(PlaylistTrackViewModel item) => false;

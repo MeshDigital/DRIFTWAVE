@@ -55,6 +55,13 @@ public class TrackListViewModel : ReactiveObject, IDisposable
         get => _filteredTracks;
         private set => this.RaiseAndSetIfChanged(ref _filteredTracks, value);
     }
+    
+    /// <summary>
+    /// A safe subset of tracks (max 50) for non-virtualized views like the Card View.
+    /// Prevents UI freezing with large lists.
+    /// </summary>
+    public IEnumerable<PlaylistTrackViewModel> LimitedTracks => 
+        (FilteredTracks as VirtualizedTrackCollection)?.GetSubset(50) ?? FilteredTracks.Take(50);
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -637,6 +644,9 @@ public class TrackListViewModel : ReactiveObject, IDisposable
             IsFilterDownloaded ? true : (IsFilterPending ? false : null));
 
         FilteredTracks = virtualized;
+        
+        // Update limited view for Cards to prevent UI freeze
+        RaisePropertyChanged(nameof(LimitedTracks));
         
         _logger.LogDebug("RefreshFilteredTracks (Virtualized): Updated filters for project {Id}", selectedProjectId);
 
