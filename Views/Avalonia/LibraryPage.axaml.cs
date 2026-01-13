@@ -153,4 +153,12 @@ public partial class LibraryPage : UserControl
             libraryViewModel.AddToPlaylist(targetPlaylist, sourceTrack);
         }
     }
+    
+    private void ToggleHelpPanel(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel vm)
+        {
+            vm.IsHelpPanelOpen = !vm.IsHelpPanelOpen;
+        }
+    }
 }

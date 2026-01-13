@@ -12,15 +12,6 @@ public interface ISpotifyMetadataService
     /// </summary>
     Task<FullTrack?> FindTrackAsync(string artist, string title, int? durationMs = null, bool forceRefresh = false);
 
-    /// <summary>
-    /// Fetches audio features (Key, BPM) for a track.
-    /// </summary>
-    Task<TrackAudioFeatures?> GetAudioFeaturesAsync(string spotifyId);
-
-    /// <summary>
-    /// Fetches audio features (Key, BPM) for a batch of tracks.
-    /// </summary>
-    Task<Dictionary<string, TrackAudioFeatures?>> GetAudioFeaturesBatchAsync(IEnumerable<string> spotifyIds);
 
     /// <summary>
     /// Enriches a PlaylistTrack with Spotify metadata (ID, Art, Key, BPM).

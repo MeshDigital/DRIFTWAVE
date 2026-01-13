@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
+using SLSKDONET.Data.Essentia;
 using SLSKDONET.Views; // For RelayCommand
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -61,6 +62,9 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
     public ObservableCollection<PlaylistTrackViewModel> Tracks { get; } = new();
     
     public ICommand DownloadAlbumCommand { get; }
+    public ICommand AnalyzeAlbumT1Command { get; }
+    public ICommand AnalyzeAlbumT2Command { get; }
+    public ICommand AnalyzeAlbumT3Command { get; }
     public ICommand PlayAlbumCommand { get; } 
     public ICommand AnalyzeAlbumCommand { get; }
 
@@ -108,7 +112,10 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         _downloadManager = downloadManager;
         _analysisQueueService = analysisQueueService;
         
-        DownloadAlbumCommand = new RelayCommand<object>(_ => DownloadAlbum());
+        DownloadAlbumCommand = new RelayCommand(DownloadAlbum);
+        AnalyzeAlbumT1Command = new RelayCommand(() => AnalyzeAlbum(AnalysisTier.Tier1));
+        AnalyzeAlbumT2Command = new RelayCommand(() => AnalyzeAlbum(AnalysisTier.Tier2));
+        AnalyzeAlbumT3Command = new RelayCommand(() => AnalyzeAlbum(AnalysisTier.Tier3));
         PlayAlbumCommand = new RelayCommand<object>(_ => PlayAlbum());
         AnalyzeAlbumCommand = new RelayCommand<object>(_ => AnalyzeAlbum());
         
@@ -145,7 +152,7 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
         _downloadManager.QueueTracks(tracksToDownload);
     }
 
-    private void AnalyzeAlbum()
+    private void AnalyzeAlbum(AnalysisTier tier = AnalysisTier.Tier1)
     {
         if (_analysisQueueService == null || !Tracks.Any()) return;
         
@@ -156,7 +163,7 @@ public class AlbumNode : ILibraryNode, INotifyPropertyChanged
             
         if (tracksToAnalyze.Any())
         {
-            _analysisQueueService.QueueAlbumWithPriority(tracksToAnalyze);
+            _analysisQueueService.QueueAlbumWithPriority(tracksToAnalyze, tier);
         }
     }
 

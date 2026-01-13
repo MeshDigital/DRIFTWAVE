@@ -68,7 +68,7 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
 
         AddToProjectCommand = ReactiveCommand.Create(() => 
         {
-            _eventBus.Publish(new AddToProjectRequestEvent(Model));
+            _eventBus.Publish(new AddToProjectRequestEvent(new[] { Model }));
         }, this.WhenAnyValue(x => x.IsCompleted));
 
         PauseCommand = ReactiveCommand.CreateFromTask(async () => 
@@ -257,27 +257,16 @@ public class UnifiedTrackViewModel : ReactiveObject, IDisplayableTrack, IDisposa
     public double IntegrityScore => Model.QualityConfidence ?? 0.0;
     public bool IsSecure => IntegrityScore > 0.9 && !string.IsNullOrEmpty(Model.ResolvedFilePath) && System.IO.File.Exists(Model.ResolvedFilePath);
 
-    public string QualityIcon 
-    {
-        get 
-        {
-            if (Model.Bitrate >= 1000 || (Model.Format?.Equals("FLAC", StringComparison.OrdinalIgnoreCase) ?? false)) return "💎";
-            if (Model.Bitrate >= 320) return "✅";
-            if (Model.Bitrate >= 192) return "⚠️";
-            return "❌";
-        }
-    }
+    // Phase 19: Search 2.0 Tiers for Library
+    public SLSKDONET.Models.SearchTier Tier => MetadataForensicService.CalculateTier(Model);
 
-    public Avalonia.Media.IBrush QualityColor 
-    {
-        get
-        {
-            if (Model.Bitrate >= 1000 || (Model.Format?.Equals("FLAC", StringComparison.OrdinalIgnoreCase) ?? false)) return Avalonia.Media.Brushes.DeepSkyBlue; // Lossless
-            if (Model.Bitrate >= 320) return Avalonia.Media.Brushes.LimeGreen; // 320kbps
-            if (Model.Bitrate >= 192) return Avalonia.Media.Brushes.Orange; // 192kbps
-            return Avalonia.Media.Brushes.Red; // Low Quality
-        }
-    }
+    public string TierBadge => MetadataForensicService.GetTierBadge(Tier);
+
+    public Avalonia.Media.IBrush TierColor => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(MetadataForensicService.GetTierColor(Tier)));
+    
+    // Legacy mapping for backward compatibility if needed, otherwise replaced by Tier
+    public string QualityIcon => TierBadge;
+    public Avalonia.Media.IBrush QualityColor => TierColor;
     
     public string BpmDisplay => Model.BPM.HasValue ? $"{Model.BPM:0}" : "—";
     public string KeyDisplay => Model.MusicalKey ?? "—";

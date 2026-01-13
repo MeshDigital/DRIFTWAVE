@@ -41,12 +41,20 @@ public class SearchFilterViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _useHighReliability, value); 
     }
 
-    // Phase 12.6: Hide potential fakes by default (Curation Assistant)
+    // Phase 12.6: Curation Assistant
     private bool _hideSuspects = true;
     public bool HideSuspects
     {
         get => _hideSuspects;
         set => this.RaiseAndSetIfChanged(ref _hideSuspects, value);
+    }
+
+    // Phase 19: The Bouncer
+    private BouncerMode _bouncerMode = BouncerMode.Standard;
+    public BouncerMode BouncerMode
+    {
+        get => _bouncerMode;
+        set => this.RaiseAndSetIfChanged(ref _bouncerMode, value);
     }
 
     // Phase 12.6: Bi-directional sync infrastructure
@@ -115,14 +123,15 @@ public class SearchFilterViewModel : ReactiveObject
         this.WhenAnyValue(
             x => x.MinBitrate,
             x => x.UseHighReliability,
-            x => x.HideSuspects) // Phase 12.6: Curation filter
+            x => x.HideSuspects,
+            x => x.BouncerMode) // Phase 19
             .Throttle(TimeSpan.FromMilliseconds(200), RxApp.MainThreadScheduler)
             .Merge(
                 Observable.FromEventPattern<NotifyCollectionChangedEventHandler, NotifyCollectionChangedEventArgs>(
                     h => SelectedFormats.CollectionChanged += h, 
                     h => SelectedFormats.CollectionChanged -= h)
                 .Select(_ => System.Reactive.Unit.Default)
-                .Select(_ => (MinBitrate, UseHighReliability, HideSuspects)) // Updated tuple
+                .Select(_ => (MinBitrate, UseHighReliability, HideSuspects, BouncerMode)) // Updated tuple
             )
             .Select(_ => GetFilterPredicate());
 
@@ -134,12 +143,28 @@ public class SearchFilterViewModel : ReactiveObject
         var formats = SelectedFormats.Select(f => f.ToUpperInvariant()).ToHashSet(); // HashSet for O(1)
         var highReliability = UseHighReliability;
         var hideSuspects = HideSuspects; // Phase 12.6: Curation quality
+        var bouncerMode = BouncerMode; // Phase 19: The Bouncer
         
         // Return a single optimized function
         return result => 
         {
             if (result.Model == null) return false;
 
+            // Phase 19: The Bouncer Logic
+            // Calculate Tier for Bouncer checks
+            var tier = Services.MetadataForensicService.CalculateTier(result.Model);
+
+            if (bouncerMode == BouncerMode.Strict)
+            {
+                // Strict: Only Gold or Platinum
+                if (tier != SearchTier.Platinum && tier != SearchTier.Gold) return false;
+            }
+            else if (bouncerMode == BouncerMode.Standard)
+            {
+                // Standard: Block Garbage
+                if (tier == SearchTier.Garbage) return false;
+            }
+            
             // 1. Bitrate Check with "Bucket Logic" for VBR
             // If user asks for 320, we allow V0 (~240+)
             // If user asks for 256, we allow ~220
@@ -187,6 +212,18 @@ public class SearchFilterViewModel : ReactiveObject
     {
             if (result.Model == null) return false;
 
+            // Phase 19: The Bouncer Logic
+            var tier = Services.MetadataForensicService.CalculateTier(result.Model);
+
+            if (BouncerMode == BouncerMode.Strict)
+            {
+                if (tier != SearchTier.Platinum && tier != SearchTier.Gold) return false;
+            }
+            else if (BouncerMode == BouncerMode.Standard)
+            {
+                if (tier == SearchTier.Garbage) return false;
+            }
+
             // 1. Bitrate Check
             int effectiveMin = MinBitrate;
             if (MinBitrate >= 320) effectiveMin = 240;      
@@ -198,14 +235,14 @@ public class SearchFilterViewModel : ReactiveObject
             // 2. Format
             var ext = System.IO.Path.GetExtension(result.Model.Filename)?.TrimStart('.')?.ToUpperInvariant() ?? "";
             
-            // Note: SelectedFormats is ObservableCollection. For specific single check this is O(N) but N=3. Fine.
             if (!SelectedFormats.Contains(ext)) return false; 
 
             // 3. Reliability
             if (UseHighReliability && result.QueueLength > 50) return false;
 
             // Phase 12.6: Hide potential fakes/upscales
-            if (HideSuspects && result.IntegrityStatus == "Suspect") return false;
+            if (HideSuspects && (result.IntegrityStatus == "Suspect" || Services.MetadataForensicService.IsFake(result.Model))) 
+                return false;
 
             return true;
     }

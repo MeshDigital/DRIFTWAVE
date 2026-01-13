@@ -10,6 +10,7 @@ namespace SLSKDONET.ViewModels
     public class AnalyzedSearchResultViewModel : ReactiveObject
     {
         private readonly SearchResult _result;
+        public Models.SearchTier Tier { get; } // Phase 19
 
 
 
@@ -25,6 +26,10 @@ namespace SLSKDONET.ViewModels
         public int UploadSpeed => _result.UploadSpeed;
         public int QueueLength => _result.QueueLength;
         public bool SlotFree => _result.SlotFree;
+        
+        // Phase 19: Sonic Match Reason
+        public string? MatchReason => _result.Model.MatchReason;
+        public bool HasMatchReason => !string.IsNullOrEmpty(MatchReason);
         
         // Formatted Values
         public string DisplayLength => Length.HasValue ? TimeSpan.FromSeconds(Length.Value).ToString(@"mm\:ss") : "--:--";
@@ -93,9 +98,19 @@ namespace SLSKDONET.ViewModels
             }
             
             // Sync with base SearchResult for Filter & Badge logic
+            // Sync with base SearchResult for Filter & Badge logic
             if (IsFake) _result.IntegrityStatus = "Suspect";
             else if (IsGoldenMatch) _result.IntegrityStatus = "Verified";
             else _result.IntegrityStatus = "";
+            
+            // Phase 19: Search 2.0 Tier Calculation
+            Tier = MetadataForensicService.CalculateTier(result.Model);
         }
+
+        public string TierBadge => MetadataForensicService.GetTierBadge(Tier);
+
+        public string TierDescription => MetadataForensicService.GetTierDescription(Tier);
+
+        public IBrush TierColor => new SolidColorBrush(Color.Parse(MetadataForensicService.GetTierColor(Tier)));
     }
 }

@@ -12,11 +12,58 @@ namespace SLSKDONET.Views.Avalonia
         {
             InitializeComponent();
             
-            // Wire up selection synchronization
-            var grid = this.FindControl<DataGrid>("ResultsGrid");
+            // Wire up TreeDataGrid interaction
+            var grid = this.FindControl<TreeDataGrid>("ResultsGrid");
             if (grid != null)
             {
-                grid.SelectionChanged += ValidatingSelectionChanged;
+                grid.DoubleTapped += (s, e) => {
+                    if (DataContext is SearchViewModel vm && vm.SelectedResults.Any())
+                    {
+                        vm.DownloadSelectedCommand.Execute(null);
+                    }
+                };
+
+                grid.KeyDown += (s, e) => {
+                    if (e.Key == Key.Enter && DataContext is SearchViewModel vm && vm.SelectedResults.Any())
+                    {
+                        vm.DownloadSelectedCommand.Execute(null);
+                        e.Handled = true;
+                    }
+                    else if (e.Key == Key.Down && e.KeyModifiers.HasFlag(KeyModifiers.Control) && DataContext is SearchViewModel vm2)
+                    {
+                        // Navigate to next Platinum track
+                        if (grid.Source is FlatTreeDataGridSource<AnalyzedSearchResultViewModel> source && source.RowSelection != null)
+                        {
+                            var currentIndex = source.RowSelection.SelectedIndex.FirstOrDefault();
+                            var items = vm2.SearchResults.ToList();
+                            for (int i = currentIndex + 1; i < items.Count; i++)
+                            {
+                                if (items[i].Tier == Models.SearchTier.Platinum)
+                                {
+                                    source.RowSelection.SelectedIndex = new global::Avalonia.Controls.IndexPath(i);
+                                    grid.RowsPresenter?.BringIntoView(i);
+                                    e.Handled = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                };
+
+                // Sync selection
+                if (grid.Source is FlatTreeDataGridSource<AnalyzedSearchResultViewModel> source && source.RowSelection != null)
+                {
+                    source.RowSelection.SelectionChanged += (s, e) => {
+                        if (DataContext is SearchViewModel vm)
+                        {
+                            vm.SelectedResults.Clear();
+                            foreach (var item in source.RowSelection.SelectedItems.OfType<AnalyzedSearchResultViewModel>())
+                            {
+                                vm.SelectedResults.Add(item);
+                            }
+                        }
+                    };
+                }
             }
 
             // Enable Drag & Drop

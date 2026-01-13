@@ -10,10 +10,13 @@
     <Border Width="180" Background="Transparent">
         <Border.ContextMenu>
             <ContextMenu>
-                <MenuItem Header="Analyze Album" Command="{Binding AnalyzeAlbumCommand}">
+                <MenuItem Header="Analyze Album">
                     <MenuItem.Icon>
                         <TextBlock Text="🔬"/>
                     </MenuItem.Icon>
+                    <MenuItem Header="Tier 1: Basic (Fast)" Command="{Binding AnalyzeAlbumT1Command}" CommandParameter="{Binding}" />
+                    <MenuItem Header="Tier 2: Detailed" Command="{Binding AnalyzeAlbumT2Command}" CommandParameter="{Binding}" />
+                    <MenuItem Header="Tier 3: Specialized (Deep)" Command="{Binding AnalyzeAlbumT3Command}" CommandParameter="{Binding}" />
                 </MenuItem>
                 <MenuItem Header="Download Album" Command="{Binding DownloadAlbumCommand}">
                     <MenuItem.Icon>

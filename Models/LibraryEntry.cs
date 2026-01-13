@@ -78,6 +78,7 @@ public class LibraryEntry
     public double? Energy { get; set; }
     public double? Danceability { get; set; }
     public double? Valence { get; set; }
+    public double? InstrumentalProbability { get; set; } // Phase 18.2
     
     // Dual-Truth Metadata
     public double? SpotifyBPM { get; set; }
@@ -105,4 +106,8 @@ public class LibraryEntry
     public bool IsPrepared { get; set; } = false; // Phase 10
     public string? PrimaryGenre { get; set; } // Phase 10
     public string? CuePointsJson { get; set; } // Phase 10
+    
+    // Phase 21: AI Brain Upgrade
+    public double? Sadness { get; set; }
+    public float[]? VectorEmbedding { get; set; } // Effnet Embeddings
 }

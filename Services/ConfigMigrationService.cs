@@ -24,6 +24,7 @@ public class ConfigMigrationService
     /// <returns>True if migration occurred and config should be saved; otherwise false.</returns>
     public bool Migrate(AppConfig config)
     {
+#pragma warning disable CS0618 // Type or member is obsolete
         bool changed = false;
 
         // Migration: ScoringWeights -> SearchPolicy
@@ -84,5 +85,6 @@ public class ConfigMigrationService
         }
 
         return changed;
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 }

@@ -105,11 +105,49 @@ public partial class LibraryViewModel
     /// Handles smart playlist selection event from SmartPlaylistViewModel.
     /// Coordinates updating track list.
     /// </summary>
-    private void OnSmartPlaylistSelected(object? sender, Library.SmartPlaylist? playlist)
+    private async void OnSmartPlaylistSelected(object? sender, Library.SmartPlaylist? playlist)
     {
-        if (playlist != null)
+        if (playlist == null) return;
+
+        try
         {
-            _notificationService.Show("Smart Playlist", $"Loading {playlist.Name}", NotificationType.Information);
+            IsLoading = true;
+            
+            // Phase 23: Smart Crates (DB-backed)
+            if (playlist.Definition != null)
+            {
+                _notificationService.Show("Smart Crate", $"Evaluating rules for '{playlist.Name}'...", NotificationType.Information);
+                
+                // 1. Evaluate rules against database (Global Index)
+                var ids = await _smartCrateService.GetMatchingTrackIdsAsync(playlist.Definition);
+                
+                // 2. Load matching tracks via TrackListViewModel
+                await Tracks.LoadSmartCrateAsync(ids);
+                
+                _logger.LogInformation("Loaded Smart Crate '{Name}' with {Count} tracks", playlist.Name, ids.Count);
+            }
+            else
+            {
+                // Legacy: In-Memory Smart Playlists
+                _notificationService.Show("Smart Playlist", $"Loading {playlist.Name}", NotificationType.Information);
+                
+                // Execute filter on loaded memory state
+                var tracks = SmartPlaylists.RefreshSmartPlaylist(playlist);
+                
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+                {
+                    Tracks.CurrentProjectTracks = tracks;
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load smart playlist {Name}", playlist.Name);
+            _notificationService.Show("Error", "Failed to load crate.", NotificationType.Error);
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

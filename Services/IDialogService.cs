@@ -1,9 +1,13 @@
 using System.Threading.Tasks;
+using SLSKDONET.Models;
 
 namespace SLSKDONET.Services;
 
 public interface IDialogService
 {
+    // Phase 23: Smart Crate Editor
+    Task<Data.Entities.SmartCrateDefinitionEntity?> ShowSmartCrateEditorAsync(ViewModels.Library.SmartCrateEditorViewModel vm);
+
     /// <summary>
     /// Shows a confirmation dialog with Yes/No options.
     /// </summary>
@@ -25,4 +29,14 @@ public interface IDialogService
     /// Shows the Smart Sorter preview dialog.
     /// </summary>
     Task<bool> ShowSortPreviewAsync(ViewModels.Tools.SortPreviewViewModel vm);
+
+    /// <summary>
+    /// Shows a prompt dialog for text input.
+    /// </summary>
+    Task<string?> ShowPromptAsync(string title, string message, string initialValue = "");
+
+    /// <summary>
+    /// Shows a project picker dialog.
+    /// </summary>
+    Task<PlaylistJob?> ShowProjectPickerAsync(System.Collections.Generic.IEnumerable<PlaylistJob> projects);
 }

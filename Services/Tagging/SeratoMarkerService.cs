@@ -70,7 +70,7 @@ namespace SLSKDONET.Services.Tagging
                             // IF the standard text encoding is used, OR raw binary if handled differently.
                             // Most reverse engineering shows "Serato Markers2" content is a BASE64 encoded string of the structs.
                             
-                            var frame = GeneralEncapsulatedObjectFrame.Get(id3v2, "Serato Markers2", true);
+                            var frame = AttachmentFrame.Get(id3v2, "Serato Markers2", true);
                             frame.MimeType = "application/octet-stream";
                             frame.Data = new ByteVector(payload);
 
@@ -95,7 +95,7 @@ namespace SLSKDONET.Services.Tagging
         private void RemoveExistingSeratoFrames(TagLib.Id3v2.Tag tag)
         {
             var framesToRemove = new List<Frame>();
-            foreach (var frame in tag.GetFrames<GeneralEncapsulatedObjectFrame>())
+            foreach (var frame in tag.GetFrames<AttachmentFrame>())
             {
                 if (frame.Description == "Serato Markers_" || frame.Description == "Serato Markers2")
                 {

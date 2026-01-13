@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows.Input;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
+using SLSKDONET.Data.Essentia;
 using SLSKDONET.Views; // Assuming RelayCommand is here or accessible via project usage
 
 namespace SLSKDONET.ViewModels;
@@ -109,7 +110,7 @@ public class AlbumResultViewModel
             // Use new QueueProject overload - creates job in Library and queues tracks
             await _downloadManager.QueueProject(job);
         }
-        catch (System.Exception ex)
+        catch (System.Exception)
         {
             // Log would be good here, but we don't have a logger in this VM?
             // Actually it doesn't seem to have one.
@@ -130,7 +131,7 @@ public class AlbumResultViewModel
                 // Only queue if file exists (downloaded or in library)
                 if (System.IO.File.Exists(filePath))
                 {
-                    _analysisQueue.QueueAnalysis(filePath, track.UniqueHash ?? string.Empty);
+                    _analysisQueue.QueueAnalysis(filePath, track.UniqueHash ?? string.Empty, AnalysisTier.Tier1);
                 }
             }
         }

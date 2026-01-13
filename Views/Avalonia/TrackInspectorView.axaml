@@ -3,6 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
+             xmlns:models="clr-namespace:SLSKDONET.Models"
+             xmlns:essentia="clr-namespace:SLSKDONET.Data.Essentia"
              xmlns:controls="clr-namespace:SLSKDONET.Views.Avalonia.Controls"
              xmlns:conv="clr-namespace:SLSKDONET.Views.Avalonia.Converters"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
@@ -386,30 +388,76 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Vibe Radar (Simple Bars) -->
-                        <Border Background="#252526" CornerRadius="12" Padding="16">
+                        <!-- Vibe Radar (Sonic Profile) -->
+                        <Border Background="#252526" CornerRadius="12" Padding="16" IsVisible="{Binding Track.HasAnalysis}">
                             <StackPanel Spacing="16">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="📡" FontSize="16"/>
-                                    <TextBlock Text="Vibe Radar" FontSize="14" FontWeight="SemiBold" Foreground="#AAA"/>
+                                    <PathIcon Data="{StaticResource radar_regular}" Foreground="{DynamicResource SystemAccentColor}" Width="16" Height="16"/>
+                                    <TextBlock Text="SONIC PROFILE" FontSize="14" FontWeight="SemiBold" Foreground="#AAA" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                
-                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="60,*,40">
-                                    <!-- Energy -->
-                                    <TextBlock Text="Energy" Foreground="#AAA" VerticalAlignment="Center" FontSize="12" Margin="0,0,0,12"/>
-                                    <ProgressBar Grid.Column="1" Value="{Binding VibeEnergy}" Maximum="100" Height="8" Margin="12,0,0,12" Foreground="#FF5252" Background="#111" CornerRadius="4"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding VibeEnergy, StringFormat='{}{0:F0}'}" Foreground="White" FontSize="12" FontWeight="SemiBold" TextAlignment="Right" Margin="0,0,0,12"/>
 
-                                    <!-- Dance -->
-                                    <TextBlock Grid.Row="1" Text="Dance" Foreground="#AAA" VerticalAlignment="Center" FontSize="12" Margin="0,0,0,12"/>
-                                    <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding VibeDance}" Maximum="100" Height="8" Margin="12,0,0,12" Foreground="#448AFF" Background="#111" CornerRadius="4"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding VibeDance, StringFormat='{}{0:F0}'}" Foreground="White" FontSize="12" FontWeight="SemiBold" TextAlignment="Right" Margin="0,0,0,12"/>
+                                <!-- Reusable Sonic Profile Control (Energy, Mood, Vocals) -->
+                                <controls:SonicProfileControl Profile="{Binding Track.SonicProfile}" />
 
-                                    <!-- Mood -->
-                                    <TextBlock Grid.Row="2" Text="Mood" Foreground="#AAA" VerticalAlignment="Center" FontSize="12"/>
-                                    <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding VibeMood}" Maximum="100" Height="8" Margin="12,0" Foreground="#69F0AE" Background="#111" CornerRadius="4"/>
-                                    <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding VibeMood, StringFormat='{}{0:F0}'}" Foreground="White" FontSize="12" FontWeight="SemiBold" TextAlignment="Right"/>
+                                <!-- Danceability & Genre (Keep separate for now) -->
+                                <Grid ColumnDefinitions="*,*">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <PathIcon Data="{StaticResource people_checkmark_regular}" 
+                                                  Width="14" Height="14"
+                                                  Foreground="{DynamicResource SystemAccentColor}"
+                                                  Opacity="{Binding Track.Danceability, Converter={x:Static conv:OpacityMultiplierConverter.Instance}}"/>
+                                        
+                                        <TextBlock Text="Danceable" FontSize="12" VerticalAlignment="Center"
+                                                   Opacity="{Binding Track.Danceability, Converter={x:Static conv:OpacityMultiplierConverter.Instance}}"/>
+                                    </StackPanel>
                                 </Grid>
+                                
+                                <!-- Sonic Badges (Subgenre, Mood, Type) -->
+                                <WrapPanel Orientation="Horizontal">
+                                    <!-- Subgenre -->
+                                    <Border Background="{DynamicResource SurfaceRegionBrush}" 
+                                            CornerRadius="4" Padding="8,4" Margin="0,0,8,4"
+                                            IsVisible="{Binding HasSubgenre}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <PathIcon Data="{StaticResource tag_regular}" Width="10" Height="10" Opacity="0.5"/>
+                                            <TextBlock Text="{Binding ElectronicSubgenre}" 
+                                                       FontSize="11" FontStyle="Italic" Foreground="#CCC"/>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Mood -->
+                                    <Border Background="#1B5E20" 
+                                            CornerRadius="4" Padding="8,4" Margin="0,0,8,4"
+                                            IsVisible="{Binding HasMood}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="✨" FontSize="10"/>
+                                            <TextBlock Text="{Binding MoodTag}" 
+                                                       FontSize="11" FontWeight="SemiBold" Foreground="#A5D6A7"/>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Voice / Instrumental -->
+                                    <Border Background="#311B92" 
+                                            CornerRadius="4" Padding="8,4" Margin="0,0,8,4"
+                                            IsVisible="{Binding HasVoiceInstrumental}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="🎤" FontSize="10"/>
+                                            <TextBlock Text="{Binding VoiceInstrumentalLabel}" 
+                                                       FontSize="11" FontWeight="SemiBold" Foreground="#D1C4E9"/>
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- DJ Tool Warning -->
+                                    <Border Background="#B71C1C" 
+                                            CornerRadius="4" Padding="8,4" Margin="0,0,8,4"
+                                            IsVisible="{Binding IsDjTool}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="🛠" FontSize="10"/>
+                                            <TextBlock Text="DJ TOOL" 
+                                                       FontSize="11" FontWeight="Bold" Foreground="#FFCDD2"/>
+                                        </StackPanel>
+                                    </Border>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
 
@@ -518,12 +566,19 @@
                                 </StackPanel>
                                 
                                 <WrapPanel ItemWidth="180">
-                                    <Button Command="{Binding ForceReAnalyzeCommand}" Margin="4" CornerRadius="6" HorizontalAlignment="Stretch">
+                                    <SplitButton Command="{Binding ForceReAnalyzeCommand}" Margin="4" CornerRadius="6" HorizontalAlignment="Stretch">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <TextBlock Text="🔄" FontSize="12"/>
                                             <TextBlock Text="Force Re-Analysis" FontSize="12"/>
                                         </StackPanel>
-                                    </Button>
+                                        <SplitButton.Flyout>
+                                            <MenuFlyout>
+                                                <MenuItem Header="Tier 1: Basic (Fast)" Command="{Binding ForceReAnalyzeTieredCommand}" CommandParameter="{x:Static essentia:AnalysisTier.Tier1}" />
+                                                <MenuItem Header="Tier 2: Detailed" Command="{Binding ForceReAnalyzeTieredCommand}" CommandParameter="{x:Static essentia:AnalysisTier.Tier2}" />
+                                                <MenuItem Header="Tier 3: Specialized (Deep)" Command="{Binding ForceReAnalyzeTieredCommand}" CommandParameter="{x:Static essentia:AnalysisTier.Tier3}" />
+                                            </MenuFlyout>
+                                        </SplitButton.Flyout>
+                                    </SplitButton>
                                     <Button Command="{Binding MarkAsVerifiedCommand}" 
                                             IsEnabled="{Binding HasAnalysis}"
                                             Margin="4" CornerRadius="6" HorizontalAlignment="Stretch" Classes="success">
@@ -541,6 +596,83 @@
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- TAB 5: ANALYSIS HISTORY (Phase 21) -->
+            <TabItem Header="Analysis History" FontSize="14" FontWeight="SemiBold">
+                <ScrollViewer Margin="0,10,0,0">
+                    <StackPanel Spacing="12">
+                        <!-- Summary Header -->
+                        <Border Background="#252526" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="ANALYSIS RUN HISTORY" FontSize="12" Foreground="#AAA" FontWeight="Bold"/>
+                                <TextBlock Text="Shows all analysis attempts for this track with status, performance, and error details." 
+                                           FontSize="11" Foreground="#666" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- Runs List -->
+                        <ItemsControl ItemsSource="{Binding AnalysisHistory}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1E1E1E" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Border Grid.Column="0" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="0,0,12,0"
+                                                    Tag="{Binding Status}">
+                                                <Border.Styles>
+                                                    <Style Selector="Border[Tag=Completed]">
+                                                        <Setter Property="Background" Value="#1DB954"/>
+                                                    </Style>
+                                                    <Style Selector="Border[Tag=Failed]">
+                                                        <Setter Property="Background" Value="#FF5252"/>
+                                                    </Style>
+                                                    <Style Selector="Border[Tag=Processing]">
+                                                        <Setter Property="Background" Value="#2196F3"/>
+                                                    </Style>
+                                                    <Style Selector="Border[Tag=Queued]">
+                                                        <Setter Property="Background" Value="#666666"/>
+                                                    </Style>
+                                                </Border.Styles>
+                                                <TextBlock Text="{Binding Status}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                            </Border>
+                                            
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="{Binding StartedAt, StringFormat='Started: {0:yyyy-MM-dd HH:mm:ss}'}" 
+                                                           Foreground="#AAA" FontSize="11"/>
+                                                <TextBlock Text="{Binding ErrorMessage, StringFormat='Error: {0}'}" 
+                                                           Foreground="#FF5252" FontSize="11"
+                                                           IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <TextBlock Text="{Binding DurationMs, StringFormat='Total: {0}ms'}" 
+                                                               Foreground="#666" FontSize="10"/>
+                                                    <TextBlock Text="{Binding FfmpegDurationMs, StringFormat='FFmpeg: {0}ms'}" 
+                                                               Foreground="#666" FontSize="10"/>
+                                                    <TextBlock Text="{Binding EssentiaDurationMs, StringFormat='Essentia: {0}ms'}" 
+                                                               Foreground="#666" FontSize="10"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            
+                                            <!-- Checkmarks -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <TextBlock Text="🌊" ToolTip.Tip="Waveform" IsVisible="{Binding WaveformGenerated}"/>
+                                                <TextBlock Text="🎵" ToolTip.Tip="FFmpeg" IsVisible="{Binding FfmpegAnalysisCompleted}"/>
+                                                <TextBlock Text="🧠" ToolTip.Tip="Essentia" IsVisible="{Binding EssentiaAnalysisCompleted}"/>
+                                                <TextBlock Text="💾" ToolTip.Tip="Database" IsVisible="{Binding DatabaseSaved}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        
+                        <!-- Empty State -->
+                        <TextBlock Text="No analysis history found for this track" 
+                                   Foreground="#666" FontStyle="Italic"
+                                   HorizontalAlignment="Center" Margin="0,40"
+                                   IsVisible="{Binding !AnalysisHistory.Count}"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

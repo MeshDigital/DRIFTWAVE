@@ -6,6 +6,9 @@
              xmlns:controls="clr-namespace:SLSKDONET.Views.Avalonia.Controls"
              xmlns:models="clr-namespace:SLSKDONET.Models"
              xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
+             xmlns:converters="clr-namespace:SLSKDONET.Views.Avalonia.Converters"
+             xmlns:tree="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.TreeDataGrid"
+             xmlns:tp="clr-namespace:Avalonia.Controls.Primitives;assembly=Avalonia.Controls.TreeDataGrid"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="SLSKDONET.Views.Avalonia.SearchPage"
              Background="#1E1E1E" Foreground="White">
@@ -42,39 +45,20 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="Ranking Logic" FontSize="18" FontWeight="Bold" Foreground="#DDD" Margin="0,12,0,0"/>
-
-                <!-- Bitrate Weight -->
-                <StackPanel Spacing="12">
-                     <Grid ColumnDefinitions="*,Auto">
-                         <TextBlock Grid.Column="0" Text="Bitrate (Quality)" Foreground="#999" FontSize="11" VerticalAlignment="Bottom"/>
-                         <Border Grid.Column="1" Background="#1AFFD700" CornerRadius="4" Padding="6,2">
-                             <TextBlock Text="{Binding BitrateWeight, StringFormat='x{0:F1}'}" Foreground="#FFD700" FontWeight="SemiBold" FontSize="11"/>
-                         </Border>
-                     </Grid>
-                     <Slider Value="{Binding BitrateWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="0,-4,0,0"/>
-                </StackPanel>
+                <!-- Phase 19: The Bouncer -->
+                <TextBlock Text="The Bouncer" FontSize="18" FontWeight="Bold" Foreground="#DDD" Margin="0,12,0,0"/>
                 
-                <!-- Reliability Weight -->
-                <StackPanel Spacing="12" Margin="0,4,0,0">
-                     <Grid ColumnDefinitions="*,Auto">
-                         <TextBlock Grid.Column="0" Text="Reliability (Slots)" Foreground="#999" FontSize="11" VerticalAlignment="Bottom"/>
-                         <Border Grid.Column="1" Background="#1A007ACC" CornerRadius="4" Padding="6,2">
-                             <TextBlock Text="{Binding ReliabilityWeight, StringFormat='x{0:F1}'}" Foreground="#007ACC" FontWeight="SemiBold" FontSize="11"/>
-                         </Border>
-                     </Grid>
-                     <Slider Value="{Binding ReliabilityWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="0,-4,0,0"/>
-                </StackPanel>
-                
-                <!-- Match Weight -->
-                <StackPanel Spacing="12" Margin="0,4,0,0">
-                     <Grid ColumnDefinitions="*,Auto">
-                         <TextBlock Grid.Column="0" Text="Match Accuracy" Foreground="#999" FontSize="11" VerticalAlignment="Bottom"/>
-                         <Border Grid.Column="1" Background="#1ADCDCAA" CornerRadius="4" Padding="6,2">
-                             <TextBlock Text="{Binding MatchWeight, StringFormat='x{0:F1}'}" Foreground="#DCDCAA" FontWeight="SemiBold" FontSize="11"/>
-                         </Border>
-                     </Grid>
-                     <Slider Value="{Binding MatchWeight}" Minimum="0" Maximum="5" TickFrequency="0.5" IsSnapToTickEnabled="True" Margin="0,-4,0,0"/>
+                <StackPanel Spacing="10">
+                    <RadioButton GroupName="Bouncer" Content="Strict (Platinum/Gold)" 
+                                 IsChecked="{Binding FilterViewModel.BouncerMode, Converter={x:Static converters:EnumConverters.BouncerModeConverter}, ConverterParameter={x:Static models:BouncerMode.Strict}}"
+                                 ToolTip.Tip="Only shows high quality, trusted files."/>
+                    
+                    <RadioButton GroupName="Bouncer" Content="Standard (No Garbage)" 
+                                 IsChecked="{Binding FilterViewModel.BouncerMode, Converter={x:Static converters:EnumConverters.BouncerModeConverter}, ConverterParameter={x:Static models:BouncerMode.Standard}}"
+                                 ToolTip.Tip="Blocks fake/upscaled files and very low bitrate."/>
+                    
+                    <RadioButton GroupName="Bouncer" Content="Relaxed (Show All)" 
+                                 IsChecked="{Binding FilterViewModel.BouncerMode, Converter={x:Static converters:EnumConverters.BouncerModeConverter}, ConverterParameter={x:Static models:BouncerMode.Relaxed}}"/>
                 </StackPanel>
                 
                 <Separator Background="#333" Height="1"/>
@@ -178,87 +162,40 @@
                 </Grid>
             </Border>
             
-            <!-- Results DataGrid -->
-            <DataGrid Grid.Row="1" ItemsSource="{Binding SearchResults}"
-                      AutoGenerateColumns="False" SelectionMode="Extended"
-                      GridLinesVisibility="Horizontal" Background="Transparent"
-                      CanUserSortColumns="True" HeadersVisibility="Column"
-                      Margin="16,0">
-                
-                <DataGrid.Styles>
-                    <!-- Golden Match Highlight -->
-                    <Style Selector="DataGridRow.golden">
-                         <!-- TODO: Bind to IsGoldenMatch using styles in AV11? For now, we use row template logic or just rely on text colors -->
-                    </Style>
-                </DataGrid.Styles>
-                
-                <DataGrid.Columns>
-                    <!-- Trust Score -->
-                    <DataGridTemplateColumn Header="Trust" Width="60" SortMemberPath="TrustScore">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                 <Border Background="Transparent" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip.Tip="{Binding ForensicAssessment}" Opacity="{Binding Opacity}">
-                                    <TextBlock Text="{Binding TrustScore}" FontWeight="Bold" Foreground="{Binding TrustColor}"/>
-                                </Border>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    
-                    <!-- File Info (Multi-line) -->
-                    <DataGridTemplateColumn Header="Track Details" Width="*" SortMemberPath="Filename">
-                         <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate DataType="vm:AnalyzedSearchResultViewModel">
-                                <StackPanel Margin="8,6" Background="{Binding ItemBackground}" Opacity="{Binding Opacity}">
-                                    <TextBlock Text="{Binding Filename}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{Binding ForegroundColor}"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
-                                         <Border Background="#333" CornerRadius="3" Padding="3,0">
-                                            <TextBlock Text="{Binding RawResult.Extension}" Foreground="#CCC" FontSize="10"/>
-                                         </Border>
-                                         <TextBlock Text="{Binding BitRate, StringFormat='{}{0}kbps'}" Foreground="#AAA" FontSize="11"/>
-                                         <TextBlock Text="•" Foreground="#444"/>
-                                         <TextBlock Text="{Binding DisplaySize}" Foreground="#888" FontSize="11"/>
-                                         <TextBlock Text="•" Foreground="#444"/>
-                                         <TextBlock Text="{Binding DisplayLength}" Foreground="#888" FontSize="11"/>
-                                         <TextBlock Text="•" Foreground="#444"/>
-                                         <TextBlock Text="{Binding User}" Foreground="#007ACC" FontSize="11"/>
-                                         <TextBlock Text="⚡ Instant" Foreground="#1DB954" IsVisible="{Binding SlotFree}" FontSize="11" FontWeight="Bold"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </DataTemplate>
-                         </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    
-                    <!-- Action -->
-                    <DataGridTemplateColumn Header="Action" Width="100">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Button Command="{Binding $parent[DataGrid].DataContext.DownloadSelectedCommand}" 
-                                        CommandParameter="{Binding}"
-                                        Content="Download" 
-                                        Classes="pill" 
-                                        FontSize="11" 
-                                        Padding="8,4"
-                                        Opacity="{Binding Opacity}"
-                                        HorizontalAlignment="Center"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                </DataGrid.Columns>
-                
-                 <DataGrid.ContextMenu>
+            <!-- Results TreeDataGrid -->
+            <tree:TreeDataGrid x:Name="ResultsGrid" Grid.Row="1" Source="{Binding SearchSource}"
+                               CanUserResizeColumns="True"
+                               Margin="16,0">
+                <tree:TreeDataGrid.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Download Selected" Command="{Binding DownloadSelectedCommand}"/>
                     </ContextMenu>
-                </DataGrid.ContextMenu>
-            </DataGrid>
-            
-            <!-- Empty State -->
-            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsVisible="{Binding !SearchResults.Count}">
-                 <TextBlock Text="Waiting for Signal..." Foreground="#444" FontSize="24" HorizontalAlignment="Center"/>
-                 <TextBlock Text="Use the controls to initiate a search" Foreground="#333" HorizontalAlignment="Center"/>
+                </tree:TreeDataGrid.ContextMenu>
+            </tree:TreeDataGrid>
+
+            <!-- Empty State (Premium) -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                        IsVisible="{Binding !SearchResults.Count}" Spacing="16">
+                 <TextBlock Text="📡" FontSize="48" HorizontalAlignment="Center" Opacity="0.5"/>
+                 <TextBlock Text="Ready for Extraction" Foreground="#555" FontSize="20" FontWeight="Light" HorizontalAlignment="Center"/>
+                 <TextBlock Text="Initiate a search to scan the Soulseek network" Foreground="#333" HorizontalAlignment="Center"/>
             </StackPanel>
             
+             <!-- Footer / Ghost Counter -->
+            <Border Grid.Row="2" Background="#1A1A1A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="12,4">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="{Binding SearchResults.Count}" FontWeight="Bold" Foreground="#1DB954"/>
+                        <TextBlock Text="results shown" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HiddenResultsCount}">
+                        <TextBlock Text="•" Foreground="#444"/>
+                        <TextBlock Text="{Binding HiddenResultsCount}" FontWeight="Bold" Foreground="#FF9800"/>
+                        <TextBlock Text="hidden by Bouncer (Relax mode to see them)" Foreground="#888" FontSize="11" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </Grid>
         
     </DockPanel>
@@ -284,6 +221,11 @@
         <Style Selector="ToggleButton:checked">
              <Setter Property="Background" Value="#0078D4"/>
              <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <!-- Zebra Striping for TreeDataGrid -->
+        <Style Selector="tp|TreeDataGridRow:nth-child(even)">
+            <Setter Property="Background" Value="#252525"/>
         </Style>
     </UserControl.Styles>
 </UserControl>

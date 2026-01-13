@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:SLSKDONET.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="250" d:DesignHeight="320"
+             x:Class="SLSKDONET.Views.Avalonia.Controls.TrackCard"
+             x:DataType="vm:PlaylistTrackViewModel">
+
+    <Border Background="{DynamicResource SurfaceBrush}" 
+            BorderBrush="{DynamicResource BorderBrush}" 
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Margin="8"
+            ClipToBounds="True"
+            BoxShadow="0 2 8 0 #40000000">
+        <Grid RowDefinitions="Auto, *">
+            
+            <!-- Album Art -->
+            <Panel Grid.Row="0" Height="180">
+                <Image Source="{Binding Artwork.Image}" 
+                       Stretch="UniformToFill"/>
+                
+                <!-- Quality Indicator (Overlay Gradient) -->
+                <Border VerticalAlignment="Bottom" Height="40"
+                        Background="LinearGradient(0deg, #CC000000, Transparent)">
+                    <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center" Spacing="8">
+                         <Border Background="{Binding QualityColor}" Width="4" Height="4" CornerRadius="2"/>
+                         <TextBlock Text="{Binding TechnicalSummary}" FontSize="10" Foreground="White" Opacity="0.8"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- BPM/Key Badge -->
+                <Border VerticalAlignment="Top" HorizontalAlignment="Right" 
+                        Margin="8" Padding="6,2"
+                        Background="#AA000000" CornerRadius="10">
+                    <TextBlock Text="{Binding KeyDisplay}" FontSize="12" FontWeight="Bold" Foreground="#4EC9B0"/>
+                </Border>
+            </Panel>
+
+            <!-- Metadata -->
+            <Border Grid.Row="1" Padding="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding TrackTitle}" FontWeight="Bold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding ArtistName}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                    
+                    <Separator Height="1" Background="{DynamicResource BorderBrush}" Margin="0,4"/>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                        <!-- Stem Badge -->
+                        <Border Background="#20E91E63" CornerRadius="2" Padding="4,1" 
+                                BorderBrush="#E91E63" BorderThickness="1"
+                                IsVisible="{Binding HasStems}">
+                            <TextBlock Text="🎹" FontSize="10"/>
+                        </Border>
+    
+                        <!-- Genre Pill -->
+                        <Border Background="{DynamicResource TertiaryBackgroundBrush}" CornerRadius="10" Padding="8,1"
+                                IsVisible="{Binding PrimaryGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <TextBlock Text="{Binding PrimaryGenre}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            
+            <!-- Hover Overlay (Buttons) - can be implemented with styles later -->
+        </Grid>
+    </Border>
+</UserControl>

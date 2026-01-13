@@ -1,0 +1,92 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:SLSKDONET.ViewModels.Stem"
+             xmlns:controls="clr-namespace:SLSKDONET.Views.Avalonia.Controls"
+             mc:Ignorable="d" d:DesignWidth="100" d:DesignHeight="400"
+             x:Class="SLSKDONET.Views.Avalonia.Stem.StemChannelView">
+
+    <UserControl.Styles>
+        <Style Selector="Slider.volume /template/ Track#PART_Track">
+            <Setter Property="Width" Value="4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border BorderBrush="#333" BorderThickness="1" Background="#1A1A1A" CornerRadius="4" Margin="2" Padding="4">
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+            
+            <!-- Type Label -->
+            <TextBlock Grid.Row="0" Text="{Binding Name}" 
+                       Foreground="{Binding ColorHex}" 
+                       FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4"/>
+
+            <!-- Pan Knob (Simplified as Slider for now) -->
+            <Slider Grid.Row="1" Value="{Binding Pan}" Minimum="-1" Maximum="1" 
+                    Orientation="Horizontal" Width="60" Margin="0,4"/>
+            <TextBlock Grid.Row="1" Text="L  R" FontSize="9" Foreground="Gray" 
+                       HorizontalAlignment="Center" Margin="0,20,0,0"/>
+
+            <!-- Volume Fader & Waveform -->
+            <Grid Grid.Row="2" HorizontalAlignment="Center" Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Vertical Waveform (Replacing Meter) -->
+                <Border Grid.Column="0" Width="40" Background="#111" Margin="0,0,8,0" ClipToBounds="True">
+                    <!-- Rotated WaveformControl to be vertical -->
+                    <LayoutTransformControl>
+                        <LayoutTransformControl.LayoutTransform>
+                            <RotateTransform Angle="-90"/>
+                        </LayoutTransformControl.LayoutTransform>
+                        <controls:WaveformControl 
+                            Width="200" Height="40"
+                            WaveformData="{Binding WaveformData}"
+                            Foreground="{Binding ColorHex}" 
+                            Opacity="0.8"
+                            IsHitTestVisible="False"/>
+                    </LayoutTransformControl>
+                </Border>
+
+                <Slider Grid.Column="1" Classes="volume"
+                        Value="{Binding Volume}" Minimum="0" Maximum="1.5" 
+                        Orientation="Vertical" Height="200"
+                        TickFrequency="0.1" IsSnapToTickEnabled="False"/>
+            </Grid>
+
+            <!-- Mute / Solo -->
+            <UniformGrid Grid.Row="3" Columns="2" Margin="0,4">
+                <ToggleButton IsChecked="{Binding IsMuted}" Content="M" 
+                              Background="#333" Foreground="Gray"
+                              Margin="2">
+                    <ToggleButton.Styles>
+                        <Style Selector="ToggleButton:checked /template/ ContentPresenter">
+                            <Setter Property="Background" Value="#D32F2F"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Style>
+                    </ToggleButton.Styles>
+                </ToggleButton>
+                <ToggleButton IsChecked="{Binding IsSolo}" Content="S" 
+                              Background="#333" Foreground="Gray"
+                              Margin="2">
+                    <ToggleButton.Styles>
+                        <Style Selector="ToggleButton:checked /template/ ContentPresenter">
+                            <Setter Property="Background" Value="#FFB300"/>
+                            <Setter Property="Foreground" Value="Black"/>
+                        </Style>
+                    </ToggleButton.Styles>
+                </ToggleButton>
+            </UniformGrid>
+            
+            <!-- Value Readout -->
+            <TextBlock Grid.Row="4" Text="{Binding Volume, StringFormat='{}{0:0.00}'}" 
+                       FontSize="10" Foreground="Silver" HorizontalAlignment="Center"/>
+
+            <!-- Effects Slot (Placeholder) -->
+            <Border Grid.Row="5" Height="10" Margin="4,8" Background="#222" CornerRadius="2" ToolTip.Tip="Effect Insert"/>
+
+        </Grid>
+    </Border>
+</UserControl>

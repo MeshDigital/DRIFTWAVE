@@ -144,6 +144,13 @@ namespace SLSKDONET.ViewModels
             set => SetProperty(ref _currentDockLocation, value);
         }
         
+        private bool _isPlayerVisible = true;
+        public bool IsPlayerVisible
+        {
+            get => _isPlayerVisible;
+            set => SetProperty(ref _isPlayerVisible, value);
+        }
+        
         // Queue Visibility
         private bool _isQueueOpen;
         public bool IsQueueOpen
@@ -717,9 +724,27 @@ namespace SLSKDONET.ViewModels
         
         private void TogglePlayerDock()
         {
-            CurrentDockLocation = CurrentDockLocation == PlayerDockLocation.BottomBar 
-                ? PlayerDockLocation.RightSidebar 
-                : PlayerDockLocation.BottomBar;
+            // 3-state cycle for music panel button:
+            // State 1: Visible + Bottom (sidepanel can be open) → State 2: Hidden
+            // State 2: Hidden → State 3: Visible + RightSidebar  
+            // State 3: Visible + RightSidebar → State 1: Visible + Bottom
+            
+            if (IsPlayerVisible && CurrentDockLocation == PlayerDockLocation.BottomBar)
+            {
+                // State 1 → State 2: Hide everything  
+                IsPlayerVisible = false;
+            }
+            else if (!IsPlayerVisible)
+            {
+                // State 2 → State 3: Show player on right only
+                IsPlayerVisible = true;
+                CurrentDockLocation = PlayerDockLocation.RightSidebar;
+            }
+            else // IsPlayerVisible && CurrentDockLocation == RightSidebar
+            {
+                // State 3 → State 1: Move to bottom (allows sidepanel)
+                CurrentDockLocation = PlayerDockLocation.BottomBar;
+            }
         }
 
         private string? _currentFilePath;

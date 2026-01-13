@@ -28,8 +28,6 @@ public class SpotifyMetadataService : ISpotifyMetadataService
     private readonly SpotifyBatchClient _batchClient;
     private readonly Configuration.AppConfig _config;
 
-    // Circuit Breaker: If we get persistent 403s on specific endpoints, stop hitting them.
-    private bool _audioFeaturesDisabled;
 
     // Negative cache duration for "Not Found" results
     private static readonly TimeSpan NegativeCacheDuration = TimeSpan.FromDays(7);
@@ -139,16 +137,6 @@ public class SpotifyMetadataService : ISpotifyMetadataService
             track.ReleaseDate = releaseDate;
         }
 
-        var features = await GetAudioFeaturesAsync(metadata.Id);
-        if (features != null)
-        {
-            track.BPM = features.Tempo;
-            track.MusicalKey = $"{features.Key}{(features.Mode == 1 ? "B" : "A")}";
-            track.Energy = features.Energy;
-            track.Danceability = features.Danceability;
-            track.Valence = features.Valence;
-            track.AnalysisOffset = 0;
-        }
 
 
         track.IsEnriched = true;
@@ -187,119 +175,6 @@ public class SpotifyMetadataService : ISpotifyMetadataService
         return true;
     }
 
-    public async Task<Dictionary<string, TrackAudioFeatures?>> GetAudioFeaturesBatchAsync(IEnumerable<string> spotifyIds)
-    {
-        var results = new Dictionary<string, TrackAudioFeatures?>();
-        var idList = spotifyIds.Distinct().ToList();
-        
-        if (!idList.Any()) return results;
-
-        // Check if Spotify API is enabled
-        if (!_config.SpotifyUseApi)
-        {
-            _logger.LogDebug("Skipping audio features batch: Spotify API disabled in settings");
-            return results;
-        }
-
-        // Check if Audio Features are enabled (403 in Developer Mode)
-        if (!_config.SpotifyEnableAudioFeatures)
-        {
-            _logger.LogDebug("Skipping audio features batch: Audio Features disabled in settings");
-            return results;
-        }
-
-        // Circuit Breaker Check
-        if (_audioFeaturesDisabled)
-        {
-            // Fail silently to avoid log spam (we already logged the error that tripped the breaker)
-            return results;
-        }
-
-        int retryCount = 0;
-        const int maxRetries = 1;
-
-        while (retryCount <= maxRetries)
-        {
-            try
-            {
-                // Get authenticated client
-                var client = await _authService.GetAuthenticatedClientAsync();
-                
-                // Spotify API limit: 100 IDs per request
-                var chunks = idList.Chunk(100);
-                
-                foreach (var chunk in chunks)
-                {
-                    var request = new TracksAudioFeaturesRequest(chunk.ToList());
-                    var response = await client.Tracks.GetSeveralAudioFeatures(request);
-                    
-                    if (response?.AudioFeatures != null)
-                    {
-                        foreach (var feature in response.AudioFeatures)
-                        {
-                            if (feature != null && !string.IsNullOrEmpty(feature.Id))
-                            {
-                                results[feature.Id] = feature;
-                            }
-                        }
-                    }
-                }
-                
-                // Success - break loop
-                break;
-            }
-            catch (APIException apiEx) when (apiEx.Response?.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                // 403 Forbidden - Token likely expired or invalid despite local check
-                _logger.LogWarning("Spotify API 403 Forbidden in GetAudioFeaturesBatchAsync. Attempting force refresh. Retry {Retry}/{Max}", retryCount + 1, maxRetries);
-                
-                if (retryCount < maxRetries)
-                {
-                    try 
-                    {
-                        // Force refresh - bypass throttle
-                        await _authService.RefreshAccessTokenAsync(force: true);
-                        retryCount++;
-                        continue; // Retry loop
-                    }
-                    catch (Exception refreshEx)
-                    {
-                        _logger.LogError(refreshEx, "Failed to refresh token during 403 recovery");
-                        throw; // Stop retrying
-                    }
-                }
-                else
-                {
-                    _logger.LogError(apiEx, "Spotify API 403 Forbidden persists after refresh. Disabling Audio Features for this session. Reason: {Body}", 
-                        apiEx.Response?.Body ?? "Unknown");
-                    _audioFeaturesDisabled = true; // Circuit Breaker: Stop hitting the endpoint
-                    break; // Give up
-                }
-            }
-            catch (APIException apiEx)
-            {
-                // Other API validation errors
-                _logger.LogError(apiEx, 
-                    "Spotify API error in GetAudioFeaturesBatchAsync. Status: {Status}, Response: {Response}", 
-                    apiEx.Response?.StatusCode, 
-                    apiEx.Response?.Body);
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to batch fetch audio features");
-                break;
-            }
-        }
-        
-        return results;
-    }
-
-    public async Task<TrackAudioFeatures?> GetAudioFeaturesAsync(string spotifyId)
-    {
-        var batch = await GetAudioFeaturesBatchAsync(new[] { spotifyId });
-        return batch.GetValueOrDefault(spotifyId);
-    }
 
     private async Task<FullTrack?> SearchSpotifyWithSmartLogicAsync(string artist, string title, int? durationMs)
     {

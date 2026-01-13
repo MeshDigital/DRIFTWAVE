@@ -16,6 +16,13 @@ public partial class LibraryViewModel
             {
                 UpdateWorkspaceFromState();
                 OnPropertyChanged(nameof(IsRightPanelVisible));
+                
+                // Auto-dock player to bottom when sidepanel opens
+                if (value && _playerViewModel != null)
+                {
+                    _playerViewModel.CurrentDockLocation = PlayerDockLocation.BottomBar;
+                    _playerViewModel.IsPlayerVisible = true; // Ensure player is visible
+                }
             }
         }
     }
@@ -56,6 +63,13 @@ public partial class LibraryViewModel
             {
                 UpdateWorkspaceFromState();
                 OnPropertyChanged(nameof(IsRightPanelVisible));
+                
+                // Auto-dock player to bottom when sidepanel opens
+                if (value && _playerViewModel != null)
+                {
+                    _playerViewModel.CurrentDockLocation = PlayerDockLocation.BottomBar;
+                    _playerViewModel.IsPlayerVisible = true; // Ensure player is visible
+                }
             }
         }
     }

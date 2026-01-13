@@ -161,7 +161,7 @@ public class DownloadDiscoveryService
                     // Log the rejection to the persistent audit trail
                     _forensicLogger.LogRejection(
                         trackId: track.TrackUniqueHash,
-                        filename: searchTrack.Filename,
+                        filename: searchTrack.Filename ?? "Unknown",
                         reason: safety.Reason,
                         details: safety.TechnicalDetails ?? $"Bitrate: {searchTrack.Bitrate}kbps"
                     );

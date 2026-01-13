@@ -11,7 +11,11 @@ using SLSKDONET.Services.Models;
 using SLSKDONET.Services;
 using SLSKDONET.Data;
 using SLSKDONET.Data.Entities;
+using SLSKDONET.Data.Essentia;
 using SLSKDONET.Views;
+using System.Text.Json;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 
 namespace SLSKDONET.ViewModels;
 
@@ -36,8 +40,15 @@ public partial class LibraryViewModel
     public ICommand CloseInspectorCommand { get; set; } = null!;
     public ICommand AnalyzeAlbumCommand { get; set; } = null!;
     public ICommand HardwareExportCommand { get; set; } = null!;
+    public ICommand RenameProjectCommand { get; set; } = null!;
 
     public ICommand AnalyzeTrackCommand { get; set; } = null!;
+    public ICommand AnalyzeTrackT1Command { get; set; } = null!;
+    public ICommand AnalyzeTrackT2Command { get; set; } = null!;
+    public ICommand AnalyzeTrackT3Command { get; set; } = null!;
+    public ICommand AnalyzeAlbumT1Command { get; set; } = null!;
+    public ICommand AnalyzeAlbumT2Command { get; set; } = null!;
+    public ICommand AnalyzeAlbumT3Command { get; set; } = null!;
     public ICommand ExportPlaylistCommand { get; set; } = null!;
     public ICommand AutoSortCommand { get; set; } = null!;
     public ICommand FindSonicTwinsCommand { get; set; } = null!;
@@ -47,6 +58,7 @@ public partial class LibraryViewModel
     public ICommand SwitchWorkspaceCommand { get; set; } = null!;
     public ICommand QuickLookCommand { get; set; } = null!;
     public ICommand SmartEscapeCommand { get; set; } = null!;
+
 
     // Export Specific Properties
     private ObservableCollection<Services.Export.ExportDriveInfo> _availableDrives = new();
@@ -136,15 +148,23 @@ public partial class LibraryViewModel
         CloseInspectorCommand = new RelayCommand(() => IsInspectorOpen = false);
         AnalyzeAlbumCommand = new AsyncRelayCommand<object>(ExecuteAnalyzeAlbumAsync);
         AnalyzeTrackCommand = new RelayCommand<object>(ExecuteAnalyzeTrack);
+        AnalyzeTrackT1Command = new RelayCommand<PlaylistTrackViewModel>(t => ExecuteAnalyzeTrackTier(t, AnalysisTier.Tier1));
+        AnalyzeTrackT2Command = new RelayCommand<PlaylistTrackViewModel>(t => ExecuteAnalyzeTrackTier(t, AnalysisTier.Tier2));
+        AnalyzeTrackT3Command = new RelayCommand<PlaylistTrackViewModel>(t => ExecuteAnalyzeTrackTier(t, AnalysisTier.Tier3));
+        AnalyzeAlbumT1Command = new AsyncRelayCommand<PlaylistJob>(p => ExecuteAnalyzeAlbumTierAsync(p, AnalysisTier.Tier1));
+        AnalyzeAlbumT2Command = new AsyncRelayCommand<PlaylistJob>(p => ExecuteAnalyzeAlbumTierAsync(p, AnalysisTier.Tier2));
+        AnalyzeAlbumT3Command = new AsyncRelayCommand<PlaylistJob>(p => ExecuteAnalyzeAlbumTierAsync(p, AnalysisTier.Tier3));
         ExportPlaylistCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteExportPlaylistAsync);
         AutoSortCommand = new AsyncRelayCommand(ExecuteAutoSortAsync);
         FindSonicTwinsCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(async t => await ExecuteFindSonicTwinsAsync(t));
         HardwareExportCommand = new AsyncRelayCommand(ExecuteHardwareExportAsync, () => SelectedProject != null);
+        RenameProjectCommand = new AsyncRelayCommand<PlaylistJob>(ExecuteRenameProjectAsync);
 
         // Fluidity
         SwitchWorkspaceCommand = new RelayCommand<ActiveWorkspace>(ws => CurrentWorkspace = ws);
         QuickLookCommand = new RelayCommand(() => IsQuickLookVisible = !IsQuickLookVisible);
         SmartEscapeCommand = new RelayCommand(ExecuteSmartEscape);
+
     }
 
     private async Task ExecuteViewHistoryAsync()
@@ -404,7 +424,25 @@ public partial class LibraryViewModel
             foreach (var t in tracks) _analysisQueueService.QueueTrackWithPriority(t);
             _notificationService.Show("Album Queued", $"{album.SourceTitle} ({tracks.Count} tracks)", NotificationType.Information);
         }
-        await Task.CompletedTask;
+    }
+
+    private void ExecuteAnalyzeTrackTier(PlaylistTrackViewModel? track, AnalysisTier tier)
+    {
+        if (track != null)
+        {
+            _analysisQueueService.QueueTrackWithPriority(track.Model, tier);
+            _notificationService.Show($"{tier} Analysis Queued", $"{track.Artist} - {track.Title}", NotificationType.Information);
+        }
+    }
+
+    private async Task ExecuteAnalyzeAlbumTierAsync(PlaylistJob? album, AnalysisTier tier)
+    {
+        if (album != null)
+        {
+            var tracks = await _libraryService.LoadPlaylistTracksAsync(album.Id);
+            foreach (var t in tracks) _analysisQueueService.QueueTrackWithPriority(t, tier);
+            _notificationService.Show($"{tier} Album Queued", $"{album.SourceTitle} ({tracks.Count} tracks)", NotificationType.Information);
+        }
     }
 
     private async Task ExecuteExportPlaylistAsync(object? param)
@@ -542,5 +580,40 @@ public partial class LibraryViewModel
     private void OnExportProgress(object? sender, Services.Export.ExportProgressEventArgs e)
     {
         ExportStatus = $"{e.Status} ({e.CurrentTrack}/{e.TotalTracks})";
+    }
+
+    private async Task ExecuteRenameProjectAsync(object? param)
+    {
+        if (param is not PlaylistJob project)
+        {
+            project = SelectedProject!;
+        }
+
+        if (project == null) return;
+
+        var newTitle = await _dialogService.ShowPromptAsync(
+            "Rename Project",
+            $"Enter a new name for '{project.SourceTitle}':",
+            project.SourceTitle);
+
+        if (!string.IsNullOrWhiteSpace(newTitle) && newTitle != project.SourceTitle)
+        {
+            try
+            {
+                var oldTitle = project.SourceTitle;
+                project.SourceTitle = newTitle;
+                await _libraryService.SavePlaylistJobAsync(project);
+                
+                _notificationService.Show("Project Renamed", $"'{oldTitle}' is now '{newTitle}'", NotificationType.Success);
+                
+                // Refresh project list
+                await Projects.LoadProjectsAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to rename project {Id}", project.Id);
+                _notificationService.Show("Rename Failed", ex.Message, NotificationType.Error);
+            }
+        }
     }
 }

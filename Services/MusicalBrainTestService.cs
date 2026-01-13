@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Data;
 using Microsoft.EntityFrameworkCore;
+using SLSKDONET.Data.Essentia;
 
 namespace SLSKDONET.Services;
 
@@ -133,13 +134,13 @@ public class MusicalBrainTestService
     /// <summary>
     /// Queue test tracks for analysis.
     /// </summary>
-    public void QueueTestTracks(List<TestTrack> tracks)
+    public void QueueTestTracks(List<TestTrack> tracks, AnalysisTier tier = AnalysisTier.Tier1)
     {
         foreach (var track in tracks)
         {
             if (File.Exists(track.FilePath))
             {
-                _queueService.QueueAnalysis(track.FilePath, track.GlobalId);
+                _queueService.QueueAnalysis(track.FilePath, track.GlobalId, tier);
                 _logger.LogInformation("Queued test track: {FileName}", track.FileName);
             }
             else

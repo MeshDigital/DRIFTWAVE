@@ -5,6 +5,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using SLSKDONET.Views.Avalonia.Controls;
 using Avalonia.Threading;
+using SLSKDONET.ViewModels.Library;
+using SLSKDONET.Models;
 
 namespace SLSKDONET.Services;
 
@@ -103,6 +105,55 @@ public class DialogService : IDialogService
             }
             
             return false;
+        });
+    }
+
+
+    public async Task<Data.Entities.SmartCrateDefinitionEntity?> ShowSmartCrateEditorAsync(ViewModels.Library.SmartCrateEditorViewModel vm)
+    {
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var dialog = new Views.Avalonia.Dialogs.SmartCrateEditorDialog
+            {
+                DataContext = vm
+            };
+            
+            var owner = GetOwnerWindow();
+            if (owner != null)
+            {
+                var result = await dialog.ShowDialog<Data.Entities.SmartCrateDefinitionEntity?>(owner);
+                return result;
+            }
+            
+            return null;
+        });
+    }
+
+    public async Task<string?> ShowPromptAsync(string title, string message, string initialValue = "")
+    {
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var dialog = new PromptDialog(title, message, initialValue);
+            var owner = GetOwnerWindow();
+            if (owner != null)
+            {
+                return await dialog.ShowDialog<string?>(owner);
+            }
+            return null;
+        });
+    }
+
+    public async Task<PlaylistJob?> ShowProjectPickerAsync(IEnumerable<PlaylistJob> projects)
+    {
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var dialog = new ProjectPickerDialog(projects);
+            var owner = GetOwnerWindow();
+            if (owner != null)
+            {
+                return await dialog.ShowDialog<PlaylistJob?>(owner);
+            }
+            return null;
         });
     }
 }

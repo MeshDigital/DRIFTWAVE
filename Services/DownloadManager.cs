@@ -18,6 +18,7 @@ using SLSKDONET.Models;
 using SLSKDONET.Services.InputParsers;
 using SLSKDONET.Utils;
 using SLSKDONET.Services.Models;
+using SLSKDONET.Data.Essentia;
 using Microsoft.EntityFrameworkCore;
 using SLSKDONET.Services.Repositories; // [NEW] Namespace
 using SLSKDONET.Services.IO; // Added explicit using
@@ -1973,8 +1974,8 @@ public class DownloadManager : INotifyPropertyChanged, IDisposable
                                     // E. Queue for Musical Intelligence (Phase 4 - Essentia)
                                     if (analysis != null)
                                     {
-                                        _analysisQueue.QueueAnalysis(analysisParams.Path, analysisParams.Hash);
-                                        _logger.LogInformation("ðŸ§  Queued for musical analysis: {Title}", ctx.Model.Title);
+                                        _analysisQueue.QueueAnalysis(analysisParams.Path, analysisParams.Hash, AnalysisTier.Tier1);
+                                        _logger.LogInformation("🧠 Queued for musical analysis: {Title}", ctx.Model.Title);
                                     }
                                     
                                     // Break retry loop on success

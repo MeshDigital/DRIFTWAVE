@@ -37,15 +37,15 @@ public class WaveformAnalysisService
 
         // TRI-BAND FORENSIC EXTRACTION:
         // We use a complex filtergraph to split the audio into 3 frequency bands + 1 clean mono channel.
-        // Band 1 (Low/Red): < 150Hz
-        // Band 2 (Mid/Green): 150Hz - 2.5kHz
-        // Band 3 (High/Blue): > 2.5kHz
+        // Band 1 (Low/Red): 20Hz - 250Hz
+        // Band 2 (Mid/Green): 250Hz - 2kHz
+        // Band 3 (High/Blue): > 2kHz
         // Band 4 (Total): Clean mono for Peak/RMS
-        // The output is merged into a 4-channel PCM stream.
-        var filterGraph = "[0:a]pan=mono|c0=c0,asplit=4[lo][mi][hi][cl]; " +
-                         "[lo]lowpass=f=150[loout]; " +
-                         "[mi]bandpass=f=1325:width=2350[miout]; " +
-                         "[hi]highpass=f=2500[hiout]; " +
+        // [0:a]aformat=channel_layouts=mono: Ensures consistent phase-safe mono before splitting.
+        var filterGraph = "[0:a]aformat=channel_layouts=mono,asplit=4[lo][mi][hi][cl]; " +
+                         "[lo]lowpass=f=250[loout]; " +
+                         "[mi]bandpass=f=1125:width=1750[miout]; " +
+                         "[hi]highpass=f=2000[hiout]; " +
                          "[loout][miout][hiout][cl]amerge=4";
 
         var startInfo = new ProcessStartInfo
@@ -99,6 +99,7 @@ public class WaveformAnalysisService
                 if (frameCount == 0) continue;
 
                 float maxPeak = 0;
+                float maxHighPeak = 0; // For Hybrid approach (Peak for highs)
                 double sumSqTotal = 0;
                 double sumSqLow = 0;
                 double sumSqMid = 0;
@@ -123,6 +124,7 @@ public class WaveformAnalysisService
                     float fTotal = Math.Abs(totalS / 32768f);
 
                     if (fTotal > maxPeak) maxPeak = fTotal;
+                    if (fHigh > maxHighPeak) maxHighPeak = fHigh;
                     
                     sumSqTotal += (double)fTotal * fTotal;
                     sumSqLow += (double)fLow * fLow;
@@ -130,20 +132,29 @@ public class WaveformAnalysisService
                     sumSqHigh += (double)fHigh * fHigh;
                 }
 
-                // RMS Calculation per band
+                // RMS Calculation for energy
                 float rmsTotal = (float)Math.Sqrt(sumSqTotal / frameCount);
                 float rmsLow = (float)Math.Sqrt(sumSqLow / frameCount);
                 float rmsMid = (float)Math.Sqrt(sumSqMid / frameCount);
-                float rmsHigh = (float)Math.Sqrt(sumSqHigh / frameCount);
+                
+                // Hybrid Detection Mode: RMS for low/mid, Peak for high (transients)
+                float valHigh = maxHighPeak; 
 
-                // Normalization and Scaling (0-255)
-                // We apply slight boosts to Mid and High to compensate for natural energy drop
+                // Perceptual Normalization & Scaling (0-255)
+                // 1. Bass Boost (1.3x)
+                rmsLow *= 1.3f;
+                
+                // 2. Gamma Correction (0.45) for visual density
+                float finalLow = (float)Math.Pow(Math.Clamp(rmsLow, 0, 1), 0.45);
+                float finalMid = (float)Math.Pow(Math.Clamp(rmsMid, 0, 1), 0.45);
+                float finalHigh = (float)Math.Pow(Math.Clamp(valHigh, 0, 1), 0.45);
+
                 peakPoints.Add((byte)Math.Clamp(maxPeak * 255, 0, 255));
                 rmsPoints.Add((byte)Math.Clamp(rmsTotal * 255, 0, 255));
                 
-                lowPoints.Add((byte)Math.Clamp(rmsLow * 255 * 1.5f, 0, 255));
-                midPoints.Add((byte)Math.Clamp(rmsMid * 255 * 1.8f, 0, 255));
-                highPoints.Add((byte)Math.Clamp(rmsHigh * 255 * 2.2f, 0, 255));
+                lowPoints.Add((byte)Math.Clamp(finalLow * 255, 0, 255));
+                midPoints.Add((byte)Math.Clamp(finalMid * 255, 0, 255));
+                highPoints.Add((byte)Math.Clamp(finalHigh * 255, 0, 255));
 
                 totalSamples += frameCount;
             }

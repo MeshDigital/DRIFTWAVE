@@ -69,7 +69,7 @@
             <!-- Status/Footer -->
             <Border Grid.Row="3" Padding="12" Background="#1E1E1E" BorderBrush="#3E3E42" BorderThickness="0,1,0,0">
                 <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Grid.Column="0" Text="Matches based on Key &amp; BPM" FontSize="11" Foreground="#666" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0" Text="Matches based on Key, BPM &amp; Sonic Similarity" FontSize="11" Foreground="#666" VerticalAlignment="Center"/>
                     <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="60" Height="2" 
                                  IsVisible="{Binding IsLoadingMatches}"/>
                 </Grid>

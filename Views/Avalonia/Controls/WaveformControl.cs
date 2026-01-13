@@ -62,6 +62,24 @@ namespace SLSKDONET.Views.Avalonia.Controls
             set => SetValue(HighBandProperty, value);
         }
 
+        public static readonly StyledProperty<IBrush?> ForegroundProperty =
+            AvaloniaProperty.Register<WaveformControl, IBrush?>(nameof(Foreground));
+
+        public IBrush? Foreground
+        {
+            get => GetValue(ForegroundProperty);
+            set => SetValue(ForegroundProperty, value);
+        }
+
+        public static readonly StyledProperty<IBrush?> BackgroundProperty =
+            AvaloniaProperty.Register<WaveformControl, IBrush?>(nameof(Background));
+
+        public IBrush? Background
+        {
+            get => GetValue(BackgroundProperty);
+            set => SetValue(BackgroundProperty, value);
+        }
+
         public static readonly StyledProperty<System.Collections.Generic.IEnumerable<OrbitCue>?> CuesProperty =
             AvaloniaProperty.Register<WaveformControl, System.Collections.Generic.IEnumerable<OrbitCue>?>(nameof(Cues));
 
@@ -73,7 +91,7 @@ namespace SLSKDONET.Views.Avalonia.Controls
 
         static WaveformControl()
         {
-            AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty, LowBandProperty, MidBandProperty, HighBandProperty, CuesProperty);
+            AffectsRender<WaveformControl>(WaveformDataProperty, ProgressProperty, LowBandProperty, MidBandProperty, HighBandProperty, CuesProperty, ForegroundProperty, BackgroundProperty);
         }
         
         public static readonly StyledProperty<System.Windows.Input.ICommand?> CueUpdatedCommandProperty =
@@ -203,15 +221,20 @@ namespace SLSKDONET.Views.Avalonia.Controls
                 if (x > width) break;
 
                 bool isPlayed = (float)i / samples <= Progress;
-                float opacity = isPlayed ? 1.0f : 0.4f;
-
-                if (hasRgb && i < lowData.Length && i < midData.Length && i < highData.Length)
+                
+                if (hasRgb && i < lowData!.Length && i < midData!.Length && i < highData!.Length)
                 {
                     // --- Layered RGB Rendering ---
-                    float low = lowData[i] / 255f;
-                    float midB = midData[i] / 255f;
-                    float high = highData[i] / 255f;
+                    float low = lowData![i] / 255f;
+                    float midB = midData![i] / 255f;
+                    float high = highData![i] / 255f;
                     float peak = data.PeakData[i] / 255f;
+
+                    // Energy-based Opacity (Breathing Effect)
+                    // We use the peak value to modulate the brightness/opacity
+                    float energyMod = 0.5f + (peak * 0.5f); 
+                    float baseOpacity = isPlayed ? 1.0f : 0.35f;
+                    float finalOpacity = baseOpacity * energyMod;
 
                     double lowH = low * mid;
                     double midH = midB * mid;
@@ -221,38 +244,47 @@ namespace SLSKDONET.Views.Avalonia.Controls
                     // 1. Red Layer (Bass/Foundation)
                     if (lowH > 0.5)
                     {
-                        var bassPen = new Pen(new SolidColorBrush(Color.FromRgb(255, 30, 30), opacity * 0.8f), 1);
+                        var color = isPlayed ? Color.FromRgb(255, 30, 30) : Color.FromRgb(150, 40, 40);
+                        var bassPen = new Pen(new SolidColorBrush(color, finalOpacity * 0.85f), 1);
                         context.DrawLine(bassPen, new Point(x, mid - lowH), new Point(x, mid + lowH));
                     }
 
                     // 2. Green Layer (Mids/Vocals)
                     if (midH > 0.5)
                     {
-                        var midPen = new Pen(new SolidColorBrush(Color.FromRgb(30, 255, 30), opacity * 0.7f), 1);
+                        var color = isPlayed ? Color.FromRgb(30, 255, 30) : Color.FromRgb(40, 150, 40);
+                        var midPen = new Pen(new SolidColorBrush(color, finalOpacity * 0.75f), 1);
                         context.DrawLine(midPen, new Point(x, mid - midH), new Point(x, mid + midH));
                     }
 
                     // 3. Blue Layer (Highs/Percussion)
                     if (highH > 0.5)
                     {
-                        // Accentuate highs with vibrant cyan-blue
-                        var highPen = new Pen(new SolidColorBrush(Color.FromRgb(0, 220, 255), opacity), 1);
+                        var color = isPlayed ? Color.FromRgb(0, 220, 255) : Color.FromRgb(30, 120, 150);
+                        var highPen = new Pen(new SolidColorBrush(color, finalOpacity), 1);
                         context.DrawLine(highPen, new Point(x, mid - highH), new Point(x, mid + highH));
                         
-                        // "Blue Frosting" - if highs are very strong, add a small glow or sharpen
-                        if (high > 0.6)
+                        // "Blue Sparkle" - slight glow for very high energy peaks
+                        if (isPlayed && high > 0.7)
                         {
-                            var glowPen = new Pen(new SolidColorBrush(Colors.White, opacity * 0.4f), 1);
-                             context.DrawLine(glowPen, new Point(x, mid - highH - 1), new Point(x, mid - highH + 1));
-                             context.DrawLine(glowPen, new Point(x, mid + highH - 1), new Point(x, mid + highH + 1));
+                            var sparklePen = new Pen(new SolidColorBrush(Colors.White, finalOpacity * 0.5f), 1);
+                            context.DrawLine(sparklePen, new Point(x, mid - highH - 1), new Point(x, mid - highH + 1));
+                            context.DrawLine(sparklePen, new Point(x, mid + highH - 1), new Point(x, mid + highH + 1));
                         }
                     }
 
-                    // 4. Peak Silhouette (Translucent White)
-                    if (peakH > Math.Max(lowH, Math.Max(midH, highH)))
+                    // 4. White Silhouette (Peak transients)
+                    if (isPlayed && peak > 0.1)
                     {
-                        var peakPen = new Pen(new SolidColorBrush(Colors.White, opacity * 0.3f), 1);
-                        context.DrawLine(peakPen, new Point(x, mid - peakH), new Point(x, mid + peakH));
+                         var peakPen = new Pen(new SolidColorBrush(Colors.White, finalOpacity * 0.2f), 1);
+                         context.DrawLine(peakPen, new Point(x, mid - peakH), new Point(x, mid + peakH));
+                    }
+                    
+                    // 5. Unplayed Outline (Thin desaturated structure)
+                    if (!isPlayed)
+                    {
+                        var outlinePen = new Pen(new SolidColorBrush(Colors.White, 0.1f), 0.5);
+                        context.DrawLine(outlinePen, new Point(x, mid - peakH), new Point(x, mid + peakH));
                     }
                 }
                 else

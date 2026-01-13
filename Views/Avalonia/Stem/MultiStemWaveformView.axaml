@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:SLSKDONET.ViewModels.Stem"
+             xmlns:controls="clr-namespace:SLSKDONET.Views.Avalonia.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="200"
+             x:Class="SLSKDONET.Views.Avalonia.Stem.MultiStemWaveformView">
+
+    <UserControl.Styles>
+        <Style Selector="ItemsControl > ContentPresenter">
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="4">
+        <ItemsControl ItemsSource="{Binding Channels}"> <!-- Binds to StemMixerViewModel.Channels -->
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Rows="{Binding Channels.Count}" VerticalAlignment="Stretch"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                       <!-- Background Track coloring -->
+                        <Border Background="{Binding ColorHex}" Opacity="0.1" VerticalAlignment="Stretch"/>
+                        
+                        <!-- Waveform -->
+                        <controls:WaveformControl 
+                            WaveformData="{Binding WaveformData}"
+                            Foreground="{Binding ColorHex}" 
+                            Background="Transparent"
+                            Opacity="0.9"
+                            IsHitTestVisible="False"
+                            VerticalAlignment="Stretch"/>
+                            
+                        <!-- Label Overlay -->
+                        <TextBlock Text="{Binding Name}" Foreground="{Binding ColorHex}" 
+                                   FontSize="10" FontWeight="Bold" Opacity="0.5"
+                                   VerticalAlignment="Top" HorizontalAlignment="Left" Margin="4,2"/>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Border>
+</UserControl>

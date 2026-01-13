@@ -314,20 +314,6 @@ public class SettingsViewModel : INotifyPropertyChanged, IDisposable
             }
         }
     }
-
-    public bool SpotifyEnableAudioFeatures
-    {
-        get => _config.SpotifyEnableAudioFeatures;
-        set
-        {
-            if (_config.SpotifyEnableAudioFeatures != value)
-            {
-                _config.SpotifyEnableAudioFeatures = value;
-                OnPropertyChanged();
-                SaveSettings();
-            }
-        }
-    }
     
     // Phase 2.4: Strategy Command Pattern
     public ObservableCollection<RankingStrategyViewModel> Strategies { get; } = new();
@@ -1009,20 +995,7 @@ public class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private async Task ResetDatabaseAsync()
-    {
-        try
-        {
-            _logger.LogWarning("⚠️ User initiated DATABASE RESET from Settings ⚠️");
-            await _databaseService.ResetDatabaseAsync();
-            _logger.LogInformation("Database reset successful.");
-            // In a real app, we might want to trigger a restart or notification
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to reset database via Settings");
-        }
-    }
+
     
     private async Task ScanLibraryAsync()
     {
@@ -1190,6 +1163,32 @@ public class SettingsViewModel : INotifyPropertyChanged, IDisposable
             _connectCts?.Dispose();
             _connectCts = null;
             (RevokeAndReAuthCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+    private async Task ResetDatabaseAsync()
+    {
+        try 
+        {
+            // Create marker file
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var markerPath = System.IO.Path.Combine(appData, "ORBIT", ".force_schema_reset");
+            
+            await System.IO.File.WriteAllTextAsync(markerPath, DateTime.Now.ToString());
+            _logger.LogWarning("Force Reset Marker created at {Path}", markerPath);
+            
+            // Restart Application
+            var processPath = Environment.ProcessPath; 
+            _logger.LogInformation("Attempting to restart application from: {Path}", processPath);
+            
+            if (!string.IsNullOrEmpty(processPath))
+            {
+                System.Diagnostics.Process.Start(processPath);
+                Environment.Exit(0);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to initiate database reset");
         }
     }
 }

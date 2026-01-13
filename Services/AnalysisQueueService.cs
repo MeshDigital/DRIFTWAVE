@@ -16,6 +16,7 @@ using SLSKDONET.Data.Entities;
 using SLSKDONET.Models; // For Events
 using Microsoft.EntityFrameworkCore;
 using Avalonia.Threading; // For UI thread safety
+using SLSKDONET.Data.Essentia;
 
 namespace SLSKDONET.Services;
 
@@ -122,15 +123,63 @@ public class AnalysisQueueService : INotifyPropertyChanged
         // - Analysis is non-critical: if queue grows to 1000, it just takes longer
         // - Bounded channel would cause downloads to pause (unacceptable UX)
         // - Memory cost: ~100 bytes per request = 10,000 queued = 1MB (negligible)
+        // - Memory cost: ~100 bytes per request = 10,000 queued = 1MB (negligible)
         _channel = Channel.CreateUnbounded<AnalysisRequest>();
+        
+        // Subscribe to manual triggers
+        _eventBus.GetEvent<TrackAnalysisRequestedEvent>().Subscribe(OnAnalysisRequested);
     }
 
-    public void QueueAnalysis(string filePath, string trackHash)
+    public void QueueAnalysis(string filePath, string trackHash, AnalysisTier tier = AnalysisTier.Tier1)
     {
-        _channel.Writer.TryWrite(new AnalysisRequest(filePath, trackHash));
+        _channel.Writer.TryWrite(new AnalysisRequest(filePath, trackHash, tier));
         Interlocked.Increment(ref _queuedCount);
         OnPropertyChanged(nameof(QueuedCount));
         PublishStatusEvent();
+    }
+
+
+
+    private void OnAnalysisRequested(TrackAnalysisRequestedEvent evt)
+    {
+        _logger.LogInformation("🧠 Manual Analysis Requested for {Hash}", evt.TrackGlobalId);
+        
+        // Fire and forget lookup (don't block event bus)
+        Task.Run(async () =>
+        {
+            try
+            {
+                using var context = await _dbFactory.CreateDbContextAsync();
+                
+                // Try LibraryEntry first (primary source for files)
+                var entry = await context.LibraryEntries
+                    .FirstOrDefaultAsync(e => e.UniqueHash == evt.TrackGlobalId);
+                    
+                if (entry != null && System.IO.File.Exists(entry.FilePath))
+                {
+                    QueueAnalysis(entry.FilePath, entry.UniqueHash, evt.Tier);
+                    return;
+                }
+                
+                // Fallback: Check PlaylistTracks (might be downloaded but not fully indexed?)
+                var track = await context.PlaylistTracks
+                    .FirstOrDefaultAsync(t => t.TrackUniqueHash == evt.TrackGlobalId && t.Status == TrackStatus.Downloaded);
+                    
+                if (track != null && !string.IsNullOrEmpty(track.ResolvedFilePath) && System.IO.File.Exists(track.ResolvedFilePath))
+                {
+                    QueueAnalysis(track.ResolvedFilePath, evt.TrackGlobalId, evt.Tier);
+                    return;
+                }
+                
+                _logger.LogWarning("❌ Could not find file for analysis request: {Hash}", evt.TrackGlobalId);
+                _eventBus.Publish(new TrackAnalysisFailedEvent(evt.TrackGlobalId, "File not found locally"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing manual analysis request");
+                _eventBus.Publish(new TrackAnalysisFailedEvent(evt.TrackGlobalId, "Internal Error"));
+            }
+        });
     }
 
     /// <summary>
@@ -158,7 +207,7 @@ public class AnalysisQueueService : INotifyPropertyChanged
             {
                 if (File.Exists(track.FilePath))
                 {
-                    QueueAnalysis(track.FilePath, track.UniqueHash);
+                    QueueAnalysis(track.FilePath, track.UniqueHash, AnalysisTier.Tier1);
                     enqueuedCount++;
                 }
                 else
@@ -202,28 +251,28 @@ public class AnalysisQueueService : INotifyPropertyChanged
     }
 
     // Album Priority: Queue entire album for immediate analysis
-    public int QueueAlbumWithPriority(List<PlaylistTrack> tracks)
+    public int QueueAlbumWithPriority(List<PlaylistTrack> tracks, AnalysisTier tier = AnalysisTier.Tier1)
     {
         var count = 0;
         foreach (var track in tracks)
         {
             if (!string.IsNullOrEmpty(track.ResolvedFilePath) && !string.IsNullOrEmpty(track.TrackUniqueHash))
             {
-                QueueAnalysis(track.ResolvedFilePath, track.TrackUniqueHash);
+                QueueAnalysis(track.ResolvedFilePath, track.TrackUniqueHash, tier);
                 count++;
             }
         }
         
-        System.Diagnostics.Debug.WriteLine($"Queued {count} tracks from album for priority analysis");
+        System.Diagnostics.Debug.WriteLine($"Queued {count} tracks from album for {tier} priority analysis");
         return count;
     }
 
-    public void QueueTrackWithPriority(PlaylistTrack track)
+    public void QueueTrackWithPriority(PlaylistTrack track, AnalysisTier tier = AnalysisTier.Tier1)
     {
         if (!string.IsNullOrEmpty(track.ResolvedFilePath) && !string.IsNullOrEmpty(track.TrackUniqueHash))
         {
-            QueueAnalysis(track.ResolvedFilePath, track.TrackUniqueHash);
-             _logger.LogInformation("Manual priority queue: {File}", track.Title);
+            QueueAnalysis(track.ResolvedFilePath, track.TrackUniqueHash, tier);
+             _logger.LogInformation("Manual priority queue ({Tier}): {File}", tier, track.Title);
         }
     }
 
@@ -285,7 +334,7 @@ public class AnalysisQueueService : INotifyPropertyChanged
     public ChannelReader<AnalysisRequest> Reader => _channel.Reader;
 }
 
-public record AnalysisRequest(string FilePath, string TrackHash);
+public record AnalysisRequest(string FilePath, string TrackHash, AnalysisTier Tier = AnalysisTier.Tier1);
 
 public class AnalysisWorker : BackgroundService
 {
@@ -469,6 +518,11 @@ public class AnalysisWorker : BackgroundService
         
         // Generate a Correlation ID for this entire analysis flow
         string correlationId = Guid.NewGuid().ToString();
+        
+        // Phase 21: Analysis Run Tracking
+        var runId = Guid.NewGuid();
+        var runStartTime = DateTime.UtcNow;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         // Context to hold results for batching
         var resultContext = new AnalysisResultContext { TrackHash = trackHash, FilePath = request.FilePath, CorrelationId = correlationId };
@@ -481,9 +535,26 @@ public class AnalysisWorker : BackgroundService
                 _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Processing started", trackHash);
 
                 using var scope = _serviceProvider.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var essentiaAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioIntelligenceService>();
                 var audioAnalyzer = scope.ServiceProvider.GetRequiredService<IAudioAnalysisService>();
                 var waveformAnalyzer = scope.ServiceProvider.GetRequiredService<WaveformAnalysisService>();
+                
+                // Create initial run record
+                var run = new Data.Entities.AnalysisRunEntity
+                {
+                    RunId = runId,
+                    TrackUniqueHash = trackHash,
+                    TrackTitle = System.IO.Path.GetFileNameWithoutExtension(request.FilePath),
+                    FilePath = request.FilePath,
+                    StartedAt = runStartTime,
+                    Status = Data.Entities.AnalysisRunStatus.Processing,
+                    Tier = request.Tier, // Set the requested tier
+                    TriggerSource = "AutoQueue", // TODO: pass from request
+                    AnalysisVersion = "Essentia-2.1-beta5" // TODO: get from config
+                };
+                dbContext.AnalysisRuns.Add(run);
+                await dbContext.SaveChangesAsync(stoppingToken);
 
                 _logger.LogInformation("🧠 Analyzing: {Hash}", trackHash);
 
@@ -493,10 +564,11 @@ public class AnalysisWorker : BackgroundService
 
                 // 1. Generate Waveform
                 PublishThrottled(new AnalysisProgressEvent(trackHash, "Generating waveform...", 10));
-                // Offload CPU bound work
-                // Note: WaveformAnalysisService might need update for correlationId if we want to trace it too [TODO]
+                var waveformStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 resultContext.WaveformData = await Task.Run(() => waveformAnalyzer.GenerateWaveformAsync(request.FilePath, linkedCts.Token), linkedCts.Token);
                 _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Waveform generated", trackHash);
+                run.WaveformGenerated = true;
+                run.FfmpegDurationMs = waveformStopwatch.ElapsedMilliseconds;
 
                 // Phase 13: Demo-Safe Analysis Mode
                 // If a track is marked for demo (or matches a specific pattern), we skip 
@@ -518,12 +590,16 @@ public class AnalysisWorker : BackgroundService
                 {
                     // 2. Musical Analysis
                     PublishThrottled(new AnalysisProgressEvent(trackHash, "Analyzing musical features...", 40));
-                    resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
+                    var essentiaStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    resultContext.MusicalResult = await Task.Run(() => essentiaAnalyzer.AnalyzeTrackAsync(request.FilePath, trackHash, correlationId, linkedCts.Token, tier: request.Tier), linkedCts.Token);
+                    run.EssentiaAnalysisCompleted = true;
+                    run.EssentiaDurationMs = essentiaStopwatch.ElapsedMilliseconds;
                 }
 
                 // 3. Technical Analysis
                 PublishThrottled(new AnalysisProgressEvent(trackHash, "Running technical analysis...", 70));
                 resultContext.TechResult = await Task.Run(() => audioAnalyzer.AnalyzeFileAsync(request.FilePath, trackHash, correlationId, linkedCts.Token), linkedCts.Token);
+                run.FfmpegAnalysisCompleted = true;
 
                 // 4. Cue Generation (Heuristic)
                 if (resultContext.WaveformData != null)
@@ -540,18 +616,52 @@ public class AnalysisWorker : BackgroundService
                 _pendingResults.Add(resultContext);
                 analysisSucceeded = true;
                 _forensicLogger.Info(correlationId, ForensicStage.AnalysisQueue, "Results queued for batch persistence", trackHash);
+                
+                // Mark run as completed
+                run.Status = Data.Entities.AnalysisRunStatus.Completed;
+                run.CompletedAt = DateTime.UtcNow;
+                run.DurationMs = sw.ElapsedMilliseconds;
+                await dbContext.SaveChangesAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {
                 _logger.LogError("⏱ Track analysis timed out or cancelled: {Hash}", trackHash);
                 errorMessage = "Analysis timed out";
                 _forensicLogger.Warning(correlationId, ForensicStage.AnalysisQueue, "Analysis timed out or cancelled", trackHash);
+                
+                // Update run record with cancellation
+                using var errorScope = _serviceProvider.CreateScope();
+                var errorDb = errorScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var errorRun = await errorDb.AnalysisRuns.FindAsync(runId);
+                if (errorRun != null)
+                {
+                    errorRun.Status = Data.Entities.AnalysisRunStatus.Cancelled;
+                    errorRun.ErrorMessage = "Timeout or cancellation";
+                    errorRun.CompletedAt = DateTime.UtcNow;
+                    errorRun.DurationMs = sw.ElapsedMilliseconds;
+                    await errorDb.SaveChangesAsync();
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "❌ Error analyzing: {Hash}", trackHash);
                 errorMessage = ex.Message;
                 _forensicLogger.Error(correlationId, ForensicStage.AnalysisQueue, "Pipeline crashed", trackHash, ex);
+                
+                // Update run record with error
+                using var errorScope = _serviceProvider.CreateScope();
+                var errorDb = errorScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var errorRun = await errorDb.AnalysisRuns.FindAsync(runId);
+                if (errorRun != null)
+                {
+                    errorRun.Status = Data.Entities.AnalysisRunStatus.Failed;
+                    errorRun.ErrorMessage = ex.Message;
+                    errorRun.ErrorStackTrace = ex.StackTrace;
+                    errorRun.FailedStage = "Unknown"; // TODO: track which stage failed
+                    errorRun.CompletedAt = DateTime.UtcNow;
+                    errorRun.DurationMs = sw.ElapsedMilliseconds;
+                    await errorDb.SaveChangesAsync();
+                }
             }
             finally
             {
@@ -571,76 +681,79 @@ public class AnalysisWorker : BackgroundService
         var batchCount = _pendingResults.Count;
         _logger.LogInformation("💾 Flushing batch of {Count} analysis results...", batchCount);
 
-        try
+        int retryCount = 0;
+        const int maxRetries = 5;
+        
+        while (retryCount < maxRetries)
         {
-            using var dbContext = new AppDbContext();
-            
-            // Process all pending items in one transaction logic
-            foreach (var result in _pendingResults)
+            try
             {
-                var trackHash = result.TrackHash;
-
-                // Feature Tables
-                if (result.MusicalResult != null)
+                using var dbContext = new AppDbContext();
+                
+                // Process all pending items in one transaction logic
+                foreach (var result in _pendingResults)
                 {
-                    // Basic Upsert logic (Remove old, Add new) - optimized for batch?
-                    // EF Core doesn't support bulk upsert natively well without extensions, doing per-item check is costly for large batches.
-                    // But for 10 items it's fine.
-                    var existingFeatures = await dbContext.AudioFeatures.FirstOrDefaultAsync(f => f.TrackUniqueHash == trackHash, token);
-                    if (existingFeatures != null) dbContext.AudioFeatures.Remove(existingFeatures);
-                    dbContext.AudioFeatures.Add(result.MusicalResult);
-                }
+                    var trackHash = result.TrackHash;
 
-                if (result.TechResult != null)
-                {
-                    var existingAnalysis = await dbContext.AudioAnalysis.FirstOrDefaultAsync(a => a.TrackUniqueHash == trackHash, token);
-                    if (existingAnalysis != null) dbContext.AudioAnalysis.Remove(existingAnalysis);
-                    dbContext.AudioAnalysis.Add(result.TechResult);
-                }
-
-                // Update PlaylistTracks
-                 var playlistTracks = await dbContext.PlaylistTracks
-                    .Include(t => t.TechnicalDetails)
-                    .Where(t => t.TrackUniqueHash == trackHash)
-                    .ToListAsync(token);
-
-                foreach (var track in playlistTracks)
-                {
-                    ApplyResultsToTrack(track, result);
-                    
-                    // CRITICAL: If we just created a new TechnicalDetails, explicitly mark it as Added
-                    if (track.TechnicalDetails != null && dbContext.Entry(track.TechnicalDetails).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+                    if (result.MusicalResult != null)
                     {
-                        dbContext.TechnicalDetails.Add(track.TechnicalDetails);
+                        var existingFeatures = await dbContext.AudioFeatures.FirstOrDefaultAsync(f => f.TrackUniqueHash == trackHash, token);
+                        if (existingFeatures != null) dbContext.AudioFeatures.Remove(existingFeatures);
+                        dbContext.AudioFeatures.Add(result.MusicalResult);
+                    }
+
+                    if (result.TechResult != null)
+                    {
+                        var existingAnalysis = await dbContext.AudioAnalysis.FirstOrDefaultAsync(a => a.TrackUniqueHash == trackHash, token);
+                        if (existingAnalysis != null) dbContext.AudioAnalysis.Remove(existingAnalysis);
+                        dbContext.AudioAnalysis.Add(result.TechResult);
+                    }
+
+                    var playlistTracks = await dbContext.PlaylistTracks
+                        .Include(t => t.TechnicalDetails)
+                        .Where(t => t.TrackUniqueHash == trackHash)
+                        .ToListAsync(token);
+
+                    foreach (var track in playlistTracks)
+                    {
+                        ApplyResultsToTrack(track, result);
+                        if (track.TechnicalDetails != null && dbContext.Entry(track.TechnicalDetails).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+                        {
+                            dbContext.TechnicalDetails.Add(track.TechnicalDetails);
+                        }
+                    }
+                    
+                    var libraryEntry = await dbContext.LibraryEntries.FirstOrDefaultAsync(e => e.UniqueHash == trackHash, token);
+                    if (libraryEntry != null)
+                    {
+                        ApplyResultsToLibraryEntry(libraryEntry, result);
                     }
                 }
+
+                await dbContext.SaveChangesAsync(token);
                 
-                // Update LibraryEntries
-                var libraryEntry = await dbContext.LibraryEntries.FirstOrDefaultAsync(e => e.UniqueHash == trackHash, token);
-                if (libraryEntry != null)
+                foreach (var result in _pendingResults)
                 {
-                    ApplyResultsToLibraryEntry(libraryEntry, result);
+                    _eventBus.Publish(new TrackMetadataUpdatedEvent(result.TrackHash));
                 }
-            }
 
-            await dbContext.SaveChangesAsync(token);
-            
-            // NEW: After successful DB save, notify the UI for each track in the batch
-            foreach (var result in _pendingResults)
+                _lastBatchSave = DateTime.UtcNow;
+                _pendingResults.Clear();
+                _logger.LogInformation("✅ Batch save completed.");
+                return;
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 5) // SQLITE_BUSY
             {
-                _eventBus.Publish(new TrackMetadataUpdatedEvent(result.TrackHash));
+                retryCount++;
+                _logger.LogWarning("⚠️ Database locked during analysis batch save. Retry {Count}/{Max}...", retryCount, maxRetries);
+                await Task.Delay(500 * retryCount, token); // Exponential backoff
             }
-
-            _lastBatchSave = DateTime.UtcNow;
-            _pendingResults.Clear();
-            _logger.LogInformation("✅ Batch save completed.");
-        }
-        catch (Exception ex)
-        {
-             _logger.LogError(ex, "❌ Failed to save analysis batch!");
-             // Potential data loss if batch fails. In robust system we'd retry or dead-letter.
-             // For now, clear to prevent infinite loop.
-             _pendingResults.Clear(); 
+            catch (Exception ex)
+            {
+                 _logger.LogError(ex, "❌ Failed to save analysis batch! Data may be lost for {Count} tracks.", _pendingResults.Count);
+                 _pendingResults.Clear(); 
+                 return;
+            }
         }
     }
 

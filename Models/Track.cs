@@ -42,6 +42,10 @@ public class Track
     public int QueueLength { get; set; }
     public int UploadSpeed { get; set; } // Bytes per second
 
+    // Phase 21: AI Brain Upgrade
+    public double? Sadness { get; set; }
+    public byte[]? VectorEmbedding { get; set; }
+
     /// <summary>
     /// Local filesystem path where the track was stored (if known).
     /// </summary>
@@ -100,6 +104,11 @@ public class Track
     /// The reason why the track was flagged (e.g., "Suspicious Size", "Banned User").
     /// </summary>
     public string? FlagReason { get; set; }
+
+    /// <summary>
+    /// Phase 18.2: Human-readable explanation for why this track matched in a sonic search (e.g. "Twin Vibe").
+    /// </summary>
+    public string? MatchReason { get; set; }
 
     /// <summary>
     /// Gets the file extension from the filename.

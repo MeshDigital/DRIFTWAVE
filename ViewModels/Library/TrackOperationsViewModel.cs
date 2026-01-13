@@ -43,6 +43,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged, IDisposable
     public System.Windows.Input.ICommand RemoveTrackCommand { get; }
     public System.Windows.Input.ICommand DeleteAndBlacklistCommand { get; } // Phase 7
     public System.Windows.Input.ICommand CloneTrackCommand { get; } // Phase 11.6: Physical Clone
+    public System.Windows.Input.ICommand AddToProjectCommand { get; }
     public System.Windows.Input.ICommand RetryOfflineTracksCommand { get; }
     public System.Windows.Input.ICommand OpenFolderCommand { get; }
     public System.Windows.Input.ICommand IndustrialPrepCommand { get; } // Phase 10.4
@@ -99,6 +100,7 @@ public class TrackOperationsViewModel : INotifyPropertyChanged, IDisposable
         RemoveTrackCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteRemoveTrack);
         DeleteAndBlacklistCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteDeleteAndBlacklist); // Phase 7
         CloneTrackCommand = new AsyncRelayCommand<PlaylistTrackViewModel>(ExecuteCloneTrack); // Phase 11.6
+        AddToProjectCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteAddToProject);
         RetryOfflineTracksCommand = new AsyncRelayCommand(ExecuteRetryOfflineTracks);
         OpenFolderCommand = new RelayCommand<PlaylistTrackViewModel>(ExecuteOpenFolder);
         
@@ -151,6 +153,28 @@ public class TrackOperationsViewModel : INotifyPropertyChanged, IDisposable
             _logger.LogError(ex, "Clone operation failed");
         }
     }
+
+    private void ExecuteAddToProject(PlaylistTrackViewModel? track)
+    {
+        if (track == null || track.Model == null) return;
+        
+        var selectedTracks = LibraryViewModel?.Tracks.SelectedTracks;
+        var toAdd = new System.Collections.Generic.List<PlaylistTrack>();
+
+        if (selectedTracks != null && selectedTracks.Contains(track))
+        {
+            toAdd.AddRange(selectedTracks.Select(t => t.Model));
+        }
+        else
+        {
+            toAdd.Add(track.Model);
+        }
+
+        _logger.LogInformation("Requesting Add To Project for {Count} tracks", toAdd.Count);
+        _eventBus.Publish(new AddToProjectRequestEvent(toAdd));
+    }
+
+    private LibraryViewModel? LibraryViewModel => _mainViewModel?.LibraryViewModel;
 
     private void ExecutePlayTrack(PlaylistTrackViewModel? track)
     {

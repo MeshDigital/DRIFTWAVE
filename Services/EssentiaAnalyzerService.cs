@@ -13,7 +13,7 @@ namespace SLSKDONET.Services;
 
 public interface IAudioIntelligenceService
 {
-    Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, string? correlationId = null, CancellationToken cancellationToken = default, bool generateCues = false);
+    Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, string? correlationId = null, CancellationToken cancellationToken = default, bool generateCues = false, AnalysisTier tier = AnalysisTier.Tier1);
     bool IsEssentiaAvailable();
 }
 
@@ -41,7 +41,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
     
     private static string? _essentiaPath;
     private static bool _binaryValidated = false;
-    private volatile bool _isDisposing = false;
+    // private volatile bool _isDisposing = false; // Unused
     
     // WHY: Track running processes for cleanup:
     // - External processes don't auto-terminate when app crashes
@@ -124,7 +124,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
         return false;
     }
 
-    public async Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, string? correlationId = null, CancellationToken cancellationToken = default, bool generateCues = false)
+    public async Task<AudioFeaturesEntity?> AnalyzeTrackAsync(string filePath, string trackUniqueHash, string? correlationId = null, CancellationToken cancellationToken = default, bool generateCues = false, AnalysisTier tier = AnalysisTier.Tier1)
     {
         var cid = correlationId ?? Guid.NewGuid().ToString();
         
@@ -143,7 +143,8 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
             return null;
         }
 
-        using (_forensicLogger.TimedOperation(cid, ForensicStage.MusicalAnalysis, "Musical Feature Extraction", trackUniqueHash))
+        var stopwatch = Stopwatch.StartNew();
+        using (_forensicLogger.TimedOperation(cid, ForensicStage.MusicalAnalysis, $"Musical Feature Extraction ({tier})", trackUniqueHash))
         {
             // Phase 4.1: Pro Tip - Skip analysis for tiny files (likely corrupt)
             var fileInfo = new FileInfo(filePath);
@@ -177,12 +178,29 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                 startInfo.ArgumentList.Add(tempJsonPath);
 
                 // Phase 13: Advanced Sidecar Configuration
-                // Use profile.yaml to configure the C++ sidecar (Efficient model loading)
-                var profilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "Essentia", "profile.yaml");
+                // Use tiered profile.yaml to configure the C++ sidecar (Efficient model loading)
+                string profileFileName = tier switch
+                {
+                    AnalysisTier.Tier2 => "profile_tier2.yaml",
+                    AnalysisTier.Tier3 => "profile_tier3.yaml",
+                    _ => "profile_tier1.yaml"
+                };
+
+                var profilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "Essentia", profileFileName);
                 if (File.Exists(profilePath))
                 {
                      startInfo.ArgumentList.Add(profilePath);
-                     _logger.LogInformation("🧠 SIDECAR: Using Essentia profile for batch model loading: {Profile}", profilePath);
+                     _logger.LogInformation("🧠 SIDECAR: Using Essentia {Tier} profile: {Profile}", tier, profileFileName);
+                }
+                else
+                {
+                    // Fallback to default profile if tier-specific is missing
+                    profilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "Essentia", "profile.yaml");
+                    if (File.Exists(profilePath))
+                    {
+                        startInfo.ArgumentList.Add(profilePath);
+                        _logger.LogInformation("🧠 SIDECAR: Tier-specific profile missing, falling back to default: {Profile}", profilePath);
+                    }
                 }
 
                 _forensicLogger.Info(cid, ForensicStage.MusicalAnalysis, "Starting Essentia process...", trackUniqueHash);
@@ -335,6 +353,9 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                         ?? EstimateInstrumentalProbability(data.LowLevel, data.Rhythm),
                     MoodTag = DetermineMoodTag(data.HighLevel),
                     MoodConfidence = CalculateMoodConfidence(data.HighLevel),
+                    
+                    // Phase 21: AI Brain
+                    Sadness = data.HighLevel?.MoodSad?.All?.Sad, // Directly capture Sad probability
 
                     // Advanced Harmonic Mixing
                     // ChordProgression = FormatChordProgression(data.Tonal?.ChordsKey), // Commented out - ChordsKey now JsonElement
@@ -357,6 +378,11 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                             if (embedding != null && embedding.Length > 0)
                             {
                                 entity.AiEmbeddingJson = JsonSerializer.Serialize(embedding);
+                                
+                                // Phase 21: AI Brain Vector Storage
+                                // Store as float array directly (handled by NotMapped property wrapper)
+                                entity.VectorEmbedding = embedding;
+
                                 // Calculate L2 Norm (Magnitude) for efficient Cosine Similarity
                                 entity.EmbeddingMagnitude = (float)Math.Sqrt(embedding.Sum(x => x * x));
                             }
@@ -396,11 +422,46 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
                             _logger.LogDebug("🎵 Vibe Map: Arousal={Arousal}, Valence={Valence} -> {Mood}", 
                                 arousal, valence, entity.MoodTag);
                         }
+
+                        // Tier 3: VGGish Embeddings
+                        if (kvp.Key.Contains("vggish", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var embedding = ExtractEmbeddingFromJson(kvp.Value);
+                            if (embedding != null && embedding.Length > 0)
+                            {
+                                entity.VggishEmbeddingJson = JsonSerializer.Serialize(embedding);
+                                _logger.LogDebug("🎵 VGGish Embedding extracted ({Size} elements)", embedding.Length);
+                            }
+                        }
+
+                        // Tier 3: CREPE Pitch Detection
+                        if (kvp.Key.Contains("crepe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var (avgPitch, confidence) = ExtractCrepePitch(kvp.Value);
+                            entity.AvgPitch = avgPitch;
+                            entity.PitchConfidence = confidence;
+                            _logger.LogDebug("🎵 CREPE Pitch: {Pitch:F1} Hz (Conf: {Conf:P0})", avgPitch, confidence);
+                        }
+
+                        // Tier 3: Audio Visualization Metrics (deepsquare)
+                        if (kvp.Key.Contains("deepsquare", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var vector = ExtractVisualizationVector(kvp.Value);
+                            if (vector != null && vector.Length > 0)
+                            {
+                                entity.VisualizationVectorJson = JsonSerializer.Serialize(vector);
+                                _logger.LogDebug("🎵 Visualization Vector extracted ({Size} elements)", vector.Length);
+                            }
+                        }
                     }
                 }
                 
+                stopwatch.Stop();
+                _logger.LogInformation("⏱ SIDECAR PERFORMANCE: {Tier} analysis for {Hash} took {Elapsed}ms", 
+                    tier, trackUniqueHash, stopwatch.ElapsedMilliseconds);
+
                 _forensicLogger.Info(cid, ForensicStage.MusicalAnalysis, 
-                    $"Extracted: {entity.Bpm:F1} BPM | Key: {entity.Key} {entity.Scale} | Dance: {entity.Danceability:F1}", trackUniqueHash);
+                    $"Extracted ({tier}): {entity.Bpm:F1} BPM | Key: {entity.Key} {entity.Scale} | Dance: {entity.Danceability:F1} | Time: {stopwatch.ElapsedMilliseconds}ms", trackUniqueHash);
 
                 // Phase 4.2: Drop Detection & Cue Generation (OPT-IN ONLY for safety)
                 // User must manually trigger via UI to avoid unintended modifications
@@ -714,6 +775,76 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
     }
 
     /// <summary>
+    /// Extracts pitch and confidence from CREPE model output.
+    /// </summary>
+    private static (float frequency, float confidence) ExtractCrepePitch(JsonElement element)
+    {
+        try
+        {
+            // CREPE often outputs time-varying arrays. We'll take the mean.
+            if (element.TryGetProperty("all", out var allProp))
+            {
+                // Try to find frequency and confidence arrays
+                if (allProp.TryGetProperty("frequency", out var freqProp) && freqProp.ValueKind == JsonValueKind.Array)
+                {
+                    var frequencies = freqProp.EnumerateArray().Select(x => x.GetSingle()).ToList();
+                    var confidenceProp = allProp.TryGetProperty("confidence", out var confProp) && confProp.ValueKind == JsonValueKind.Array
+                        ? confProp.EnumerateArray().Select(x => x.GetSingle()).ToList()
+                        : null;
+
+                    if (frequencies.Count > 0)
+                    {
+                        // Weighted average by confidence if available
+                        if (confidenceProp != null && confidenceProp.Count == frequencies.Count)
+                        {
+                            float totalWeight = confidenceProp.Sum();
+                            if (totalWeight > 0)
+                            {
+                                float weightedSum = 0;
+                                for (int i = 0; i < frequencies.Count; i++)
+                                    weightedSum += frequencies[i] * confidenceProp[i];
+                                return (weightedSum / totalWeight, confidenceProp.Average());
+                            }
+                        }
+                        return (frequencies.Average(), confidenceProp?.Average() ?? 0.5f);
+                    }
+                }
+            }
+        }
+        catch { }
+        return (0, 0);
+    }
+
+    /// <summary>
+    /// Extracts visualization vector from deepsquare model output.
+    /// </summary>
+    private static float[]? ExtractVisualizationVector(JsonElement element)
+    {
+        try
+        {
+            // deepsquare outputs a 16-element vector
+            if (element.TryGetProperty("all", out var allProp) && allProp.TryGetProperty("activations", out var actProp))
+            {
+                if (actProp.ValueKind == JsonValueKind.Array)
+                {
+                    return actProp.EnumerateArray().Select(x => x.GetSingle()).ToArray();
+                }
+            }
+            
+            // Fallback for different naming
+            if (element.TryGetProperty("all", out var allFallback))
+            {
+                 var firstArray = allFallback.EnumerateObject()
+                    .FirstOrDefault(p => p.Value.ValueKind == JsonValueKind.Array).Value;
+                 if (firstArray.ValueKind == JsonValueKind.Array)
+                     return firstArray.EnumerateArray().Select(x => x.GetSingle()).ToArray();
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
     /// Maps arousal/valence coordinates to a mood tag.
     /// Based on Russell's Circumplex Model of Affect.
     /// </summary>
@@ -758,7 +889,7 @@ public class EssentiaAnalyzerService : IAudioIntelligenceService, IDisposable
 
     public void Dispose()
     {
-        _isDisposing = true;
+        // _isDisposing = true;
         foreach (var kvp in _activeProcesses)
         {
             try

@@ -21,13 +21,12 @@ public interface ITrackRepository
     Task<PlaylistTrackEntity?> GetPlaylistTrackByHashAsync(Guid playlistId, string hash);
     Task SavePlaylistTrackAsync(PlaylistTrackEntity track);
     Task<List<PlaylistTrackEntity>> GetAllPlaylistTracksAsync();
+    Task<int> GetPlaylistTrackCountAsync(Guid playlistId, string? filter = null, bool? downloadedOnly = null);
+    Task<List<PlaylistTrackEntity>> GetPagedPlaylistTracksAsync(Guid playlistId, int skip, int take, string? filter = null, bool? downloadedOnly = null);
     Task<List<LibraryEntryEntity>> GetLibraryEntriesNeedingEnrichmentAsync(int limit);
     Task UpdateLibraryEntryEnrichmentAsync(string uniqueHash, TrackEnrichmentResult result);
     Task<List<PlaylistTrackEntity>> GetPlaylistTracksNeedingEnrichmentAsync(int limit);
     Task UpdatePlaylistTrackEnrichmentAsync(Guid id, TrackEnrichmentResult result);
-    Task<List<LibraryEntryEntity>> GetLibraryEntriesNeedingFeaturesAsync(int limit);
-    Task<List<PlaylistTrackEntity>> GetPlaylistTracksNeedingFeaturesAsync(int limit);
-    Task UpdateLibraryEntriesFeaturesAsync(Dictionary<string, SpotifyAPI.Web.TrackAudioFeatures> featuresMap);
     Task<List<Guid>> UpdatePlaylistTrackStatusAndRecalculateJobsAsync(string trackUniqueHash, TrackStatus newStatus, string? resolvedPath);
     Task SavePlaylistTracksAsync(IEnumerable<PlaylistTrackEntity> tracks);
     Task DeletePlaylistTracksAsync(Guid playlistId);

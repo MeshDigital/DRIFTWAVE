@@ -281,10 +281,65 @@ public class HarmonicMatchService
 
     private double CalculateEnergyScore(LibraryEntryEntity seed, LibraryEntryEntity candidate)
     {
-        // Placeholder: Would calculate based on Spotify metadata
-        // Energy (0-1) and Valence (0-1) similarity
-        // For now, return neutral score
-        return 10; // Neutral baseline
+        double score = 10; // Neutral baseline
+
+        var featA = seed.AudioFeatures;
+        var featB = candidate.AudioFeatures;
+
+        // 1. Vector Similarity (Deep Match) - The "Gold Standard"
+        if (featA?.VectorEmbedding != null && featB?.VectorEmbedding != null && 
+            featA.VectorEmbedding.Length > 0 && featB.VectorEmbedding.Length > 0)
+        {
+            // Convert float[] to byte[] if necessary, but here we expect float[]
+            // AudioFeaturesEntity.VectorEmbedding is float[] (NotMapped)
+            // Wait - I need to check if EF Core eagerly loads this NotMapped property or if I need to calculate it.
+            // It is computed from VectorEmbeddingJson. So accessing .VectorEmbedding is fine.
+            
+            // However, CalculateCosineSimilarity expects byte[] in my previous implementation.
+            // I need to update CalculateCosineSimilarity to take float[] instead.
+            
+            var similarity = CalculateCosineSimilarity(featA.VectorEmbedding, featB.VectorEmbedding);
+            
+            if (similarity > 0.95) return 30; // Sonic Twin
+            if (similarity > 0.90) return 25; // Super close
+            if (similarity > 0.80) return 20; // Very close
+            if (similarity > 0.70) return 15; // Similar vibe
+            if (similarity < 0.50) return -10; // Sonic clash
+            return 10;
+        }
+
+        // 2. Fallback: High-Level Scalar Matching (Sadness, Energy, Valence)
+        if (featA?.Sadness.HasValue == true && featB?.Sadness.HasValue == true)
+        {
+            var sadDiff = Math.Abs(featA.Sadness.Value - featB.Sadness.Value);
+            if (sadDiff < 0.1) score += 5; // Compatible gloom
+            else if (sadDiff > 0.5) score -= 10; // Happy vs Sad clash
+        }
+
+        return score;
+    }
+
+    /// <summary>
+    /// Calculates Cosine Similarity between two float arrays.
+    /// </summary>
+    private float CalculateCosineSimilarity(float[] vecA, float[] vecB)
+    {
+        if (vecA.Length != vecB.Length) return 0f;
+
+        float dotProduct = 0f;
+        float normA = 0f;
+        float normB = 0f;
+
+        for (int i = 0; i < vecA.Length; i++)
+        {
+            dotProduct += vecA[i] * vecB[i];
+            normA += vecA[i] * vecA[i];
+            normB += vecB[i] * vecB[i];
+        }
+
+        if (normA == 0 || normB == 0) return 0f;
+
+        return dotProduct / ((float)Math.Sqrt(normA) * (float)Math.Sqrt(normB));
     }
 }
 

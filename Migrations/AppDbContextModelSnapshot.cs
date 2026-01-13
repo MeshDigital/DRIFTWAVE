@@ -26,6 +26,9 @@ namespace SLSKDONET.Migrations
                     b.Property<DateTime>("AnalyzedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("Arousal")
+                        .HasColumnType("REAL");
+
                     b.Property<int>("Bitrate")
                         .HasColumnType("INTEGER");
 
@@ -36,6 +39,9 @@ namespace SLSKDONET.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("Danceability")
+                        .HasColumnType("REAL");
+
                     b.Property<long>("DurationMs")
                         .HasColumnType("INTEGER");
 
@@ -45,13 +51,25 @@ namespace SLSKDONET.Migrations
                     b.Property<int>("FrequencyCutoff")
                         .HasColumnType("INTEGER");
 
+                    b.Property<double?>("InstrumentalProbability")
+                        .HasColumnType("REAL");
+
+                    b.Property<bool>("IsInstrumental")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsUpscaled")
                         .HasColumnType("INTEGER");
 
                     b.Property<double>("LoudnessLufs")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("MusicalStyle")
+                        .HasColumnType("TEXT");
+
                     b.Property<double>("QualityConfidence")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Sadness")
                         .HasColumnType("REAL");
 
                     b.Property<int>("SampleRate")
@@ -68,6 +86,12 @@ namespace SLSKDONET.Migrations
                     b.Property<double>("TruePeakDb")
                         .HasColumnType("REAL");
 
+                    b.Property<double?>("Valence")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("VectorEmbeddingJson")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.ToTable("audio_analysis");
@@ -79,9 +103,6 @@ namespace SLSKDONET.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<float>("AggressiveConfidence")
-                        .HasColumnType("REAL");
-
                     b.Property<string>("AiEmbeddingJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -92,6 +113,9 @@ namespace SLSKDONET.Migrations
 
                     b.Property<DateTime>("AnalyzedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<float>("Arousal")
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Bpm")
                         .HasColumnType("REAL");
@@ -141,6 +165,13 @@ namespace SLSKDONET.Migrations
                     b.Property<float>("DynamicComplexity")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("ElectronicSubgenre")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<float>("ElectronicSubgenreConfidence")
+                        .HasColumnType("REAL");
+
                     b.Property<float>("EmbeddingMagnitude")
                         .HasColumnType("REAL");
 
@@ -155,11 +186,14 @@ namespace SLSKDONET.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<float>("HappyConfidence")
-                        .HasColumnType("REAL");
-
                     b.Property<float>("InstrumentalProbability")
                         .HasColumnType("REAL");
+
+                    b.Property<float>("Intensity")
+                        .HasColumnType("REAL");
+
+                    b.Property<bool>("IsDjTool")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDynamicCompressed")
                         .HasColumnType("INTEGER");
@@ -195,6 +229,9 @@ namespace SLSKDONET.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<float?>("Sadness")
+                        .HasColumnType("REAL");
+
                     b.Property<string>("Scale")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -211,6 +248,9 @@ namespace SLSKDONET.Migrations
                     b.Property<float>("SubGenreConfidence")
                         .HasColumnType("REAL");
 
+                    b.Property<float>("TonalProbability")
+                        .HasColumnType("REAL");
+
                     b.Property<string>("TrackUniqueHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -218,7 +258,14 @@ namespace SLSKDONET.Migrations
                     b.Property<float>("Valence")
                         .HasColumnType("REAL");
 
+                    b.Property<byte[]>("VectorEmbeddingBytes")
+                        .HasColumnType("BLOB")
+                        .HasColumnName("VectorEmbedding");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TrackUniqueHash")
+                        .IsUnique();
 
                     b.ToTable("audio_features");
                 });
@@ -333,6 +380,145 @@ namespace SLSKDONET.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ForensicLogs");
+                });
+
+            modelBuilder.Entity("SLSKDONET.Data.Entities.GenreCueTemplateEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue1Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue1Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Cue1OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Cue1Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue2Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue2Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Cue2OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Cue2Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue3Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue3Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Cue3OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Cue3Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue4Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue4Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Cue4OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Cue4Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue5Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue5Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Cue5OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Cue5Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue6Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue6Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Cue6OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Cue6Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue7Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue7Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Cue7OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Cue7Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cue8Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue8Label")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Cue8OffsetBars")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Cue8Target")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GenreName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsBuiltIn")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("GenreCueTemplates");
                 });
 
             modelBuilder.Entity("SLSKDONET.Data.Entities.LibraryActionLogEntity", b =>
@@ -458,6 +644,42 @@ namespace SLSKDONET.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("style_definitions");
+                });
+
+            modelBuilder.Entity("SLSKDONET.Data.Entities.TrackPhraseEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("Confidence")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("EndTimeSeconds")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("EnergyLevel")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Label")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("StartTimeSeconds")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("TrackUniqueHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TrackPhrases");
                 });
 
             modelBuilder.Entity("SLSKDONET.Data.Entities.TrackTechnicalEntity", b =>
@@ -596,6 +818,9 @@ namespace SLSKDONET.Migrations
 
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
+
+                    b.Property<double?>("InstrumentalProbability")
+                        .HasColumnType("REAL");
 
                     b.Property<int>("Integrity")
                         .HasColumnType("INTEGER");
@@ -783,11 +1008,17 @@ namespace SLSKDONET.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsSmartPlaylist")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsUserPaused")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MissingCount")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("SmartCriteriaJson")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceTitle")
                         .IsRequired()
@@ -884,6 +1115,9 @@ namespace SLSKDONET.Migrations
 
                     b.Property<string>("ISRC")
                         .HasColumnType("TEXT");
+
+                    b.Property<double?>("InstrumentalProbability")
+                        .HasColumnType("REAL");
 
                     b.Property<int>("Integrity")
                         .HasColumnType("INTEGER");
@@ -994,7 +1228,6 @@ namespace SLSKDONET.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("TrackUniqueHash")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<double?>("TruePeak")
@@ -1109,6 +1342,9 @@ namespace SLSKDONET.Migrations
                     b.Property<string>("ISRC")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("InstrumentalProbability")
+                        .HasColumnType("REAL");
+
                     b.Property<int>("Integrity")
                         .HasColumnType("INTEGER");
 
@@ -1149,6 +1385,9 @@ namespace SLSKDONET.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PreviousBitrate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrimaryGenre")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Priority")
@@ -1198,9 +1437,6 @@ namespace SLSKDONET.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<float?>("SubGenreConfidence")
-                        .HasColumnType("REAL");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1214,6 +1450,15 @@ namespace SLSKDONET.Migrations
                     b.HasKey("GlobalId");
 
                     b.ToTable("Tracks");
+                });
+
+            modelBuilder.Entity("SLSKDONET.Data.Entities.AudioFeaturesEntity", b =>
+                {
+                    b.HasOne("SLSKDONET.Data.LibraryEntryEntity", null)
+                        .WithOne("AudioFeatures")
+                        .HasForeignKey("SLSKDONET.Data.Entities.AudioFeaturesEntity", "TrackUniqueHash")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SLSKDONET.Data.Entities.TrackTechnicalEntity", b =>
@@ -1246,7 +1491,19 @@ namespace SLSKDONET.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SLSKDONET.Data.Entities.AudioFeaturesEntity", "AudioFeatures")
+                        .WithMany()
+                        .HasForeignKey("TrackUniqueHash")
+                        .HasPrincipalKey("TrackUniqueHash");
+
+                    b.Navigation("AudioFeatures");
+
                     b.Navigation("Job");
+                });
+
+            modelBuilder.Entity("SLSKDONET.Data.LibraryEntryEntity", b =>
+                {
+                    b.Navigation("AudioFeatures");
                 });
 
             modelBuilder.Entity("SLSKDONET.Data.PlaylistJobEntity", b =>

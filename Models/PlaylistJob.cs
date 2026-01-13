@@ -173,6 +173,10 @@ public class PlaylistJob : INotifyPropertyChanged
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
 
+    // Phase 20: Smart Playlists 2.0
+    public bool IsSmartPlaylist { get; set; } = false;
+    public string? SmartCriteriaJson { get; set; }
+
     /// <summary>
     /// Overall progress percentage for this job (0-100).
     /// Calculated as: (SuccessfulCount + FailedCount) / TotalTracks * 100

@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:SLSKDONET.Views"
         xmlns:views="clr-namespace:SLSKDONET.Views.Avalonia"
+        xmlns:stemviews="clr-namespace:SLSKDONET.Views.Avalonia.Stem"
         xmlns:controls="clr-namespace:SLSKDONET.Views.Avalonia.Controls"
         xmlns:models="clr-namespace:SLSKDONET.Models"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
@@ -268,6 +269,18 @@
                     </Button>
                     
                     <Button Classes="nav" 
+                            Command="{Binding ToggleStemWorkspaceCommand}"
+                            Classes.selected="{Binding StemWorkspaceViewModel.IsVisible}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Grid.ColumnSpan="2" CornerRadius="4" IsVisible="False"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="🧬" FontSize="16"/>
+                                <TextBlock Text="Stems" FontSize="14"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <Button Classes="nav" 
                             Command="{Binding NavigateStyleLabCommand}"
                             Classes.selected="{Binding CurrentPageType, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static models:PageType.StyleLab}}">
                         <Grid ColumnDefinitions="Auto,*">
@@ -295,8 +308,13 @@
                     Background="#252526" 
                     BorderBrush="#3E3E3E" 
                     BorderThickness="1,0,0,0"
-                    Width="300"
-                    IsVisible="{Binding IsPlayerInSidebar}">
+                    Width="300">
+                <Border.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="IsPlayerInSidebar"/>
+                        <Binding Path="PlayerViewModel.IsPlayerVisible"/>
+                    </MultiBinding>
+                </Border.IsVisible>
                 <Grid>
                     <views:PlayerControl DataContext="{Binding PlayerViewModel}" 
                                        IsVisible="{Binding !IsQueueOpen}"/>
@@ -387,8 +405,13 @@
                 Background="#252526" 
                 BorderBrush="#3E3E3E" 
                 BorderThickness="0,1,0,0"
-                Height="100"
-                IsVisible="{Binding IsPlayerAtBottomVisible}">
+                Height="100">
+             <Border.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsPlayerAtBottomVisible"/>
+                    <Binding Path="PlayerViewModel.IsPlayerVisible"/>
+                </MultiBinding>
+            </Border.IsVisible>
              <Grid>
                  <!-- Bottom Layout usually needs a more horizontal PlayerControl, 
                       but for now we'll host the same control or a variant. -->
@@ -396,7 +419,15 @@
              </Grid>
         </Border>
 
+        <!-- Stem Workspace Overlay -->
+        <Grid Grid.RowSpan="3"
+            IsVisible="{Binding StemWorkspaceViewModel.IsVisible}"
+            ZIndex="1500">
+            <stemviews:StemWorkspaceView DataContext="{Binding StemWorkspaceViewModel}"/>
+        </Grid>
+        
         <!-- Global Bulk Operation Progress Overlay -->
+
         <controls:BulkOperationProgressModal Grid.RowSpan="3"
                                             DataContext="{Binding BulkOperationViewModel}"
                                             ZIndex="2000"/>

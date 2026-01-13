@@ -243,66 +243,6 @@ public class LibraryEnrichmentWorker : IDisposable
             didWork = true;
         }
 
-        // --- STAGE 2: Batch Musical Intelligence (Unified) ---
-        // Verify config BEFORE querying DB to prevent infinite loops and blocking Stage 3
-        if (_config.SpotifyEnableAudioFeatures)
-        {
-            var needingFeaturesEntries = await _databaseService.GetLibraryEntriesNeedingFeaturesAsync(50);
-            var needingFeaturesPlaylist = await _databaseService.GetPlaylistTracksNeedingFeaturesAsync(50);
-            
-            var allIds = needingFeaturesEntries.Select(e => e.SpotifyTrackId)
-                .Concat(needingFeaturesPlaylist.Select(p => p.SpotifyTrackId))
-                .Where(id => !string.IsNullOrEmpty(id))
-                .Distinct()
-                .Select(id => id!)
-                .Take(100)
-                .ToList();
-
-            if (allIds != null && allIds.Any())
-            {
-                 _logger.LogInformation("Enrichment Stage 2: Batch Features for {Count} unique tracks", allIds.Count);
-                 
-                 try 
-                 {
-                     var featuresMap = await _enrichmentService.GetAudioFeaturesBatchAsync(allIds);
-                     
-                     if (featuresMap != null)
-                     {
-                        // Batch DB update (Updates both LibraryEntry and PlaylistTrack tables via Intelligence Sync)
-                        await _databaseService.UpdateLibraryEntriesFeaturesAsync(featuresMap);
-                        
-                        enrichedCount += featuresMap.Count;
-                        _logger.LogInformation("Stage 2 Complete: Enriched {Count} tracks with audio features", featuresMap.Count);
-                        
-                        // Notify UI for each updated track
-                        foreach (var trackId in featuresMap.Keys)
-                        {
-                            // We need UniqueHash, but we only have SpotifyID here.
-                            // The most robust way is to broadcast a general refresh or map IDs back.
-                            // Ideally, featuresMap keys are Spotify IDs. DB update handled mapping.
-                            // But event expects GlobalID (Hash).
-                            // For now, let's skip individual events for features to avoid N+1 lookups, 
-                            // OR relying on the LibraryMetadataEnrichedEvent (count based) if ViewModel listens to it.
-                            // Wait, PlaylistTrackViewModel only listens to TrackMetadataUpdatedEvent (HASH specific).
-                            // Let's attempt to map back using the 'allIds' list? No, that's just a list of IDs.
-                            // Actually, we have 'needingFeaturesEntries' and 'needingFeaturesPlaylist'.
-                            
-                            // Iterate the original fetch list to match verified updates
-                            foreach(var t in needingFeaturesPlaylist.Where(x => x.SpotifyTrackId == trackId))
-                                _eventBus.Publish(new TrackMetadataUpdatedEvent(t.TrackUniqueHash));
-                                
-                            foreach(var e in needingFeaturesEntries.Where(x => x.SpotifyTrackId == trackId))
-                                _eventBus.Publish(new TrackMetadataUpdatedEvent(e.UniqueHash));
-                        }
-                     }
-                 }
-                 catch (Exception ex)
-                 {
-                     _logger.LogError(ex, "Stage 2 Batch failed");
-                 }
-                 didWork = true;
-            }
-        }
 
         // --- STAGE 3: Batch Genre Enrichment ---
         if (!SpotifyEnrichmentService.IsServiceDegraded)

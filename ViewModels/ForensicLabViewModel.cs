@@ -213,6 +213,41 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
         set => SetProperty(ref _subgenreRadar, value);
     }
 
+    private float _arousal;
+    public float Arousal
+    {
+        get => _arousal;
+        set => SetProperty(ref _arousal, value);
+    }
+
+    private float _valence;
+    public float Valence
+    {
+        get => _valence;
+        set => SetProperty(ref _valence, value);
+    }
+
+    private float? _sadness;
+    public float? Sadness
+    {
+        get => _sadness;
+        set => SetProperty(ref _sadness, value);
+    }
+
+    private string _electronicSubgenre = "Unknown";
+    public string ElectronicSubgenre
+    {
+        get => _electronicSubgenre;
+        set => SetProperty(ref _electronicSubgenre, value);
+    }
+
+    private bool _isDjTool;
+    public bool IsDjTool
+    {
+        get => _isDjTool;
+        set => SetProperty(ref _isDjTool, value);
+    }
+
     // ============================================
     // Right Sector: Signal Integrity (Phase 14)
     // ============================================
@@ -412,6 +447,12 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
                 Danceability = audioFeatures.Danceability;
                 Energy = audioFeatures.Energy;
                 Intensity = audioFeatures.Intensity;
+                
+                Arousal = audioFeatures.Arousal;
+                Valence = audioFeatures.Valence;
+                Sadness = audioFeatures.Sadness;
+                ElectronicSubgenre = audioFeatures.ElectronicSubgenre;
+                IsDjTool = audioFeatures.IsDjTool;
 
                 IsDynamicCompressed = audioFeatures.IsDynamicCompressed;
                 LoudnessLUFS = audioFeatures.LoudnessLUFS;
@@ -420,7 +461,9 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
                 // Store raw JSON output (if available)
                 EssentiaJsonOutput = $"// ✅ Analysis data loaded from DB\n" +
                                    $"// BPM: {BpmValue:F1}, Key: {CamelotKey}, Mood: {MoodTag}\n" +
-                                   $"// Danceability: {Danceability:P0}, Energy: {Energy:P0}";
+                                   $"// Danceability: {Danceability:P0}, Energy: {Energy:P0}, Intensity: {Intensity:P0}\n" +
+                                   $"// Arousal: {Arousal:F1}, Valence: {Valence:F1}, Sadness: {Sadness:F4 ?? 0}\n" +
+                                   $"// Style: {ElectronicSubgenre}, DJ Tool: {IsDjTool}";
             }
             else
             {

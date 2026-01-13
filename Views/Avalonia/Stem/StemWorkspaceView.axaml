@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:SLSKDONET.Views.Avalonia.Stem"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="SLSKDONET.Views.Avalonia.Stem.StemWorkspaceView">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+        
+        <!-- Header (Back button, Title, Transport) -->
+        <Border Grid.Row="0" Height="60" Background="#111" BorderBrush="#333" BorderThickness="0,0,0,1" Padding="20,0">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Button Grid.Column="0" Content="← Back" Command="{Binding $parent[Window].DataContext.ToggleStemWorkspaceCommand}" 
+                        Background="Transparent" BorderBrush="Transparent"/>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+                    <TextBlock Text="STEM WORKSPACE" VerticalAlignment="Center" FontWeight="Bold" FontSize="16" LetterSpacing="2"/>
+                    <TextBlock Text="{Binding Library.SelectedTrackId}" VerticalAlignment="Center" Foreground="#666"/>
+                </StackPanel>
+                
+                <!-- Transport Controls Placeholder -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+                    <Button Command="{Binding TogglePlayCommand}" Background="#FF4081" Foreground="White" CornerRadius="20" Padding="20,5">
+                        <TextBlock Text="{Binding IsPlaying, Converter={StaticResource PlayPauseConverter}, FallbackValue='▶ Play'}"/>
+                    </Button>
+                    <Button Content="Export Mix" Background="#333"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1" ColumnDefinitions="250,*" Margin="20">
+             <!-- Library / Browser Sidebar -->
+             <Border Grid.Column="0" Background="#1A1A1A" CornerRadius="8" Padding="10" Margin="0,0,20,0">
+                 <Grid RowDefinitions="Auto,*,Auto,*">
+                     <!-- History -->
+                     <TextBlock Grid.Row="0" Text="Stem History" FontWeight="Bold" Margin="0,0,0,5"/>
+                     <ListBox Grid.Row="1" Background="Transparent" ItemsSource="{Binding Library.SeparatedTracks}" Margin="0,0,0,10">
+                         <ListBox.ItemTemplate>
+                             <DataTemplate>
+                                 <TextBlock Text="{Binding}" Foreground="#999" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                             </DataTemplate>
+                         </ListBox.ItemTemplate>
+                     </ListBox>
+                     
+                     <!-- Projects/Remixes -->
+                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,0,0,5">
+                        <TextBlock Text="Saved Remixes" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="Save" Command="{Binding SaveProjectCommand}" FontSize="10" Padding="8,2"/>
+                     </Grid>
+                     
+                     <ListBox Grid.Row="3" Background="Transparent" ItemsSource="{Binding SavedProjects}">
+                         <ListBox.ItemTemplate>
+                             <DataTemplate>
+                                 <Grid ColumnDefinitions="*,Auto">
+                                     <StackPanel VerticalAlignment="Center">
+                                         <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold"/>
+                                         <TextBlock Text="{Binding Modified, StringFormat='{}{0:g}'}" Foreground="#666" FontSize="10"/>
+                                     </StackPanel>
+                                     <Button Grid.Column="1" Content="Load" 
+                                             Command="{Binding $parent[UserControl].DataContext.LoadProjectCommand}" 
+                                             CommandParameter="{Binding}"
+                                             FontSize="10" Padding="6,2" Background="#333"/>
+                                 </Grid>
+                             </DataTemplate>
+                         </ListBox.ItemTemplate>
+                     </ListBox>
+                 </Grid>
+             </Border>
+             
+             <!-- Mixer & Timeline Area -->
+             <Grid Grid.Column="1" RowDefinitions="150,*">
+                 <!-- Top: Timeline / Stems Overview -->
+                 <Border Grid.Row="0" Margin="0,0,0,20">
+                      <views:MultiStemWaveformView DataContext="{Binding Mixer}"/>
+                 </Border>
+
+                 <!-- Bottom: Mixer Console -->
+                 <views:StemMixerView Grid.Row="1" DataContext="{Binding Mixer}"/>
+             </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

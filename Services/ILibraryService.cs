@@ -32,6 +32,12 @@ public interface ILibraryService
     /// Loads all library entries (main global index).
     /// </summary>
     Task<List<LibraryEntry>> LoadAllLibraryEntriesAsync();
+
+    /// <summary>
+    /// Loads a specific set of library entries by their UniqueHash.
+    /// Used for Smart Crates and bulk retrievals.
+    /// </summary>
+    Task<List<LibraryEntry>> GetLibraryEntriesByHashesAsync(List<string> hashes);
     
     /// <summary>
     /// Searches library entries and returns enrichment status.
@@ -143,6 +149,16 @@ public interface ILibraryService
     /// Used for "All Tracks" view.
     /// </summary>
     Task<List<PlaylistTrack>> GetAllPlaylistTracksAsync();
+    
+    /// <summary>
+    /// Gets the count of tracks in a playlist, optionally filtered.
+    /// </summary>
+    Task<int> GetTrackCountAsync(Guid playlistId, string? filter = null, bool? downloadedOnly = null);
+
+    /// <summary>
+    /// Loads a page of tracks for a specific playlist.
+    /// </summary>
+    Task<List<PlaylistTrack>> GetPagedPlaylistTracksAsync(Guid playlistId, int skip, int take, string? filter = null, bool? downloadedOnly = null);
 
     /// <summary>
     /// Loads a specific track from a playlist by its unique hash.
@@ -190,5 +206,11 @@ public interface ILibraryService
     // Phase 16.2: Vibe Match
     Task<AudioFeaturesEntity?> GetAudioFeaturesByHashAsync(string uniqueHash);
 
+
     Task<List<LibraryEntry>> GetTracksAddedSinceAsync(DateTime since);
+
+    /// <summary>
+    /// Adds existing tracks to a project by creating new relational entries.
+    /// </summary>
+    Task AddTracksToProjectAsync(System.Collections.Generic.IEnumerable<PlaylistTrack> tracks, Guid targetProjectId);
 }

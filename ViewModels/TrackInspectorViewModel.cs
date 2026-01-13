@@ -9,6 +9,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using SLSKDONET.Data.Entities;
 using SLSKDONET.Models;
+using SLSKDONET.Data.Essentia;
 using System.Linq;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
@@ -60,6 +61,8 @@ namespace SLSKDONET.ViewModels
         {
              // Trigger async Pro DJ load
              _ = LoadProDjFeaturesAsync();
+             // Phase 21: Load analysis history
+             _ = LoadAnalysisHistoryAsync();
         } // Phase 4: Musical Intelligence
         
         private bool _isAnalyzing;
@@ -105,6 +108,9 @@ namespace SLSKDONET.ViewModels
         public ObservableCollection<PlaylistTrack> OtherVersions { get; } = new();
         public ObservableCollection<OrbitCue> Cues { get; } = new(); // Phase 10
         
+        // Phase 21: Analysis Run Tracking
+        public ObservableCollection<Data.Entities.AnalysisRunEntity> AnalysisHistory { get; } = new();
+        
         // Vibe Radar Data (0-100 scale for UI)
         public double VibeEnergy => (AudioFeatures != null && AudioFeatures.Energy > 0 
             ? AudioFeatures.Energy 
@@ -120,6 +126,7 @@ namespace SLSKDONET.ViewModels
         
         public bool HasProDjFeatures => HasAnalysis && !string.IsNullOrEmpty(CamelotKey);
         public System.Windows.Input.ICommand ForceReAnalyzeCommand { get; }
+        public System.Windows.Input.ICommand ForceReAnalyzeTieredCommand { get; }
         public System.Windows.Input.ICommand ExportLogsCommand { get; }
         public System.Windows.Input.ICommand ReFetchUpgradeCommand { get; }
         public System.Windows.Input.ICommand GenerateSpectrogramCommand { get; }
@@ -129,6 +136,8 @@ namespace SLSKDONET.ViewModels
         public System.Windows.Input.ICommand DeleteCueCommand { get; }
         public System.Windows.Input.ICommand MarkAsVerifiedCommand { get; } // Phase 11.5
         public System.Windows.Input.ICommand CloneCommand { get; } // Phase 11.6
+        public System.Windows.Input.ICommand RevealFileCommand { get; }
+        public System.Windows.Input.ICommand OpenStemWorkspaceCommand { get; } // Phase 24
 
         public TrackInspectorViewModel(
             Services.IAudioAnalysisService audioAnalysisService, 
@@ -152,9 +161,25 @@ namespace SLSKDONET.ViewModels
             _libraryService = libraryService;
             _cueService = cueService;
             _forensicLogger = forensicLogger;
-            _trackOperations = trackOperations;
             _logger = logger;
+            _trackOperations = trackOperations;
 
+            RevealFileCommand = ReactiveCommand.Create(() =>
+            {
+                if (Track != null && !string.IsNullOrEmpty(Track.ResolvedFilePath))
+                {
+                    _eventBus.Publish(new RevealFileRequestEvent(Track.ResolvedFilePath));
+                }
+            });
+
+            OpenStemWorkspaceCommand = ReactiveCommand.Create(() =>
+            {
+                if (Track != null)
+                {
+                    _eventBus.Publish(new OpenStemWorkspaceRequestEvent(Track.TrackUniqueHash));
+                }
+            });
+            
             // Subscribe to live forensic logs
             _forensicLogger.LogGenerated += OnForensicLogGenerated;
             
@@ -263,7 +288,7 @@ namespace SLSKDONET.ViewModels
                         ProgressModal = new AnalysisProgressViewModel(Track.TrackUniqueHash, _eventBus);
                         OnPropertyChanged(nameof(IsProgressModalVisible));
                         
-                        _analysisQueue.QueueAnalysis(Track.ResolvedFilePath, Track.TrackUniqueHash);
+                        _analysisQueue.QueueAnalysis(Track.ResolvedFilePath, Track.TrackUniqueHash, AnalysisTier.Tier1);
                     }
                     else
                     {
@@ -274,6 +299,27 @@ namespace SLSKDONET.ViewModels
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Re-analyze failed");
+                }
+            });
+
+            ForceReAnalyzeTieredCommand = ReactiveCommand.CreateFromTask<AnalysisTier>(async (tier) =>
+            {
+                if (Track == null || string.IsNullOrEmpty(Track.TrackUniqueHash)) return;
+                
+                try
+                {
+                    if (!string.IsNullOrEmpty(Track.ResolvedFilePath))
+                    {
+                        IsAnalyzing = true;
+                        ProgressModal = new AnalysisProgressViewModel(Track.TrackUniqueHash, _eventBus);
+                        OnPropertyChanged(nameof(IsProgressModalVisible));
+                        
+                        _analysisQueue.QueueAnalysis(Track.ResolvedFilePath, Track.TrackUniqueHash, tier);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Tiered re-analyze failed");
                 }
             });
             
@@ -457,6 +503,36 @@ namespace SLSKDONET.ViewModels
                 _logger.LogError(ex, "Failed to load Pro DJ features");
             }
         }
+        
+        // Phase 21: Analysis Run Tracking
+        private async Task LoadAnalysisHistoryAsync()
+        {
+            if (Track == null) return;
+            
+            try
+            {
+                using var db = new Data.AppDbContext();
+                var runs = await db.AnalysisRuns
+                    .Where(r => r.TrackUniqueHash == Track.TrackUniqueHash)
+                    .OrderByDescending(r => r.StartedAt)
+                    .Take(20) // Limit to last 20 runs
+                    .ToListAsync();
+                    
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    AnalysisHistory.Clear();
+                    foreach (var run in runs)
+                    {
+                        AnalysisHistory.Add(run);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load analysis history for track {Hash}", Track.TrackUniqueHash);
+            }
+        }
+
 
         private PlaylistTrack? _track;
         public PlaylistTrack? Track
@@ -743,7 +819,7 @@ namespace SLSKDONET.ViewModels
 
         public bool HasTrack => Track != null;
 
-        public string CamelotKey => !string.IsNullOrEmpty(EssentiaCamelotKey) ? EssentiaCamelotKey : MapToCamelot(Track?.Key);
+        public string CamelotKey => MapToCamelot(Track?.Key);
 
         public string BitrateLabel => Track?.Bitrate > 0 ? $"{Track.Bitrate} kbps" : "Unknown Bitrate";
 
@@ -766,14 +842,7 @@ namespace SLSKDONET.ViewModels
         
         // Phase 4: Musical Intelligence Properties (from Essentia via AudioFeaturesEntity)
         public float? EssentiaBpm => _audioFeatures?.Bpm > 0 ? _audioFeatures.Bpm : null;
-        public string BpmLabel 
-        {
-            get
-            {
-                if (EssentiaBpm.HasValue) return $"{EssentiaBpm.Value:F1} BPM";
-                return Track?.BPM > 0 ? $"{Track.BPM} BPM" : "--";
-            }
-        }
+        public string BpmLabel => Track?.BPM > 0 ? $"{Track.BPM:F1} BPM" : "--";
         public float? BpmConfidence => _audioFeatures?.BpmConfidence;
         public string BpmConfidenceLabel => BpmConfidence.HasValue ? $"({BpmConfidence.Value:P0})" : "";
         
@@ -799,8 +868,8 @@ namespace SLSKDONET.ViewModels
         public float? DropTime => _audioFeatures?.DropTimeSeconds;
         public string DropTimeLabel => DropTime.HasValue ? $"{DropTime.Value:F1}s" : "--";
         
-        public float? CueIntro => _audioFeatures?.CueIntro;
-        public string CueIntroLabel => CueIntro.HasValue ? $"Intro: {CueIntro.Value:F1}s" : "--";
+        public float CueIntro => _audioFeatures?.CueIntro ?? 0f;
+        public string CueIntroLabel => CueIntro > 0 ? $"Intro: {CueIntro:F1}s" : "--";
         
         public float? CueBuild => _audioFeatures?.CueBuild;
         public string CueBuildLabel => CueBuild.HasValue ? $"Build: {CueBuild.Value:F1}s" : "--";
@@ -808,9 +877,31 @@ namespace SLSKDONET.ViewModels
         public float? CuePhraseStart => _audioFeatures?.CuePhraseStart;
         public string CuePhraseStartLabel => CuePhraseStart.HasValue ? $"Phrase: {CuePhraseStart.Value:F1}s" : "--";
         
-        // Computed
-        public bool HasMusicalIntelligence => EssentiaBpm.HasValue || !string.IsNullOrEmpty(EssentiaCamelotKey);
-        public bool HasCuePoints => DropTime.HasValue || CueIntro.HasValue;
+        // Phase 22.5: Musical Intelligence UI Properties
+        public bool HasMusicalIntelligence => _audioFeatures != null;
+        public bool HasCuePoints => _audioFeatures != null && (_audioFeatures.DropTimeSeconds.HasValue || _audioFeatures.CuePhraseStart.HasValue);
+        
+        public string MoodTag => _audioFeatures?.MoodTag ?? "";
+        public bool HasMood => !string.IsNullOrEmpty(MoodTag);
+        
+        public bool IsDjTool => _audioFeatures?.IsDjTool ?? false;
+        
+        public string ElectronicSubgenre => _audioFeatures?.ElectronicSubgenre ?? "";
+        public bool HasSubgenre => !string.IsNullOrEmpty(ElectronicSubgenre);
+        
+        public string VoiceInstrumentalLabel
+        {
+            get
+            {
+                if (_audioFeatures == null) return "";
+                // Logic based on InstrumentalProbability
+                // > 0.8 = Instrumental, < 0.2 = Vocal, else Hybrid/Unknown
+                if (_audioFeatures.InstrumentalProbability > 0.85f) return "Instrumental";
+                if (_audioFeatures.InstrumentalProbability < 0.3f) return "Vocal";
+                return ""; // Don't show anything for ambiguous cases
+            }
+        }
+        public bool HasVoiceInstrumental => !string.IsNullOrEmpty(VoiceInstrumentalLabel);
 
         // Phase 10.5: Reliability & Transparency (Diff View)
         public Data.Entities.CurationConfidence CurationConfidence => _audioFeatures?.CurationConfidence ?? Data.Entities.CurationConfidence.None;
@@ -821,7 +912,7 @@ namespace SLSKDONET.ViewModels
             get
             {
                 if (!EssentiaBpm.HasValue || (Track?.BPM ?? 0) <= 0) return false;
-                return Math.Abs(EssentiaBpm.Value - (float)(Track.BPM ?? 0)) > 1.0f; // Tolerance of 1 BPM
+                return Math.Abs(EssentiaBpm.Value - (float)(Track?.BPM ?? 0)) > 1.0f; // Tolerance of 1 BPM
             }
         }
 

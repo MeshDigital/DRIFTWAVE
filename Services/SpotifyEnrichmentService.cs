@@ -199,66 +199,6 @@ public class SpotifyEnrichmentService
         }
     }
 
-    /// <summary>
-    /// Stage 2: Batch fetch audio features for multiple Spotify IDs.
-    /// </summary>
-    public async Task<Dictionary<string, TrackAudioFeatures>> GetAudioFeaturesBatchAsync(System.Collections.Generic.List<string> spotifyIds)
-    {
-        var result = new Dictionary<string, TrackAudioFeatures>();
-        if (!spotifyIds.Any()) return result;
-
-        try
-        {
-            var client = await _authService.GetAuthenticatedClientAsync();
-            
-            // API allows max 100 IDs per call
-            var chunkedIds = spotifyIds.Chunk(100);
-            
-            foreach (var chunk in chunkedIds)
-            {
-                var req = new TracksAudioFeaturesRequest(chunk.ToList());
-                var features = await client.Tracks.GetSeveralAudioFeatures(req);
-                
-                if (features?.AudioFeatures != null)
-                {
-                    foreach (var feature in features.AudioFeatures)
-                    {
-                        if (feature != null)
-                        {
-                            result[feature.Id] = feature;
-                        }
-                    }
-                }
-            }
-        }
-        catch (APITooManyRequestsException ex)
-        {
-            _logger.LogError("Spotify 429 Rate Limit hit (Batch). Backing off for {Seconds}s.", ex.RetryAfter.TotalSeconds);
-            _isServiceDegraded = true;
-            _retryAfter = DateTime.UtcNow.Add(ex.RetryAfter).AddSeconds(1);
-        }
-        catch (APIException apiEx)
-        {
-            // Enhanced diagnostics: Log actual HTTP status and response
-            _logger.LogError(apiEx, "Spotify API error in GetAudioFeaturesBatchAsync. Status: {Status}, Response: {Response}", 
-                apiEx.Response?.StatusCode ?? System.Net.HttpStatusCode.InternalServerError, 
-                apiEx.Response?.Body ?? "No body");
-            
-            // If it's a 403, provide specific guidance
-            if (apiEx.Response?.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                _logger.LogWarning("Spotify API 403 Forbidden - Possible causes: Developer Mode restrictions, missing scopes, or revoked permissions. Disabling Audio Features for this session.");
-                _isServiceDegraded = true;
-                _retryAfter = DateTime.UtcNow.AddMinutes(30); // Long cooldown for permission errors
-            }
-        }
-        catch (Exception ex)
-        {
-             _logger.LogError(ex, "Failed to batch fetch audio features (non-API exception)");
-        }
-        
-        return result;
-    }
 
     /// <summary>
     /// Wrapper for single-track enrichment (legacy/convenience).
@@ -269,23 +209,8 @@ public class SpotifyEnrichmentService
         var identification = await IdentifyTrackAsync(artist, trackName);
         if (!identification.Success || identification.SpotifyId == null) return identification;
 
-        // 2. Fetch Features
-        var client = await _authService.GetAuthenticatedClientAsync();
-        var features = await client.Tracks.GetAudioFeatures(identification.SpotifyId);
-        
-        if (features != null)
-        {
-            identification.Bpm = features.Tempo;
-            identification.Energy = features.Energy;
-            identification.Valence = features.Valence;
-            identification.Danceability = features.Danceability;
-            
-            // Map Spotify Key/Mode to Camelot
-            var camelotNum = (features.Key + 7) % 12 + 1;
-            identification.MusicalKey = $"{camelotNum}{(features.Mode == 1 ? "B" : "A")}";
-            
-            _logger.LogInformation("Spotify: Enriched '{Title}' (BPM: {BPM}, Key: {Key})", identification.OfficialTitle, features.Tempo, identification.MusicalKey);
-        }
+        // 2. Fetch Features (Stage 2) - REMOVED: Paywalled API
+        _logger.LogInformation("Spotify: Identified '{Title}' (Skipping paywalled audio features)", identification.OfficialTitle);
 
         return identification;
     }

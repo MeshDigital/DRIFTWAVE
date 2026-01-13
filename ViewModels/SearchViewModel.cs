@@ -8,11 +8,14 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia.Controls;
+using Avalonia.Controls.Models.TreeDataGrid;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using SLSKDONET.Models;
 using SLSKDONET.Services;
+using SLSKDONET.Services.AI;
 using SLSKDONET.Services.ImportProviders;
 using SLSKDONET.Views;
 using DynamicData;
@@ -38,6 +41,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
     private readonly IClipboardService _clipboardService;
     private readonly SearchOrchestrationService _searchOrchestration;
     private readonly IBulkOperationCoordinator _bulkCoordinator;
+    private readonly ISonicMatchService _sonicMatchService; // Phase 18.2
 
     private readonly FileNameFormatter _fileNameFormatter;
     
@@ -110,6 +114,8 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
     private readonly ReadOnlyObservableCollection<AnalyzedSearchResultViewModel> _publicSearchResults;
     public ReadOnlyObservableCollection<AnalyzedSearchResultViewModel> SearchResults => _publicSearchResults;
     
+    // Phase 19: Search 2.0 Dense Grid Source
+    public FlatTreeDataGridSource<AnalyzedSearchResultViewModel> SearchSource { get; }
     // Album Results (Legacy/Separate collection for now)
     public ObservableCollection<AlbumResultViewModel> AlbumResults { get; } = new();
 
@@ -213,7 +219,8 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         SearchOrchestrationService searchOrchestration,
         FileNameFormatter fileNameFormatter,
         IEventBus eventBus,
-        IBulkOperationCoordinator bulkCoordinator)
+        IBulkOperationCoordinator bulkCoordinator,
+        ISonicMatchService sonicMatchService) // <--- Injected
     {
         _logger = logger;
         _soulseek = soulseek;
@@ -229,6 +236,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         _searchOrchestration = searchOrchestration;
         _fileNameFormatter = fileNameFormatter;
         _bulkCoordinator = bulkCoordinator;
+        _sonicMatchService = sonicMatchService;
 
         // Reactive Status Updates
         eventBus.GetEvent<TrackStateChangedEvent>()
@@ -240,7 +248,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
             .DisposeWith(_disposables);
             
         // Phase 6: Hybrid Search
-        eventBus.GetEvent<FindSimilarRequestEvent>()
+        eventBus.GetEvent<FindSimilarRequestEvent>() // Models.FindSimilarRequestEvent
             .Subscribe(OnFindSimilarRequest)
             .DisposeWith(_disposables);
 
@@ -259,6 +267,10 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
                 this.RaisePropertyChanged(nameof(SearchResults)); 
             })
             .DisposeWith(_disposables);
+
+        // Phase 19: Search 2.0 Dense Grid Source Initialization
+        SearchSource = new FlatTreeDataGridSource<AnalyzedSearchResultViewModel>(_publicSearchResults);
+        InitializeSearchColumns();
 
 
         // Commands
@@ -462,8 +474,8 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         {
             var path = await _fileInteractionService.OpenFileDialogAsync("Select CSV File", new[] 
             { 
-                new FileDialogFilter("CSV Files", new List<string> { "csv" }),
-                new FileDialogFilter("All Files", new List<string> { "*" })
+                new SLSKDONET.Services.FileDialogFilter("CSV Files", new List<string> { "csv" }),
+                new SLSKDONET.Services.FileDialogFilter("All Files", new List<string> { "*" })
             });
 
             if (!string.IsNullOrEmpty(path))
@@ -634,8 +646,8 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
             _navigationService.NavigateTo("Search");
             
             // 2. Prepare UI
-            SearchQuery = $"sonic: {evt.SeedTrack.Title}"; // Display indicator
-            StatusText = $"Finding sonic twins for '{evt.SeedTrack.Title}'...";
+            SearchQuery = $"similar: {evt.SeedTrack.Title}"; // Display indicator
+            StatusText = $"Finding tracks with a vibe like '{evt.SeedTrack.Title}'...";
             IsSearching = true;
             _searchResults.Clear();
             AlbumResults.Clear();
@@ -644,25 +656,36 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
             try 
             {
                 // 3. Execute Vector Search
-                var results = await _searchOrchestration.SearchSimilarAsync(evt.SeedTrack.TrackUniqueHash);
+                var initialMatches = await _sonicMatchService.FindSonicMatchesAsync(evt.SeedTrack.TrackUniqueHash, limit: 50);
                 
                 // 4. Update Results
-                if (results.Any())
+                if (initialMatches.Any())
                 {
-                    var viewModels = results.Select(t => 
+                    var viewModels = initialMatches.Select(m => 
                     {
+                        // Convert SonicMatch back to Track model for display
+                        var t = new Models.Track
+                        {
+                            Artist = m.Artist,
+                            Title = m.Title,
+                            MatchReason = m.MatchReason,
+                            // Populate audio features for visualization
+                            Energy = m.Arousal,
+                            Valence = m.Valence,
+                            Danceability = m.Danceability,
+                            BPM = m.Bpm
+                        };
+
                         // Use a specific SearchResult wrapper
                         var sr = new SearchResult(t); 
-                        sr.Status = TrackStatus.Downloaded; // They are library tracks
-                        
-                        // Rank is already synced with Model in SearchResult constructor/wrapper
-                        // sr.CurrentRank = t.CurrentRank; 
+                        // These are typically local tracks if matched by Sonic Fingerprint, so marked as Downloaded.
+                        sr.Status = TrackStatus.Downloaded;
                         
                         return new AnalyzedSearchResultViewModel(sr);
                     }).ToList();
                     
                     _searchResults.AddRange(viewModels);
-                    StatusText = $"Found {results.Count} sonic twins";
+                    StatusText = $"Found {initialMatches.Count} sonic twins";
                 }
                 else
                 {
@@ -672,7 +695,7 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Sonic search failed");
-                StatusText = "Sonic search failed";
+                StatusText = $"Error finding similar tracks: {ex.Message}";
             }
             finally
             {
@@ -770,5 +793,140 @@ public partial class SearchViewModel : ReactiveObject, IDisposable
         if (IsWavEnabled) list.Add("wav");
         if (list.Count == 0) list.AddRange(new[] { "mp3", "flac", "wav" }); 
         return list;
+    }
+
+    private void InitializeSearchColumns()
+    {
+        SearchSource.Columns.Add(new TemplateColumn<AnalyzedSearchResultViewModel>(
+            "Tier", 
+            CreateSearchTierTemplate(),
+            width: new GridLength(50),
+            options: new TemplateColumnOptions<AnalyzedSearchResultViewModel> 
+            { 
+                CanUserSortColumn = true, 
+                CompareAscending = (x, y) => ((int?)x?.Tier ?? 0).CompareTo((int?)y?.Tier ?? 0),
+                CompareDescending = (x, y) => ((int?)y?.Tier ?? 0).CompareTo((int?)x?.Tier ?? 0)
+            }));
+
+        SearchSource.Columns.Add(new TextColumn<AnalyzedSearchResultViewModel, int>(
+            "Trust", 
+            x => x.TrustScore,
+            width: new GridLength(60),
+            options: new TextColumnOptions<AnalyzedSearchResultViewModel> { CanUserSortColumn = true }));
+
+        SearchSource.Columns.Add(new TemplateColumn<AnalyzedSearchResultViewModel>(
+            "Track Details", 
+            CreateSearchDetailsTemplate(),
+            width: new GridLength(1, GridUnitType.Star),
+            options: new TemplateColumnOptions<AnalyzedSearchResultViewModel> 
+            { 
+                CanUserSortColumn = true, 
+                CompareAscending = (x, y) => string.Compare(x?.Filename, y?.Filename, StringComparison.OrdinalIgnoreCase),
+                CompareDescending = (x, y) => string.Compare(y?.Filename, x?.Filename, StringComparison.OrdinalIgnoreCase)
+            }));
+
+        SearchSource.Columns.Add(new TextColumn<AnalyzedSearchResultViewModel, int>(
+            "Bitrate", 
+            x => x.BitRate,
+            width: new GridLength(80),
+            options: new TextColumnOptions<AnalyzedSearchResultViewModel> { CanUserSortColumn = true }));
+
+        SearchSource.Columns.Add(new TextColumn<AnalyzedSearchResultViewModel, string>(
+            "Source", 
+            x => x.User,
+            width: new GridLength(120)));
+
+        SearchSource.Columns.Add(new TextColumn<AnalyzedSearchResultViewModel, string>(
+            "Speed", 
+            x => x.UploadSpeed > 0 ? $"{(double)x.UploadSpeed / 1024.0:F1}MB/s" : "Slow",
+            width: new GridLength(80)));
+    }
+
+    private Avalonia.Controls.Templates.IDataTemplate CreateSearchDetailsTemplate()
+    {
+        return new Avalonia.Controls.Templates.FuncDataTemplate<AnalyzedSearchResultViewModel>((vm, _) => 
+        {
+            var root = new Avalonia.Controls.StackPanel { Margin = new Avalonia.Thickness(8, 4), Spacing = 2 };
+            root.Bind(Avalonia.Controls.StackPanel.OpacityProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.Opacity)));
+
+            // Filename
+            var nameText = new Avalonia.Controls.TextBlock 
+            { 
+                FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis 
+            };
+            nameText.Bind(Avalonia.Controls.TextBlock.TextProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.Filename)));
+            nameText.Bind(Avalonia.Controls.TextBlock.ForegroundProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.ForegroundColor)));
+            root.Children.Add(nameText);
+
+            // Match Reason Badge
+            var badgeBorder = new Avalonia.Controls.Border 
+            { 
+                CornerRadius = new Avalonia.CornerRadius(4),
+                Padding = new Avalonia.Thickness(6, 1),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                Margin = new Avalonia.Thickness(0, 2),
+                Background = new Avalonia.Media.LinearGradientBrush
+                {
+                    StartPoint = new Avalonia.RelativePoint(0, 0, Avalonia.RelativeUnit.Relative),
+                    EndPoint = new Avalonia.RelativePoint(1, 1, Avalonia.RelativeUnit.Relative),
+                    GradientStops = 
+                    {
+                        new Avalonia.Media.GradientStop(Avalonia.Media.Color.Parse("#512BD4"), 0),
+                        new Avalonia.Media.GradientStop(Avalonia.Media.Color.Parse("#C30052"), 1)
+                    }
+                }
+            };
+            badgeBorder.Bind(Avalonia.Controls.Border.IsVisibleProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.HasMatchReason)));
+            
+            var badgePanel = new Avalonia.Controls.StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4 };
+            badgePanel.Children.Add(new Avalonia.Controls.TextBlock { Text = "✨", FontSize = 10, Foreground = Avalonia.Media.Brushes.White });
+            
+            var badgeText = new Avalonia.Controls.TextBlock { FontSize = 10, FontWeight = Avalonia.Media.FontWeight.Bold, Foreground = Avalonia.Media.Brushes.White };
+            badgeText.Bind(Avalonia.Controls.TextBlock.TextProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.MatchReason)));
+            badgePanel.Children.Add(badgeText);
+            
+            badgeBorder.Child = badgePanel;
+            root.Children.Add(badgeBorder);
+
+            // Sub-info
+            var infoPanel = new Avalonia.Controls.StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
+            
+            var extBorder = new Avalonia.Controls.Border { Background = Avalonia.Media.Brush.Parse("#333"), CornerRadius = new Avalonia.CornerRadius(3), Padding = new Avalonia.Thickness(3, 0) };
+            var extText = new Avalonia.Controls.TextBlock { Foreground = Avalonia.Media.Brush.Parse("#CCC"), FontSize = 10 };
+            extText.Bind(Avalonia.Controls.TextBlock.TextProperty, new Avalonia.Data.Binding("RawResult.Extension"));
+            extBorder.Child = extText;
+            infoPanel.Children.Add(extBorder);
+
+            var sizeText = new Avalonia.Controls.TextBlock { Foreground = Avalonia.Media.Brush.Parse("#888"), FontSize = 11 };
+            sizeText.Bind(Avalonia.Controls.TextBlock.TextProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.DisplaySize)));
+            infoPanel.Children.Add(sizeText);
+
+            infoPanel.Children.Add(new Avalonia.Controls.TextBlock { Text = "•", Foreground = Avalonia.Media.Brush.Parse("#444") });
+
+            var userText = new Avalonia.Controls.TextBlock { Foreground = Avalonia.Media.Brush.Parse("#007ACC"), FontSize = 11 };
+            userText.Bind(Avalonia.Controls.TextBlock.TextProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.User)));
+            infoPanel.Children.Add(userText);
+
+            root.Children.Add(infoPanel);
+
+            return root;
+        }, false);
+    }
+
+    private Avalonia.Controls.Templates.IDataTemplate CreateSearchTierTemplate()
+    {
+        return new Avalonia.Controls.Templates.FuncDataTemplate<AnalyzedSearchResultViewModel>((vm, _) => 
+        {
+            var textBlock = new Avalonia.Controls.TextBlock 
+            { 
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                FontSize = 18 
+            };
+            textBlock.Bind(Avalonia.Controls.TextBlock.TextProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.TierBadge)));
+            textBlock.Bind(Avalonia.Controls.ToolTip.TipProperty, new Avalonia.Data.Binding(nameof(AnalyzedSearchResultViewModel.TierDescription)));
+            return textBlock;
+        }, false);
     }
 }
