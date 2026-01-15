@@ -41,4 +41,6 @@ public interface ITrackRepository
     Task<List<PlaylistTrackEntity>> GetPlaylistTracksNeedingGenresAsync(int limit);
     Task UpdateLibraryEntriesGenresAsync(Dictionary<string, List<string>> artistGenreMap);
     Task MarkTrackAsVerifiedAsync(string trackHash);
+    Task<int> GetTotalLibraryTrackCountAsync(string? filter = null, bool? downloadedOnly = null);
+    Task<List<PlaylistTrackEntity>> GetPagedAllTracksAsync(int skip, int take, string? filter = null, bool? downloadedOnly = null);
 }

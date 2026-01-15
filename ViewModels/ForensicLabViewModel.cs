@@ -441,14 +441,14 @@ public class ForensicLabViewModel : INotifyPropertyChanged, IDisposable
                 KeyConfidence = audioFeatures.KeyConfidence;
                 ChordProgression = audioFeatures.ChordProgression;
                 
-                InstrumentalProbability = audioFeatures.InstrumentalProbability;
+                InstrumentalProbability = audioFeatures.InstrumentalProbability ?? 0.0f;
                 MoodTag = audioFeatures.MoodTag;
                 MoodConfidence = audioFeatures.MoodConfidence;
                 Danceability = audioFeatures.Danceability;
                 Energy = audioFeatures.Energy;
                 Intensity = audioFeatures.Intensity;
                 
-                Arousal = audioFeatures.Arousal;
+                Arousal = audioFeatures.Arousal ?? 0.0f;
                 Valence = audioFeatures.Valence;
                 Sadness = audioFeatures.Sadness;
                 ElectronicSubgenre = audioFeatures.ElectronicSubgenre;

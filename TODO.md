@@ -6,6 +6,13 @@
 
 ## Current Status: 73% Complete ✅
 
+### Recent Updates (January 15, 2026)
+- ✅ **High-Fidelity Playback**: Switched to WASAPI (Windows Audio Session API) for low-latency, stutter-free performance.
+- ✅ **Interactive Waveforms**: Implemented direct click-to-seek and drag-to-seek on the `WaveformControl`.
+- ✅ **Centered Playhead**: Added "Rolling" mode (DJ-style) for centered playback visualization in Sidebar, Bottom Player, and Now Playing views.
+- ✅ **Library Virtualization**: Fixed blank List View issues with a robust non-generic `IList` implementation and refined data sourcing.
+- ⚠️ **Note**: Library performance and playback still need further optimization (caching, hierarchical virtualization).
+
 ### Recent Updates (December 21, 2025)
 ### Recent Updates (December 21, 2025)
 ### Recent Updates (December 22, 2025)

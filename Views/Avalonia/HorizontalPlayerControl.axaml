@@ -97,33 +97,11 @@
                 <Panel Grid.Column="1" Height="32" Margin="12,0">
                     <!-- High-Res Waveform Background -->
                     <controls:WaveformControl WaveformData="{Binding WaveformData}" 
-                                              LowBand="{Binding LowData}"
-                                              MidBand="{Binding MidData}"
-                                              HighBand="{Binding HighData}"
-                                            Progress="{Binding Position}" 
-                                            Opacity="0.4"
-                                            SeekCommand="{Binding SeekCommand}"
-                                            VerticalAlignment="Stretch"/>
-                    
-                    <!-- Interactive Slider -->
-                    <Slider Minimum="0" 
-                            Maximum="1" 
-                            Value="{Binding Position, Mode=TwoWay}" 
-                            Foreground="#1DB954" 
-                            Background="Transparent"
-                            VerticalAlignment="Center">
-                        <Slider.Styles>
-                            <Style Selector="Slider /template/ Thumb">
-                                <Setter Property="Background" Value="White"/>
-                                <Setter Property="Width" Value="12"/>
-                                <Setter Property="Height" Value="12"/>
-                                <Setter Property="CornerRadius" Value="6"/>
-                            </Style>
-                            <Style Selector="Slider /template/ Border#TrackBackground">
-                                <Setter Property="IsVisible" Value="False"/>
-                            </Style>
-                        </Slider.Styles>
-                    </Slider>
+                                             Progress="{Binding Position}" 
+                                             Background="#01000000"
+                                             PlayheadBrush="#1DB954"
+                                             SeekCommand="{Binding SeekCommand}"
+                                             VerticalAlignment="Stretch"/>
                 </Panel>
                 
                 <TextBlock Grid.Column="2" 

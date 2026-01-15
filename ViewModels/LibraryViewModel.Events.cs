@@ -88,6 +88,7 @@ public partial class LibraryViewModel
     {
         if (project != null)
         {
+            _logger.LogInformation("LibraryViewModel.OnProjectSelected: Switching to project {Title} (ID: {Id})", project.SourceTitle, project.Id);
             await Tracks.LoadProjectTracksAsync(project);
             
             // If we are in Preparer mode, find matches for the first track automatically

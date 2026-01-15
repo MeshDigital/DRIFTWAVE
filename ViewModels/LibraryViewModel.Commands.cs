@@ -165,7 +165,10 @@ public partial class LibraryViewModel
         QuickLookCommand = new RelayCommand(() => IsQuickLookVisible = !IsQuickLookVisible);
         SmartEscapeCommand = new RelayCommand(ExecuteSmartEscape);
 
+        SetViewModeCommand = new RelayCommand<TrackViewMode>(mode => ViewSettings.ViewMode = mode);
     }
+
+    public ICommand SetViewModeCommand { get; set; } = null!;
 
     private async Task ExecuteViewHistoryAsync()
     {

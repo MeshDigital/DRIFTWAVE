@@ -37,7 +37,7 @@ namespace SLSKDONET.Services
         public AudioPlayerService()
         {
             _isInitialized = true;
-            _timer = new System.Timers.Timer(50);
+            _timer = new System.Timers.Timer(30);
             _timer.Elapsed += OnTimerElapsed;
             _timer.Start();
         }
@@ -91,7 +91,7 @@ namespace SLSKDONET.Services
                 _meteringProvider = new MeteringSampleProvider(_sampleChannel);
                 _meteringProvider.StreamVolume += OnStreamVolume;
                 
-                _outputDevice = new WaveOutEvent { DesiredLatency = 100 };
+                _outputDevice = new WasapiOut(NAudio.CoreAudioApi.AudioClientShareMode.Shared, 100);
                 _outputDevice.Init(_meteringProvider);
                 _outputDevice.PlaybackStopped += (s, e) => EndReached?.Invoke(this, EventArgs.Empty);
                 

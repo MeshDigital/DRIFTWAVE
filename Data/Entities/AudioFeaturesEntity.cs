@@ -169,7 +169,7 @@ public class AudioFeaturesEntity
     /// Probability that the track is Instrumental (no vocals).
     /// From 'voice_instrumental-msd-musicnn-1.pb'.
     /// </summary>
-    public float InstrumentalProbability { get; set; }
+    public float? InstrumentalProbability { get; set; }
 
     /// <summary>
     /// "Vibe" classification (Happy, Aggressive, Relaxed, etc.)
@@ -190,7 +190,7 @@ public class AudioFeaturesEntity
     /// Arousal (Energy/Intensity) from arousal_valence model.
     /// Range: 1-9 (1=calm, 9=energetic)
     /// </summary>
-    public float Arousal { get; set; }
+    public float? Arousal { get; set; }
 
     /// <summary>
     /// Valence (Emotion) from arousal_valence model.

@@ -127,37 +127,19 @@
             
             <!-- Waveform Seekbar -->
             <StackPanel Spacing="8">
-                <Panel Height="40">
-                    <!-- Background Waveform -->
+                <Panel Height="60">
+                    <!-- Background Waveform with Centered Playhead -->
                     <controls:WaveformControl WaveformData="{Binding WaveformData}" 
-                                              LowBand="{Binding LowData}"
-                                              MidBand="{Binding MidData}"
-                                              HighBand="{Binding HighData}"
-                                            Progress="{Binding Position}"
-                                            Opacity="0.6"
-                                            SeekCommand="{Binding SeekCommand}"
-                                            VerticalAlignment="Stretch"
-                                            HorizontalAlignment="Stretch"/>
-                    
-                    <!-- Interactive Slider Overlay -->
-                    <Slider Minimum="0"
-                            Maximum="1"
-                            Value="{Binding Position, Mode=TwoWay}"
-                            Height="40"
-                            Foreground="#1DB954"
-                            Background="Transparent">
-                        <Slider.Styles>
-                            <Style Selector="Slider /template/ Thumb">
-                                <Setter Property="Background" Value="White"/>
-                                <Setter Property="Width" Value="2"/>
-                                <Setter Property="Height" Value="40"/>
-                                <Setter Property="CornerRadius" Value="0"/>
-                            </Style>
-                            <Style Selector="Slider /template/ Border#TrackBackground">
-                                <Setter Property="IsVisible" Value="False"/>
-                            </Style>
-                        </Slider.Styles>
-                    </Slider>
+                                               LowBand="{Binding CurrentTrack.LowData}"
+                                               MidBand="{Binding CurrentTrack.MidData}"
+                                               HighBand="{Binding CurrentTrack.HighData}"
+                                             Progress="{Binding Position}"
+                                             IsRolling="True"
+                                             Background="#01000000"
+                                             PlayheadBrush="#1DB954"
+                                             SeekCommand="{Binding SeekCommand}"
+                                             VerticalAlignment="Stretch"
+                                             HorizontalAlignment="Stretch"/>
                 </Panel>
                 
                 <!-- Time Labels -->

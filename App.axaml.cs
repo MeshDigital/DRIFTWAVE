@@ -361,7 +361,7 @@ public partial class App : Application
                         // Initialize DownloadManager
                         var downloadManager = Services.GetRequiredService<DownloadManager>();
                         await downloadManager.InitAsync();
-                        _ = downloadManager.StartAsync();
+                        // _ = downloadManager.StartAsync(); // MANUAL START ONLY (User Request)
 
                         // Phase 3B: Start Health Monitor
                         var healthMonitor = Services.GetRequiredService<DownloadHealthMonitor>();

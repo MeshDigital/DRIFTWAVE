@@ -450,6 +450,16 @@ public class DatabaseService
         return await _trackRepository.GetPagedPlaylistTracksAsync(playlistId, skip, take, filter, downloadedOnly);
     }
 
+    public async Task<int> GetTotalLibraryTrackCountAsync(string? filter = null, bool? downloadedOnly = null)
+    {
+        return await _trackRepository.GetTotalLibraryTrackCountAsync(filter, downloadedOnly);
+    }
+
+    public async Task<List<PlaylistTrackEntity>> GetPagedAllTracksAsync(int skip, int take, string? filter = null, bool? downloadedOnly = null)
+    {
+        return await _trackRepository.GetPagedAllTracksAsync(skip, take, filter, downloadedOnly);
+    }
+
     public async Task<PlaylistTrackEntity?> GetPlaylistTrackByHashAsync(Guid jobId, string trackHash)
     {
         return await _trackRepository.GetPlaylistTrackByHashAsync(jobId, trackHash);

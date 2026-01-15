@@ -711,4 +711,109 @@ public class TrackRepository : ITrackRepository
             _logger.LogWarning(ex, "Failed to update library health cache during track update");
         }
     }
+
+    public async Task<int> GetTotalLibraryTrackCountAsync(string? filter = null, bool? downloadedOnly = null)
+    {
+        using var context = new AppDbContext();
+        var query = context.LibraryEntries.AsQueryable();
+
+        if (!string.IsNullOrEmpty(filter))
+        {
+            var lowerFilter = filter.ToLower();
+            query = query.Where(t => t.Artist.ToLower().Contains(lowerFilter) || t.Title.ToLower().Contains(lowerFilter));
+        }
+        
+        if (downloadedOnly == true)
+        {
+            query = query.Where(t => t.FilePath != null && t.FilePath != "");
+        }
+
+        return await query.CountAsync();
+    }
+
+    public async Task<List<PlaylistTrackEntity>> GetPagedAllTracksAsync(int skip, int take, string? filter = null, bool? downloadedOnly = null)
+    {
+        using var context = new AppDbContext();
+        
+        // 1. Start with LibraryEntries (The Permanent Index)
+        var query = context.LibraryEntries
+            .Include(le => le.AudioFeatures) // FIX: Include AI Data
+            .AsQueryable();
+
+        // 2. Apply Filters (Replicate logic from ApplyFilters for consistency)
+        if (!string.IsNullOrEmpty(filter))
+        {
+            var lowerFilter = filter.ToLower();
+            query = query.Where(t => t.Artist.ToLower().Contains(lowerFilter) || t.Title.ToLower().Contains(lowerFilter));
+        }
+
+        // 3. Apply DownloadedOnly (LibraryEntries don't track status perfectly, checking FilePath presence is a good proxy)
+        if (downloadedOnly == true)
+        {
+            query = query.Where(t => t.FilePath != null && t.FilePath != "");
+        }
+
+        // 4. Order & Page
+        var entries = await query
+            .OrderByDescending(t => t.AddedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        // 5. PROJECT to PlaylistTrackEntity (The Adapter Pattern)
+        // This allows the existing UI to consume LibraryEntries without refactoring the ViewModels.
+        return entries.Select(e => new PlaylistTrackEntity
+        {
+            Id = Guid.NewGuid(), // Virtual ID for the view
+            PlaylistId = Guid.Empty, // Indicates "Library View"
+            
+            // Map Core Metadata
+            Artist = e.Artist,
+            Title = e.Title,
+            Album = e.Album,
+            TrackUniqueHash = e.UniqueHash,
+            
+            // Map Status (If it has a path, it's downloaded)
+            Status = string.IsNullOrEmpty(e.FilePath) ? TrackStatus.Missing : TrackStatus.Downloaded,
+            ResolvedFilePath = e.FilePath,
+            
+            // Map Enrichment Data
+            // Map Enrichment Data (Prefer AudioFeatures if available)
+            SpotifyTrackId = e.SpotifyTrackId,
+            AlbumArtUrl = e.AlbumArtUrl,
+            BPM = (e.AudioFeatures?.Bpm > 0) ? e.AudioFeatures.Bpm : e.BPM,
+            Energy = (e.AudioFeatures?.Energy > 0) ? e.AudioFeatures.Energy : e.Energy,
+            Danceability = (e.AudioFeatures?.Danceability > 0) ? e.AudioFeatures.Danceability : e.Danceability,
+            Valence = (e.AudioFeatures?.Valence > 0) ? e.AudioFeatures.Valence : e.Valence,
+            MusicalKey = !string.IsNullOrEmpty(e.AudioFeatures?.Key) ? e.AudioFeatures.Key : e.MusicalKey,
+            CanonicalDuration = e.DurationSeconds * 1000, // Convert to MS
+            
+            // Important: Library entries might not have SortOrder, so we default to 0
+            SortOrder = 0,
+            AddedAt = e.AddedAt,
+            IsEnriched = e.IsEnriched,
+            
+            // FIX: Map Technical Data (Badges/Quality)
+            Bitrate = e.Bitrate,
+            Format = e.Format,
+            Integrity = e.Integrity, // Now correctly mapped
+            BitrateScore = e.Bitrate, // Fallback score
+            
+            // FIX: Map AI/Curation Data (Vibes/Shields)
+            DetectedSubGenre = e.AudioFeatures?.DetectedSubGenre ?? e.DetectedSubGenre,
+            SubGenreConfidence = e.AudioFeatures?.SubGenreConfidence ?? e.SubGenreConfidence,
+            InstrumentalProbability = e.AudioFeatures?.InstrumentalProbability ?? e.InstrumentalProbability, // FIX: Map Instrumental Pill
+            PrimaryGenre = e.PrimaryGenre,
+            AudioFeatures = e.AudioFeatures, // Pass the whole object if possible, or map fields
+            
+            // Map Technical Audio (Loudness/Dynamics)
+            Loudness = e.Loudness,
+            TruePeak = e.TruePeak,
+            DynamicRange = e.DynamicRange,
+            
+            // Map Trust
+            IsTrustworthy = e.Integrity != Data.IntegrityLevel.Suspicious && e.Integrity != Data.IntegrityLevel.None,
+            QualityConfidence = (e.Bitrate >= 320 || e.Format == "flac") ? 1.0 : 0.5
+        }).ToList();
+    }
 }

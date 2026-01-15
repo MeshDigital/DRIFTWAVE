@@ -348,6 +348,14 @@ public class DownloadCenterViewModel : ReactiveObject, IDisposable
     
     private async void ResumeAll()
     {
+        // MANUAL START TRIGGER (User Request)
+        if (!_downloadManager.IsRunning)
+        {
+            _ = _downloadManager.StartAsync();
+            // Allow small delay for manager to spin up
+            await Task.Delay(100);
+        }
+
         foreach (var item in ActiveDownloads.Where(d => d.State == PlaylistTrackState.Paused).ToList())
         {
             item.ResumeCommand.Execute(null);

@@ -604,6 +604,12 @@ public class LibraryService : ILibraryService
         {
             // Use repository through databaseService if possible, or add to databaseService
             // For now, I'll assume databaseService exposes it or I'll add it there.
+            if (playlistId == Guid.Empty)
+            {
+                // FIX: Guid.Empty means "All Tracks" (Global Library Index)
+                return await _databaseService.GetTotalLibraryTrackCountAsync(filter, downloadedOnly).ConfigureAwait(false);
+            }
+
             return await _databaseService.GetPlaylistTrackCountAsync(playlistId, filter, downloadedOnly).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -617,6 +623,13 @@ public class LibraryService : ILibraryService
     {
         try
         {
+            if (playlistId == Guid.Empty)
+            {
+                 // FIX: Guid.Empty means "All Tracks" (Global Library Index)
+                 var globalEntities = await _databaseService.GetPagedAllTracksAsync(skip, take, filter, downloadedOnly).ConfigureAwait(false);
+                 return globalEntities.Select(EntityToPlaylistTrack).ToList();
+            }
+
             var entities = await _databaseService.GetPagedPlaylistTracksAsync(playlistId, skip, take, filter, downloadedOnly).ConfigureAwait(false);
             return entities.Select(EntityToPlaylistTrack).ToList();
         }

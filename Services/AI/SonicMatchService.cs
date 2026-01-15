@@ -110,7 +110,7 @@ public class SonicMatchService : ISonicMatchService
                         Title = candidateTrack?.Title ?? "Unknown",
                         Distance = distance,
                         MatchReason = matchReason,
-                        Arousal = candidate.Arousal,
+                        Arousal = candidate.Arousal ?? 0f,
                         Valence = candidate.Valence,
                         Danceability = candidate.Danceability,
                         MoodTag = candidate.MoodTag,
@@ -152,7 +152,7 @@ public class SonicMatchService : ISonicMatchService
         var aDance = source.Danceability * DanceabilityScale;
         var bDance = target.Danceability * DanceabilityScale;
         
-        var dArousal = (source.Arousal - target.Arousal) * WeightArousal;
+        var dArousal = ((source.Arousal ?? 0f) - (target.Arousal ?? 0f)) * WeightArousal;
         var dValence = (source.Valence - target.Valence) * WeightValence;
         var dDance = (aDance - bDance) * WeightDanceability;
         
@@ -186,7 +186,7 @@ public class SonicMatchService : ISonicMatchService
 
         // 4. Determine Match Reason for UX
         string matchReason = DetermineMatchReason(
-            Math.Abs(source.Arousal - target.Arousal),
+            Math.Abs((source.Arousal ?? 0) - (target.Arousal ?? 0)),
             Math.Abs(source.Valence - target.Valence),
             Math.Abs(source.Danceability - target.Danceability),
             vibeDistance
